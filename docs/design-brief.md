@@ -18,12 +18,12 @@ Three surfaces:
 
 ## 2. Source documents
 
-Two Word documents define the instrument. Copy both into `docs/source/` and extract their text into `docs/source/*.md` as the working reference:
+Two Word documents define the instrument. They live in `resources/source/` — deliberately outside `docs/`, so the published documentation site does not republish them — alongside plain-text extractions used as the working reference:
 
 - `SPI-RDT Checklist.docx` — the instrument itself (the questions, structure, scoring, report layout)
 - `SPI-RDT Checklist Guidelines.docx` — the User's Guide. **Critically important**: for every one of the 59 questions it gives explicit `Y = … / P = … / N = …` scoring definitions. This text becomes per-question guidance in the app and is the primary mechanism for consistent scoring between auditors.
 
-Both currently live in `~/Downloads/`.
+
 
 **Note:** Appendices 2 and 3 of the Guidelines (worked examples) are headings with no content — flagged to the client, treat as missing.
 
@@ -405,7 +405,7 @@ The PWA, the admin UI, Excel exports, and the dashboard. They come next, and the
 
 1. Clone `git@github.com:deforay/spirdt.git`
 2. Read `~/www/house-reference` — particularly `bin/migrate`, `bin/housekeeping`, `src/Helper/Log.php`, `src/Middleware/ApiLoggerMiddleware.php`, `composer.json`, and the `routes/` split
-3. Extract both source .docx files into `docs/source/`
+3. Read the extracted source text in `resources/source/`
 4. Propose the Phase 1 migration set and the template JSON schema **for review before writing application code**
 
 Start with the template JSON schema and the data model. Everything else hangs off them.

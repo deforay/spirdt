@@ -4,7 +4,9 @@ Site assessment platform for the **Stepwise Process for Improving the Quality of
 
 Replaces a paper/Word checklist and supersedes the older ODK-based SPI-RRT tool.
 
-> **Start here:** [`docs/KICKOFF.md`](docs/KICKOFF.md) is the authoritative brief — the domain, the scoring rules, the architecture decisions, and the conventions this codebase follows. Read it before writing code.
+> **Documentation:** <https://deforay.github.io/spirdt/>
+>
+> **Start here:** [`docs/design-brief.md`](docs/design-brief.md) is the authoritative brief — the domain, the scoring rules, the architecture decisions, and the conventions this codebase follows. Read it before writing code.
 
 ---
 
@@ -189,7 +191,8 @@ something a refresh script should quietly resolve.
 bin/            CLI scripts. Each carries a docblock; --help prints it.
 db/seeds/       production-bootstrap.sql + demo fixtures
 docker/         Dockerfile, php.ini, nginx conf
-docs/           KICKOFF.md (the brief), source/ (the two source documents)
+docs/           mkdocs site sources — published to GitHub Pages
+resources/      source/ (the two source checklist documents)
 migrations/     Plain SQL, semver-ordered, idempotent
 public/         Web root — front controller only
 routes/         api.php + api/*.php, split by audience
@@ -215,7 +218,7 @@ Carried over from the house reference project (`~/www/house-reference`) — foll
 
 ### Non-negotiables
 
-- **Tenant isolation is the top security concern.** Tenant is resolved from the authenticated user in middleware — never from a request parameter. See `docs/KICKOFF.md` §5.
+- **Tenant isolation is the top security concern.** Tenant is resolved from the authenticated user in middleware — never from a request parameter. See `docs/design-brief.md` §5.
 - **Maintainability over smart code.** If a junior developer can't follow it in a year, it's wrong.
 
 ---
@@ -224,4 +227,4 @@ Carried over from the house reference project (`~/www/house-reference`) — foll
 
 Scaffolding stage. Working on both the Docker and native paths: Slim bootstrap with DI and middleware, migration runner, preflight doctor, `/api/health`, test harness, static analysis, pre-commit hook.
 
-Next, in order: the remaining baseline migrations, the template JSON schema, the seeded base SPI-RDT template, and the scoring engine. Phase 1 scope and its definition of done are in `docs/KICKOFF.md` §10.
+Next, in order: the remaining baseline migrations, the template JSON schema, the seeded base SPI-RDT template, and the scoring engine. Phase 1 scope and its definition of done are in `docs/design-brief.md` §10.

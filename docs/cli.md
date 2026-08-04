@@ -1,0 +1,125 @@
+# CLI Reference
+
+Every script in `bin/` carries a docblock and prints it with `--help`:
+
+```bash
+bin/setup --help
+```
+
+Most are also exposed as Composer scripts, which is the recommended way to run them. `composer run-script --list` prints all of them with descriptions.
+
+Under Docker, prefix with `docker compose exec php`. Natively, run directly.
+
+!!! tip "Passing flags through Composer"
+    Composer needs `--` before script arguments:
+    `composer setup -- --reset` and `composer migrate -- --status`.
+
+## Setup and upgrade
+
+### `bin/setup`
+
+Takes a fresh clone to a running application: prerequisites, `.env` (generating `JWT_SECRET`), dependencies, database creation, migrations, then verification.
+
+**Idempotent** — every step checks before acting.
+
+| Flag | Effect |
+|---|---|
+| `--reset` | Drop every table first. Refuses on `APP_ENV=production`; requires typing the database name |
+| `--yes` | Skip the typed confirmation. For CI or `exec -T` where there is no TTY. Still refuses on production |
+| `--skip-deps` | Leave Composer alone |
+| `--non-interactive` | Never prompt; fail rather than ask |
+
+### `bin/upgrade`
+
+The production path. Takes a database backup **first** and aborts if it fails, syncs code via `bin/refresh`, then runs migrations *unconditionally*, verifies, and reports versions before and after.
+
+Migrations are deliberately **not** gated on the diff here — a previously failed run can leave pending work that this pull knows nothing about.
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Show every step, change nothing |
+| `--skip-backup` | Skip the backup. This is the step that makes everything else reversible |
+| `--skip-pull` | Migrate and verify only; code already updated |
+| `--keep=N` | Backup retention count |
+
+### `bin/refresh`
+
+The developer loop: pull the latest code, then do only the work the diff actually requires.
+
+- `composer install` runs **only** when `composer.lock` changed
+- migrations run **only** when something under `migrations/` changed
+- already at the target commit means the whole run is a fast no-op
+
+It works out for itself whether to run follow-up commands natively or inside the Compose container.
+
+A dirty working tree **aborts** rather than stashing — silently setting aside work in progress is a nasty surprise. Pass `--stash` to opt in. Pulls are `--ff-only`, so a diverged branch stops for a human instead of being quietly merged.
+
+| Flag | Effect |
+|---|---|
+| `--status` | Local vs remote state; changes nothing |
+| `--dry-run` | Print every step, execute none |
+| `--stash` | Stash local changes first |
+| `--branch=NAME` | Target a branch other than `main` |
+
+## Diagnostics
+
+### `bin/preflight`
+
+Checks this machine can run the application: PHP version, extensions, `.env`, required keys, writable paths, database reachability, and whether migrations have run.
+
+Runs identically inside Docker and on a bare host. `--quiet` prints only failures, for CI and hooks.
+
+Exit code is 0 when everything passes, 1 otherwise.
+
+### `bin/serve`
+
+PHP's built-in server, for the native path. Development only.
+
+```bash
+bin/serve              # 127.0.0.1:8080
+bin/serve 9000         # 127.0.0.1:9000
+bin/serve 0.0.0.0:8080 # all interfaces — reach it from a phone or tablet
+```
+
+## Database
+
+### `bin/migrate`
+
+Applies pending migrations from `migrations/` in semver order, tracking the current version in `system_config.app_version`.
+
+| Flag | Effect |
+|---|---|
+| `--status` | Current version and what is pending |
+| `--dry-run` | Show what would run, execute nothing |
+| `--verbose` | Report benign skips |
+
+!!! warning "The runner exits 0 even when statements fail"
+    Failures appear in the summary, but the exit code does not reflect them. `bin/setup` and `bin/upgrade` both parse the summary and refuse to continue on a non-zero failure count rather than trusting the exit code. Anything else calling `bin/migrate` should do the same.
+
+### `composer db:backup`
+
+Backup via [`amitdugar/db-tools`](https://github.com/amitdugar/db-tools), configured in `db-tools.php`. Writes zstd-compressed archives to `var/backups/db/` with a retention of 14.
+
+db-tools also provides restore, verify and point-in-time recovery:
+
+```bash
+vendor/bin/db-tools list
+```
+
+See [Backup & Upgrade](operations.md) for the encryption caveat.
+
+### `composer db:collation`
+
+Normalises every table to the server-default utf8mb4 collation. Idempotent.
+
+## Quality
+
+| Command | What it does |
+|---|---|
+| `composer test` | Full PHPUnit suite |
+| `composer test:unit` | Unit suite — no database, fast |
+| `composer test:integration` | Integration suite |
+| `composer test:feature` | Feature suite — full HTTP through the Slim stack |
+| `composer phpstan` | Static analysis at level 6 |
+| `composer cs:check` | Report style drift |
+| `composer cs:fix` | Apply style fixes |
