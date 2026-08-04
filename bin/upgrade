@@ -1,0 +1,226 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Upgrade an existing installation to the latest code and schema.
+ *
+ * HOW THIS DIFFERS FROM bin/refresh — they are not duplicates:
+ *   refresh is the developer loop. Pull, and skip anything the diff says is
+ *   unnecessary. Fast, no safety net.
+ *   upgrade is the production path. It takes a restore point BEFORE anything
+ *   changes, delegates the code sync to refresh so the git logic lives in
+ *   exactly one place, then ALWAYS runs migrations — never gated on the diff,
+ *   because a previous run may have failed partway and left work pending that
+ *   this pull does not mention. Finally it verifies and reports.
+ *
+ * Steps:
+ *   1. Record current state (code and schema versions)
+ *   2. Back up the database (amitdugar/db-tools)
+ *   3. Sync code and dependencies (bin/refresh)
+ *   4. Migrate, unconditionally
+ *   5. Verify (bin/preflight) and summarise
+ *
+ * Usage:
+ *   bin/upgrade                  full upgrade
+ *   bin/upgrade --dry-run        show every step, change nothing
+ *   bin/upgrade --skip-backup    skip step 2. Only when a backup was just
+ *                                taken by other means — this is the one step
+ *                                that makes the rest reversible.
+ *   bin/upgrade --skip-pull      migrate and verify only; code already updated
+ *   bin/upgrade --keep=30        backups to retain (db-tools retention)
+ *   bin/upgrade --help           print this docblock
+ *
+ * Exit codes: 0 success, 1 failure.
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/lib/console.php';
+
+$root = dirname(__DIR__);
+chdir($root);
+
+$dryRun     = in_array('--dry-run', $argv, true);
+$skipBackup = in_array('--skip-backup', $argv, true);
+$skipPull   = in_array('--skip-pull', $argv, true);
+
+$keep = '';
+foreach ($argv as $arg) {
+    if (str_starts_with($arg, '--keep=')) {
+        $keep = ' --retention=' . (int) substr($arg, 7);
+    }
+}
+
+$env = con_read_env(con_env_path($root));
+
+if ($env === []) {
+    con_fail('No .env found. This looks like a fresh checkout — run bin/setup instead.');
+}
+
+$php    = escapeshellarg(PHP_BINARY);
+$prefix = con_docker_prefix($root);
+
+con_print('header', 'SPI-RDT upgrade' . ($dryRun ? '  (dry run)' : ''));
+
+// ─── 1. Current state ───
+
+con_print('step', '[1/5] Current state');
+
+$codeVersionBefore = is_file($root . '/VERSION')
+    ? trim((string) file_get_contents($root . '/VERSION'))
+    : 'unknown';
+
+/**
+ * Read the schema version via bin/migrate --status rather than a direct PDO
+ * connection.
+ *
+ * Upgrade may run on the host while the database is a Compose service, where
+ * DB_HOST=mysql resolves only inside the container. Shelling through the same
+ * prefix as every other step means one DB access path that is correct on both
+ * runtimes, instead of a second one that silently only works natively.
+ */
+function schema_version(string $prefix): string
+{
+    [$out, $code] = con_run($prefix . 'php bin/migrate --status');
+
+    if ($code !== 0) {
+        return 'unreachable';
+    }
+
+    return preg_match('/Current DB version:\s*(\S+)/', $out, $m) === 1 ? $m[1] : 'unknown';
+}
+
+$schemaVersionBefore = schema_version($prefix);
+
+if ($schemaVersionBefore === 'unreachable') {
+    con_fail('Cannot reach the database. Is the stack running, and is .env correct?');
+}
+
+[$commitBefore] = con_run('git rev-parse --short HEAD');
+
+con_print('info', 'Code version:   ' . $codeVersionBefore);
+con_print('info', 'Schema version: ' . $schemaVersionBefore);
+con_print('info', 'Commit:         ' . trim($commitBefore));
+
+// ─── 2. Backup ───
+
+con_print('step', '[2/5] Database backup');
+
+if ($skipBackup) {
+    con_print('warn', 'Skipped (--skip-backup). Nothing here is reversible without one.');
+} else {
+    // amitdugar/db-tools, the same tool the other house projects use. Runs
+    // wherever the app runs, since it needs the mysqldump binary and .env.
+    //
+    // --no-encrypt is deliberate for now: db-tools encrypts by default, but
+    // supplying an encryption password currently produces no archive at all,
+    // and a backup step that silently writes nothing is far worse than an
+    // unencrypted one. Revisit once encryption is working and there is a key
+    // management story to go with it.
+    [$backupOut, $backupCode] = con_run(
+        $prefix . 'php vendor/bin/db-tools backup --no-encrypt --note=pre-upgrade' . $keep,
+        $dryRun,
+    );
+
+    foreach (explode("\n", trim($backupOut)) as $line) {
+        if (trim($line) !== '') {
+            con_print('info', trim($line));
+        }
+    }
+
+    if ($backupCode !== 0 && !$dryRun) {
+        // Deliberately fatal. An upgrade with no restore point is how a bad
+        // migration becomes an incident rather than an inconvenience.
+        con_fail('Backup failed — aborting before any change is made.');
+    }
+}
+
+// ─── 3. Code and dependencies ───
+
+con_print('step', '[3/5] Code and dependencies');
+
+if ($skipPull) {
+    con_print('info', 'Skipped (--skip-pull)');
+} else {
+    $refresh = $php . ' ' . escapeshellarg($root . '/bin/refresh') . ($dryRun ? ' --dry-run' : '');
+
+    [$refreshOut, $refreshCode] = con_run($refresh);
+
+    foreach (explode("\n", trim($refreshOut)) as $line) {
+        if (trim($line) !== '') {
+            con_print('info', rtrim($line));
+        }
+    }
+
+    if ($refreshCode !== 0) {
+        con_fail('Code sync failed. The database backup from step 2 is untouched.');
+    }
+}
+
+// ─── 4. Migrate ───
+
+con_print('step', '[4/5] Schema');
+
+// Unconditional, unlike refresh. A partially-applied earlier run leaves
+// pending work that this pull's diff knows nothing about.
+[$migrateOut, $migrateCode] = con_run(
+    $prefix . 'php bin/migrate' . ($dryRun ? ' --dry-run' : ''),
+);
+
+foreach (explode("\n", trim($migrateOut)) as $line) {
+    if (trim($line) !== '') {
+        con_print('info', rtrim($line));
+    }
+}
+
+if ($migrateCode !== 0) {
+    con_fail('Migration failed. Restore from the backup taken in step 2.');
+}
+
+// The runner summarises failures but still exits 0, so the exit code alone
+// would let a half-applied schema through while stamping the new version.
+if (preg_match('/Failed:\s+([1-9]\d*)/', $migrateOut) === 1) {
+    con_fail('One or more migration statements failed. Restore from the step 2 backup.');
+}
+
+// ─── 5. Verify ───
+
+con_print('step', '[5/5] Verify');
+
+[$preflightOut, $preflightCode] = con_run(
+    $prefix . 'php bin/preflight --quiet',
+);
+
+foreach (explode("\n", trim($preflightOut)) as $line) {
+    if (trim($line) !== '') {
+        con_print('info', rtrim($line));
+    }
+}
+
+if ($preflightCode !== 0 && !$dryRun) {
+    con_fail('Preflight reported failures after upgrade — see above.');
+}
+
+// ─── Summary ───
+
+$codeVersionAfter = is_file($root . '/VERSION')
+    ? trim((string) file_get_contents($root . '/VERSION'))
+    : 'unknown';
+
+$schemaVersionAfter = schema_version($prefix);
+
+[$commitAfter] = con_run('git rev-parse --short HEAD');
+
+con_print('header', $dryRun ? 'Dry run complete — nothing was changed.' : 'Upgrade complete.');
+
+$arrow = static fn (string $before, string $after): string => $before === $after
+    ? $before . ' (unchanged)'
+    : $before . ' -> ' . $after;
+
+con_print('info', 'Code version:   ' . $arrow($codeVersionBefore, $codeVersionAfter));
+con_print('info', 'Schema version: ' . $arrow($schemaVersionBefore, $schemaVersionAfter));
+con_print('info', 'Commit:         ' . $arrow(trim($commitBefore), trim($commitAfter)));
+
+exit(0);

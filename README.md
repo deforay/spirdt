@@ -16,6 +16,7 @@ Replaces a paper/Word checklist and supersedes the older ODK-based SPI-RRT tool.
 | Frontend | Vue 3 + Vite + TypeScript *(not yet scaffolded)* |
 | Auditor app | Offline-first PWA *(not yet scaffolded)* |
 | Runtime | Docker Compose, or native PHP + MySQL |
+| Backups | `amitdugar/db-tools` (zstd) |
 
 ---
 
@@ -114,6 +115,10 @@ Native, run directly. Under Docker, prefix with `docker compose exec php`.
 
 | Command | What it does |
 |---|---|
+| `composer setup` | First-run setup. Idempotent — safe to re-run |
+| `composer setup -- --reset` | Drop every table and rebuild (refuses on production) |
+| `composer upgrade` | Backup, sync code, migrate, verify |
+| `composer db:backup` | Backup via db-tools |
 | `composer refresh` | Pull latest, then install/migrate only if needed |
 | `composer refresh -- --status` | Local vs remote state, changes nothing |
 | `composer preflight` | Check this machine can run the app |
@@ -129,6 +134,33 @@ Native, run directly. Under Docker, prefix with `docker compose exec php`.
 
 `composer run-script --list` prints every script with a description. Every
 `bin/` script takes `--help` and prints its own docblock.
+
+### Setup, upgrade and backup
+
+`bin/setup` takes a fresh clone to a running application: prerequisites, `.env`
+(generating `JWT_SECRET`), dependencies, database creation, migrations, then
+verification. It is **idempotent** — every step checks before acting, so when
+it fails halfway on a real machine the fix is to run it again.
+
+`bin/upgrade` is the production path: it takes a **database backup first** and
+aborts if that fails, syncs code via `bin/refresh`, then runs migrations
+*unconditionally* — never gated on the diff, because a previously failed run
+can leave pending work this pull knows nothing about.
+
+Backups use [`amitdugar/db-tools`](https://github.com/amitdugar/db-tools), the
+same tool as the other house projects, configured in `db-tools.php`. It also
+provides restore, verify and PITR — see `vendor/bin/db-tools list`.
+
+> **The php image ships MySQL's own client, not the distro package.** On both
+> Alpine and Debian, `mysql-client` is MariaDB's client, and it cannot talk to a
+> default MySQL 8.4 server at all: it rejects the server's self-signed TLS
+> certificate, and it has no `caching_sha2_password` plugin. The Dockerfile
+> copies the real client from the `mysql:8.4` image. See the comment there.
+
+> **Backups are currently unencrypted.** db-tools encrypts by default, but
+> supplying an encryption password produces no archive at all, so `--no-encrypt`
+> is passed explicitly — a backup step that silently writes nothing is worse
+> than an unencrypted one. Revisit alongside a key-management story.
 
 ### Staying up to date
 

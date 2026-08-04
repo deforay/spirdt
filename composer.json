@@ -5,6 +5,7 @@
     "type": "project",
     "require": {
         "php": "^8.4",
+        "amitdugar/db-tools": "^3.1",
         "composer/semver": "^3.4",
         "firebase/php-jwt": "^6.0 || ^7.0",
         "illuminate/database": "^13.8",
@@ -37,6 +38,8 @@
         }
     },
     "scripts": {
+        "setup": "php bin/setup",
+        "upgrade": "php bin/upgrade",
         "refresh": "php bin/refresh",
         "preflight": "php bin/preflight",
         "serve": "php bin/serve",
@@ -53,9 +56,13 @@
             "@migrate"
         ],
         "post-install-cmd": "git config core.hooksPath .githooks || true",
-        "post-update-cmd": "git config core.hooksPath .githooks || true"
+        "post-update-cmd": "git config core.hooksPath .githooks || true",
+        "db:backup": "@php vendor/bin/db-tools backup --no-encrypt",
+        "db:collation": "@php vendor/bin/db-tools collation"
     },
     "scripts-descriptions": {
+        "setup": "First-run setup: prerequisites, .env, dependencies, database, migrations, verification. Idempotent. --reset drops every table first (refuses on production).",
+        "upgrade": "Upgrade an existing install: backup, sync code, migrate unconditionally, verify. Aborts if the backup fails.",
         "refresh": "Pull the latest code and bring the checkout back to runnable. Runs composer install only when composer.lock changed, and migrations only when migrations/ changed. Supports --status, --dry-run, --stash, --branch=.",
         "preflight": "Check this machine can run the app: PHP version, extensions, .env, writable paths, DB reachability. Works the same inside Docker and on a bare host.",
         "serve": "Run the API on PHP's built-in server (no Docker). Dev only. Pass a port or host:port.",
@@ -68,7 +75,9 @@
         "phpstan:baseline": "Regenerate the baseline to silence current errors. Use after a refactor, not to dodge new ones.",
         "cs:check": "Report style violations without writing. What CI runs.",
         "cs:fix": "Apply style fixes in place.",
-        "post-update": "Post-deploy hook: run pending migrations after composer install."
+        "post-update": "Post-deploy hook: run pending migrations after composer install.",
+        "db:backup": "Backup via amitdugar/db-tools (zstd), honouring db-tools.php for output dir and retention. --no-encrypt because db-tools currently writes no archive at all when an encryption password is supplied. db-tools also provides restore/verify/pitr — see: vendor/bin/db-tools list",
+        "db:collation": "Normalise every table to the server-default utf8mb4 collation. Idempotent."
     },
     "config": {
         "optimize-autoloader": true,

@@ -1,0 +1,275 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * First-run setup — take a fresh clone to a running application.
+ *
+ * IDEMPOTENT BY DESIGN. Every step checks before it acts, so re-running after
+ * a failure resumes rather than breaking. That matters more than elegance
+ * here: setup fails halfway on a real machine (wrong password, port in use,
+ * MySQL still booting) and the fix must be "run it again".
+ *
+ * Steps:
+ *   1. Prerequisites — PHP version and extensions
+ *   2. .env          — created from .env.example, JWT_SECRET generated
+ *   3. Dependencies  — composer install if vendor/ is absent
+ *   4. Database      — created if missing, then migrated
+ *   5. Verify        — hand off to bin/preflight
+ *
+ * Usage:
+ *   bin/setup                 run every step, prompting where needed
+ *   bin/setup --non-interactive
+ *                             never prompt; fail instead of asking
+ *   bin/setup --reset         DROP EVERY TABLE first, then set up clean.
+ *                             Refuses on APP_ENV=production. Requires typing
+ *                             the database name to confirm.
+ *   bin/setup --reset --yes   Skip the typed confirmation. For rebuilding a
+ *                             test database in CI or through `docker compose
+ *                             exec -T`, where there is no TTY to type into.
+ *                             Still refuses on APP_ENV=production.
+ *   bin/setup --skip-deps     leave composer alone
+ *   bin/setup --help          print this docblock
+ *
+ * Exit codes: 0 success, 1 failure.
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/lib/console.php';
+
+$root = dirname(__DIR__);
+chdir($root);
+
+$reset     = in_array('--reset', $argv, true);
+$assumeYes = in_array('--yes', $argv, true);
+$skipDeps  = in_array('--skip-deps', $argv, true);
+$noPrompt  = in_array('--non-interactive', $argv, true);
+
+if ($noPrompt) {
+    putenv('CI=1');
+}
+
+con_print('header', 'SPI-RDT setup');
+
+// ─── 1. Prerequisites ───
+
+con_print('step', '[1/5] Prerequisites');
+
+if (PHP_VERSION_ID < 80400) {
+    con_fail('PHP 8.4 or newer is required. Found ' . PHP_VERSION . '.');
+}
+con_print('success', 'PHP ' . PHP_VERSION);
+
+$missing = [];
+foreach (['pdo_mysql', 'intl', 'zip', 'mbstring', 'bcmath'] as $ext) {
+    if (!extension_loaded($ext)) {
+        $missing[] = $ext;
+    }
+}
+
+if ($missing !== []) {
+    con_print('error', 'Missing PHP extensions: ' . implode(', ', $missing));
+    con_print('info', 'ext-zip is needed by openspout for .xlsx export.');
+    con_fail('Install them and re-run.');
+}
+con_print('success', 'Required extensions present');
+
+// ─── 2. Environment ───
+
+con_print('step', '[2/5] Environment');
+
+$envPath = con_env_path($root);
+
+if (!is_file($envPath)) {
+    if (!is_file($root . '/.env.example')) {
+        con_fail('.env.example is missing — cannot create .env.');
+    }
+
+    copy($root . '/.env.example', $envPath);
+    con_print('success', 'Created .env from .env.example');
+} else {
+    con_print('info', '.env already present — leaving it alone');
+}
+
+$env = con_read_env($envPath);
+
+// JWT_SECRET is the one value that must never ship as a default, so generate
+// it rather than asking. Bootstrap refuses to serve without at least 32 chars.
+if (strlen($env['JWT_SECRET'] ?? '') < 32) {
+    con_set_env($envPath, 'JWT_SECRET', bin2hex(random_bytes(32)));
+    con_print('success', 'Generated JWT_SECRET');
+} else {
+    con_print('info', 'JWT_SECRET already set');
+}
+
+// On the native path the shipped default (the Compose service name) cannot
+// resolve. Offer to point it at a local server rather than letting the user
+// discover it as an opaque connection error two steps later.
+if (($env['DB_HOST'] ?? '') === 'mysql' && !is_file('/.dockerenv')) {
+    [, $composeUp] = con_run('docker compose ps --quiet php');
+
+    if ($composeUp !== 0) {
+        con_print('warn', 'DB_HOST=mysql, but no Compose stack is running.');
+
+        if (con_confirm('Point DB_HOST at 127.0.0.1 for a local MySQL?', true)) {
+            con_set_env($envPath, 'DB_HOST', '127.0.0.1');
+            con_print('success', 'DB_HOST set to 127.0.0.1');
+        }
+    }
+}
+
+$env = con_read_env($envPath);
+con_print('info', sprintf(
+    'Database target: %s:%s/%s',
+    $env['DB_HOST'] ?? '?',
+    $env['DB_PORT'] ?? '?',
+    $env['DB_NAME'] ?? '?',
+));
+
+// ─── 3. Dependencies ───
+
+con_print('step', '[3/5] Dependencies');
+
+if ($skipDeps) {
+    con_print('info', 'Skipped (--skip-deps)');
+} elseif (is_file($root . '/vendor/autoload.php')) {
+    con_print('info', 'vendor/ present — skipping composer install');
+} else {
+    [, $composerFound] = con_run('command -v composer');
+    if ($composerFound !== 0) {
+        con_fail('composer not found on PATH. Install it, or re-run with --skip-deps.');
+    }
+
+    con_print('info', 'Running composer install…');
+    [$out, $code] = con_run('composer install --no-interaction');
+
+    if ($code !== 0) {
+        con_print('error', $out);
+        con_fail('composer install failed.');
+    }
+    con_print('success', 'Dependencies installed');
+}
+
+// ─── 4. Database ───
+
+con_print('step', '[4/5] Database');
+
+$dbName = $env['DB_NAME'] ?? 'spirdt';
+
+try {
+    $server = con_pdo($env, null);
+} catch (PDOException $e) {
+    con_print('error', 'Cannot reach the database server: ' . $e->getMessage());
+    con_print('info', 'Check DB_HOST/DB_PORT/DB_USER/DB_PASS in .env.');
+    con_print('info', 'Using Docker? Start it first: docker compose up -d');
+    con_fail('Database unreachable.');
+}
+
+$exists = $server
+    ->query('SHOW DATABASES LIKE ' . $server->quote($dbName))
+    ->fetchColumn() !== false;
+
+if (!$exists) {
+    // Quoting a database name is not something PDO::quote does correctly —
+    // it quotes string literals. Identifiers need backticks, so validate the
+    // name against a strict pattern instead of trusting it.
+    if (preg_match('/^[A-Za-z0-9_]+$/', $dbName) !== 1) {
+        con_fail("DB_NAME '{$dbName}' contains characters that are not safe as an identifier.");
+    }
+
+    $server->exec(
+        "CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
+    );
+    con_print('success', "Created database `{$dbName}`");
+} else {
+    con_print('info', "Database `{$dbName}` already exists");
+}
+
+$pdo = con_pdo($env, $dbName);
+
+if ($reset) {
+    if (($env['APP_ENV'] ?? 'production') === 'production') {
+        con_fail('--reset refuses to run with APP_ENV=production.');
+    }
+
+    $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+
+    if ($tables === []) {
+        con_print('info', 'Nothing to reset — no tables present');
+    } else {
+        if ($assumeYes) {
+            con_print('warn', sprintf('Dropping all %d tables in `%s` (--yes).', count($tables), $dbName));
+            $confirmed = true;
+        } else {
+            $confirmed = con_confirm_typed(
+                sprintf('This DROPS all %d tables in `%s`. Data will be lost.', count($tables), $dbName),
+                $dbName,
+            );
+        }
+
+        if (!$confirmed) {
+            con_fail('Reset not confirmed — nothing was changed.');
+        }
+
+        // Order is unknowable with circular foreign keys (assessments
+        // references itself, facilities reference facilities), so disable the
+        // checks rather than trying to topologically sort.
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach ($tables as $table) {
+            $pdo->exec('DROP TABLE IF EXISTS `' . $table . '`');
+        }
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+        con_print('success', sprintf('Dropped %d table(s)', count($tables)));
+    }
+}
+
+con_print('info', 'Running migrations…');
+[$migrateOut, $migrateCode] = con_run(PHP_BINARY . ' ' . escapeshellarg($root . '/bin/migrate'));
+
+foreach (explode("\n", trim($migrateOut)) as $line) {
+    if (trim($line) !== '') {
+        con_print('info', $line);
+    }
+}
+
+if ($migrateCode !== 0) {
+    con_fail('Migrations failed. Fix the cause and re-run bin/setup.');
+}
+
+// The runner reports failures in its summary but still exits 0, so a
+// migration that could not apply would otherwise slip past unnoticed and
+// leave a half-built schema stamped with the new version.
+if (preg_match('/Failed:\s+([1-9]\d*)/', $migrateOut) === 1) {
+    con_fail('One or more migration statements failed — see the output above.');
+}
+
+con_print('success', 'Schema up to date');
+
+// ─── 5. Verify ───
+
+con_print('step', '[5/5] Verifying');
+
+[$preflightOut, $preflightCode] = con_run(
+    PHP_BINARY . ' ' . escapeshellarg($root . '/bin/preflight') . ' --quiet',
+);
+
+foreach (explode("\n", trim($preflightOut)) as $line) {
+    if (trim($line) !== '') {
+        con_print('info', $line);
+    }
+}
+
+if ($preflightCode !== 0) {
+    con_fail('Preflight reported failures — see above.');
+}
+
+con_print('header', 'Setup complete.');
+con_print('info', 'Start the API:');
+con_print('info', is_file('/.dockerenv') || ($env['DB_HOST'] ?? '') === 'mysql'
+    ? '  docker compose up -d      then  curl http://localhost:8080/api/health'
+    : '  composer serve            then  curl http://127.0.0.1:8080/api/health');
+
+exit(0);
