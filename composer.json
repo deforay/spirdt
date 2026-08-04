@@ -12,6 +12,7 @@
         "illuminate/events": "^13.8",
         "monolog/monolog": "^3.10",
         "openspout/openspout": "^5.7",
+        "opis/json-schema": "^2.4",
         "php-di/php-di": "^7.1",
         "phpmyadmin/sql-parser": "^6.0",
         "ramsey/uuid": "^4.9",
@@ -38,6 +39,8 @@
         }
     },
     "scripts": {
+        "template:build": "php bin/dev/build-base-template",
+        "template:validate": "php bin/dev/validate-template",
         "setup": "php bin/setup",
         "upgrade": "php bin/upgrade",
         "refresh": "php bin/refresh",
@@ -61,6 +64,8 @@
         "db:collation": "@php vendor/bin/db-tools collation"
     },
     "scripts-descriptions": {
+        "template:build": "Regenerate the canonical SPI-RDT template from resources/source/. Re-run after the instrument is revised rather than hand-editing the JSON.",
+        "template:validate": "Validate every template in resources/templates/ against the schema, structurally and semantically. Pass a path to check one.",
         "setup": "First-run setup: prerequisites, .env, dependencies, database, migrations, verification. Idempotent. --reset drops every table first (refuses on production).",
         "upgrade": "Upgrade an existing install: backup, sync code, migrate unconditionally, verify. Aborts if the backup fails.",
         "refresh": "Pull the latest code and bring the checkout back to runnable. Runs composer install only when composer.lock changed, and migrations only when migrations/ changed. Supports --status, --dry-run, --stash, --branch=.",

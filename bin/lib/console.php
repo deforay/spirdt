@@ -60,6 +60,14 @@ if (!function_exists('con_print')) {
             default   => ['', '', STDOUT],
         };
 
+        // Flush STDOUT before writing anything to STDERR. The two streams
+        // buffer independently, so without this an error can surface above
+        // output that was actually emitted before it — which reads as though
+        // the steps ran out of order.
+        if ($stream === STDERR) {
+            fflush(STDOUT);
+        }
+
         if ($level === 'header') {
             fwrite($stream, "\n" . con_paint($message, $colour) . "\n");
 

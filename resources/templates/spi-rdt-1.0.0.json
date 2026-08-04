@@ -1,0 +1,1974 @@
+{
+    "schema_version": 1,
+    "code": "spi-rdt",
+    "version": "1.0.0",
+    "title": {
+        "en": "SPI-RDT Checklist"
+    },
+    "description": {
+        "en": "Stepwise Process for Improving the Quality of Rapid Diagnostic Testing — site assessment checklist."
+    },
+    "locales": [
+        "en"
+    ],
+    "default_locale": "en",
+    "source": {
+        "documents": [
+            "SPI-RDT Checklist.docx",
+            "SPI-RDT Checklist Guidelines.docx"
+        ],
+        "generated_by": "bin/dev/build-base-template",
+        "note": "Generated from resources/source/. Re-run rather than hand-editing."
+    },
+    "scoring": {
+        "responses": {
+            "Y": {
+                "points": 2,
+                "label": {
+                    "en": "Yes"
+                }
+            },
+            "P": {
+                "points": 1,
+                "label": {
+                    "en": "Partial"
+                }
+            },
+            "N": {
+                "points": 0,
+                "label": {
+                    "en": "No"
+                }
+            },
+            "NA": {
+                "points": null,
+                "excluded": true,
+                "label": {
+                    "en": "Not Applicable"
+                }
+            }
+        },
+        "round_dp": 2,
+        "bands": [
+            {
+                "level": 0,
+                "min_percent": 0,
+                "label": {
+                    "en": "Level 0"
+                },
+                "description": {
+                    "en": "Needs improvement in all areas and immediate remediation"
+                }
+            },
+            {
+                "level": 1,
+                "min_percent": 40,
+                "label": {
+                    "en": "Level 1"
+                },
+                "description": {
+                    "en": "Needs improvement in specific areas"
+                }
+            },
+            {
+                "level": 2,
+                "min_percent": 60,
+                "label": {
+                    "en": "Level 2"
+                },
+                "description": {
+                    "en": "Partially eligible for site certification"
+                }
+            },
+            {
+                "level": 3,
+                "min_percent": 80,
+                "label": {
+                    "en": "Level 3"
+                },
+                "description": {
+                    "en": "Close to national site certification"
+                }
+            },
+            {
+                "level": 4,
+                "min_percent": 90,
+                "label": {
+                    "en": "Level 4"
+                },
+                "description": {
+                    "en": "Eligible for national site certification"
+                }
+            }
+        ]
+    },
+    "context_fields": [
+        {
+            "code": "assessment_date",
+            "type": "date",
+            "label": {
+                "en": "Date of assessment"
+            },
+            "required": true
+        },
+        {
+            "code": "assessment_time",
+            "type": "time",
+            "label": {
+                "en": "Time of assessment"
+            },
+            "hint": {
+                "en": "When the assessment started."
+            },
+            "required": false
+        },
+        {
+            "code": "previous_assessment_date",
+            "type": "date",
+            "label": {
+                "en": "Date of previous assessment"
+            },
+            "hint": {
+                "en": "Leave blank for a new site with no previous assessment."
+            },
+            "required": false
+        },
+        {
+            "code": "poc_site_count",
+            "type": "integer",
+            "label": {
+                "en": "Number of POC testing sites within the same facility"
+            },
+            "hint": {
+                "en": "Contextual and planning information only, including sites not assessed during this visit. It does not imply a facility-level assessment."
+            },
+            "required": false
+        },
+        {
+            "code": "poc_tests_list",
+            "type": "textarea",
+            "label": {
+                "en": "Point of care tests conducted at this testing site"
+            },
+            "hint": {
+                "en": "All rapid diagnostic tests in use, including any not assessed today."
+            },
+            "required": false
+        },
+        {
+            "code": "facility_type",
+            "type": "select_one",
+            "label": {
+                "en": "Type of facility"
+            },
+            "hint": {
+                "en": "Select the single most applicable."
+            },
+            "required": true,
+            "options": [
+                {
+                    "key": "health_center",
+                    "label": {
+                        "en": "Health Centre"
+                    }
+                },
+                {
+                    "key": "mobile_clinic",
+                    "label": {
+                        "en": "Mobile Clinic"
+                    }
+                },
+                {
+                    "key": "laboratory",
+                    "label": {
+                        "en": "Laboratory"
+                    },
+                    "specify": true
+                },
+                {
+                    "key": "specialized_clinic",
+                    "label": {
+                        "en": "Specialised Clinic"
+                    },
+                    "specify": true
+                },
+                {
+                    "key": "hospital_bedside",
+                    "label": {
+                        "en": "Hospital Bedside"
+                    }
+                },
+                {
+                    "key": "other",
+                    "label": {
+                        "en": "Other"
+                    },
+                    "specify": true
+                }
+            ]
+        },
+        {
+            "code": "level",
+            "type": "select_one",
+            "label": {
+                "en": "Level"
+            },
+            "hint": {
+                "en": "Position within the tiered health network. Confirm with the supervisor."
+            },
+            "required": true,
+            "options": [
+                {
+                    "key": "region",
+                    "label": {
+                        "en": "Region, province or zone"
+                    }
+                },
+                {
+                    "key": "district",
+                    "label": {
+                        "en": "District"
+                    }
+                },
+                {
+                    "key": "health_center",
+                    "label": {
+                        "en": "Health Centre"
+                    }
+                },
+                {
+                    "key": "other",
+                    "label": {
+                        "en": "Other"
+                    },
+                    "specify": true
+                }
+            ]
+        },
+        {
+            "code": "affiliation",
+            "type": "select_one",
+            "label": {
+                "en": "Affiliation"
+            },
+            "required": true,
+            "options": [
+                {
+                    "key": "government",
+                    "label": {
+                        "en": "Government"
+                    }
+                },
+                {
+                    "key": "private",
+                    "label": {
+                        "en": "Private"
+                    }
+                },
+                {
+                    "key": "faith_based",
+                    "label": {
+                        "en": "Faith-based organisation"
+                    }
+                },
+                {
+                    "key": "ngo",
+                    "label": {
+                        "en": "Non-governmental organisation"
+                    }
+                },
+                {
+                    "key": "other",
+                    "label": {
+                        "en": "Other"
+                    },
+                    "specify": true
+                }
+            ]
+        },
+        {
+            "code": "refers_specimens",
+            "type": "select_one",
+            "label": {
+                "en": "Does this testing site refer specimens for further testing?"
+            },
+            "hint": {
+                "en": "Answering no marks Section 5 not applicable in full — it then contributes nothing to the score or the possible total."
+            },
+            "required": true,
+            "options": [
+                {
+                    "key": "yes",
+                    "label": {
+                        "en": "Yes"
+                    }
+                },
+                {
+                    "key": "no",
+                    "label": {
+                        "en": "No"
+                    }
+                }
+            ]
+        },
+        {
+            "code": "testing_staff",
+            "type": "repeat",
+            "label": {
+                "en": "Staff performing point of care testing"
+            },
+            "hint": {
+                "en": "Full name and job title of every tester at this site."
+            },
+            "required": false,
+            "fields": [
+                {
+                    "code": "name",
+                    "type": "text",
+                    "label": {
+                        "en": "Name of staff"
+                    },
+                    "required": true
+                },
+                {
+                    "code": "title",
+                    "type": "text",
+                    "label": {
+                        "en": "Title of staff"
+                    },
+                    "required": false
+                }
+            ]
+        },
+        {
+            "code": "interviewee_name",
+            "type": "text",
+            "label": {
+                "en": "Name of interviewee"
+            },
+            "hint": {
+                "en": "Ideally the tester rather than the supervisor."
+            },
+            "required": true
+        },
+        {
+            "code": "interviewee_title",
+            "type": "text",
+            "label": {
+                "en": "Title of interviewee"
+            },
+            "required": false
+        },
+        {
+            "code": "interviewee_phone",
+            "type": "text",
+            "label": {
+                "en": "Phone number of interviewee"
+            },
+            "required": false
+        }
+    ],
+    "sections": [
+        {
+            "number": 1,
+            "code": "1",
+            "title": {
+                "en": "Organization and Management"
+            },
+            "scope": "assessment",
+            "questions": [
+                {
+                    "code": "1.1",
+                    "text": {
+                        "en": "Are lines of authority and roles and responsibilities clearly defined and an organogram available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Personnel should have a basic understanding of the organization they work for. A facility organogram should be available and displayed for all personnel to see. The organogram describes the lines of authority at the facility. Check evidence of organizational structure. As testers, do they know who to report to and who does their supervisor report to?"
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of the internal facility organogram, and personnel understand who they report to at the facility level"
+                        },
+                        "P": {
+                            "en": "Personnel have some knowledge about their organization and who they report to at the facility level, but there is no organogram, or there is an organogram, but personnel do not understand it."
+                        },
+                        "N": {
+                            "en": "There is no evidence of an organogram, and personnel have no understanding of the facility's general structure, roles, and responsibilities, or where the facility fits into the general MoH structure."
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.2",
+                    "text": {
+                        "en": "Does each staff member involved in testing have a current job description?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Each tester should have a written job description that is current. The job description should provide clear duties and tasks conducted by the tester. Ask the testers to describe their tasks and cross-check against the job description. The job description should be current and reflect the personnel duties. In cases where nurses are conducting rapid testing, this task should be included in their job description."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Job descriptions are available and current for all testers"
+                        },
+                        "P": {
+                            "en": "Job descriptions are available for some testers, or outdated or inaccurate"
+                        },
+                        "N": {
+                            "en": "No evidence of job descriptions"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.3",
+                    "text": {
+                        "en": "Where there is more than one tester, is there a duty roster?"
+                    },
+                    "na_allowed": true,
+                    "guidance": {
+                        "en": "If there is more than one tester at the testing site being assessed, look for evidence of rotation among testers and review the weekly/monthly duty roster (e.g., 1 testing site + multiple testers). If there are several testers within the testing site, look for evidence of rotation to the various testing sites and review the weekly/monthly duty roster (e.g., multiple testing sites + multiple testers)"
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of a duty roster and rotation of staff, current and displayed"
+                        },
+                        "P": {
+                            "en": "Evidence of an old or outdated duty roster or no rotation of staff"
+                        },
+                        "N": {
+                            "en": "No evidence of a duty roster"
+                        },
+                        "NA": {
+                            "en": "The site only has one tester"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.4",
+                    "text": {
+                        "en": "Are there adequate staff for the testing volume?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Do testers complete the testing of all patients/specimens each day, or are some patients asked to return the following day?"
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All POC testing is completed the same day"
+                        },
+                        "P": {
+                            "en": "Some POC testing is completed same day, but other tests are not completed"
+                        },
+                        "N": {
+                            "en": "None of the POC tests are completed on the same day"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.5",
+                    "text": {
+                        "en": "Are minutes of routine (at least monthly) staff meetings available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Staff meetings are an important form of communication between staff. How often meetings are held depends on the site/facility, but generally, they should be held at least monthly. Observe evidence of meeting minutes and completed follow-up actions. The meeting could be between the tester(s) and supervisor(s), or the tester and the facility manager. This question aims to ensure regular communication."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of ongoing regular staff meeting minutes, including follow-up actions addressed for issues reported"
+                        },
+                        "P": {
+                            "en": "Evidence of occurrence of sporadic staff meetings, but there are follow-up actions on issues communicated by testers"
+                        },
+                        "N": {
+                            "en": "No evidence of any meeting minutes/communication"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.6",
+                    "text": {
+                        "en": "Are training records available on general basic quality activities for staff performing point of care testing?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "All personnel performing POC testing should have a basic understanding of a quality management system (QMS), including safety, record keeping, stock management, equipment (e.g., fridge, pipette), PT/EQA and QC, and testing procedures. Observe tester training records, logs, and/or certificates for QMS training. There should be a folder/log/register where all personnel records are stored. If quality management systems may be confusing, ask what aspects of quality the staff was trained in, and if there is a need to paraphrase the question"
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All personnel have been trained in basic QMS, and training records are available"
+                        },
+                        "P": {
+                            "en": "Some personnel have been trained or understand what quality means regarding POCT, and/or training records are not available for those trained"
+                        },
+                        "N": {
+                            "en": "Personnel have not been trained or there is no evidence of training records"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.7",
+                    "text": {
+                        "en": "Are copies of previous assessment reports available?"
+                    },
+                    "na_allowed": true,
+                    "guidance": {
+                        "en": "POCT sites should be assessed on a regular basis in accordance with POCT guidelines. Repeated use of the same POC testing site checklist will assist in quantitative monitoring the improvements of facilities over time. A copy of the last assessment should be available as well as an accompanying site assessment report."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Recent site assessment report available"
+                        },
+                        "P": {
+                            "en": "Old/outdated report available"
+                        },
+                        "N": {
+                            "en": "No reports available"
+                        },
+                        "NA": {
+                            "en": "New site with no previous assessment"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "1.8",
+                    "text": {
+                        "en": "Have gaps and recommendations from the last assessment been addressed?"
+                    },
+                    "na_allowed": true,
+                    "guidance": {
+                        "en": "The site assessment report clearly states the gaps, recommended actions, who is responsible for addressing the gaps, and when and by whom they were addressed. Are actions being taken to address gaps? Are action items completed? Note, some of the actions might be beyond the scope of the site or facility. Some actions might be the responsibility of the national or regional level. Assessors should follow up with the national level regarding gaps observed across the facilities that are the responsibility of the national level."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Written evidence of action items addressed"
+                        },
+                        "P": {
+                            "en": "Action items are addressed but not documented consistently"
+                        },
+                        "N": {
+                            "en": "No evidence of actions implemented and no documentation"
+                        },
+                        "NA": {
+                            "en": "New site with no previous assessment"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                }
+            ]
+        },
+        {
+            "number": 2,
+            "code": "2",
+            "title": {
+                "en": "Physical Facility and Equipment"
+            },
+            "scope": "assessment",
+            "questions": [
+                {
+                    "code": "2.1",
+                    "text": {
+                        "en": "Is there a designated (private if needed) specimen/patient collection/reception area where appropriate?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "There should be a designated area to receive patients or specimens. This could be a waiting area outside the testing area for clients. Where specimens are received for testing or referral, is there a designated area for specimen reception? If the site tests clients only, then there needs to be a waiting area for them."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Designated area for patients, or specimen reception (if appropriate)"
+                        },
+                        "P": {
+                            "en": "Some testing sites have waiting areas for clients, but not all, or specimen reception is required, but is not in place (if appropriate)"
+                        },
+                        "N": {
+                            "en": "No designated area for patients or specimens"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.2",
+                    "text": {
+                        "en": "Is the testing area access-controlled and secure?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Testing areas need to be private and security-controlled The testing area should be separated from patients waiting to be tested, at least by a screen, but preferably in separate rooms. The testing area/room should have an appropriate sign reading “restricted access.” If the area is a room, it should be locked when in use. If testing occurs at the bedside, a curtain should be used for privacy."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of signage, and the door is closed and locked when in use, or a curtain is present at bedside"
+                        },
+                        "P": {
+                            "en": "Testing room door has signage or is locked, but not both"
+                        },
+                        "N": {
+                            "en": "No signage or locks, or bedside curtain"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.3",
+                    "text": {
+                        "en": "Is there an area for staff to store food and personal items, separate from the testing area?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Staff should have a separate area for eating, drinking, and storing personal belongings, outside or away from the testing area."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "There is a dedicated space/room for eating, drinking and storing personal belongings"
+                        },
+                        "P": {
+                            "en": "There is a dedicated or separate space for eating, drinking and storing personal belongings in the room where testing is occurring"
+                        },
+                        "N": {
+                            "en": "There is no dedicated or separate space/room for eating, drinking and/or storing personal belongings"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.4",
+                    "text": {
+                        "en": "Is there a designated area for testing only, separate from the “clean” administrative area?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "The area/room should be partitioned or clearly separated for testing (contaminated) and record keeping (clean) for paperwork/records/reports."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of segregated contaminated and non-contaminated spaces. This could be as simple as having 2 desks or tables in one room."
+                        },
+                        "P": {
+                            "en": "Segregated areas are available, but not used"
+                        },
+                        "N": {
+                            "en": "Testing, reporting, logbooks, everything happens in one place e.g., one desk/table for all work"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.5",
+                    "text": {
+                        "en": "Is the testing area clean and organized?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "The testing area should contain only testing-related items, and the area should be neat, organized and uncluttered. Even at the bedside, items should be available in a neat and organized manner."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Testing area is neat and consists of testing items only"
+                        },
+                        "P": {
+                            "en": "The area is neat, but includes testing and non-testing items"
+                        },
+                        "N": {
+                            "en": "The area is cluttered and untidy"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.6",
+                    "text": {
+                        "en": "Is sufficient lighting available in the designated testing area?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "The designated testing area should have adequate natural or electric lighting to support safe specimen collection and accurate reading of test results."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Adequate lighting (natural and/or electric) is consistently available in the designated testing area during testing hours, and results can be read accurately without relocating or pausing testing"
+                        },
+                        "P": {
+                            "en": "Lighting is adequate only when electric power is available and the site has a defined, acceptable contingency during outages (e.g., testing is paused until lighting is restored or testing moves to a pre-identified alternative area that meets testing area requirements)"
+                        },
+                        "N": {
+                            "en": "Lighting is inadequate for specimen collection and reading results, or outages lead to testing continuing in poorly lit/non-approved areas, or there is no acceptable contingency plan"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.7",
+                    "text": {
+                        "en": "Does the site have adequate and appropriate storage for test kits, consumables and ancillary equipment?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "There should be a designated area(s) for adequate and appropriate storage of test kits and consumables. Test kits should be stored following the manufacturer’s instructions, away from direct sunlight and in a secure area. Consider also checking the facility's storeroom or pharmacy if the testing site does not have a dedicated storage space or is supplied daily."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All test kits and consumables are stored adequately and appropriately according to the manufacturers’ instructions; protected from sunlight; secure; organized; First Expired First Out (FEFO)/expiry management evident; no signs of damage/exposure)"
+                        },
+                        "P": {
+                            "en": "Storage exists, but one or more requirements are not consistently met, or some items are stored appropriately while others are not. Specify gaps observed e.g., temperature monitoring absent, items exposed to sunlight/heat, mixed with chemicals/cleaning agents, poor security, crowding, humidity/water risk, expired kits present, FEFO not practiced"
+                        },
+                        "N": {
+                            "en": "Storage is not adequate to maintain kit integrity, e.g., no designated storage, or conditions are clearly non-compliant/unsafe. Unsecured, exposed to heat/sunlight/moisture/contaminants, no ability to maintain required conditions, frequent stock left in open areas, such that kit quality cannot be assured."
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.8",
+                    "text": {
+                        "en": "Is there a current inventory SOP/job aid available and a system in place for ordering and managing reagents and consumables?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Each site needs a SOP/job aid on how to order kits and supplies from the facility’s storeroom or pharmacy, the district laboratory, or wherever supplies are obtained (storage locations may differ by country). It is also important to understand the facility's process for ordering test kits and supplies; this should include who orders, when they order, what the timeline is and how stocks are inventoried. Observe any written procedures regarding ordering. Observe evidence of a stock log/book/card being used as part of inventory management."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Inventory SOP/job aid available and current and stock log maintained"
+                        },
+                        "P": {
+                            "en": "Either SOP/job aid or stock log are available, but not consistently maintained"
+                        },
+                        "N": {
+                            "en": "No evidence of SOP/job aid or stock log"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.9",
+                    "text": {
+                        "en": "Are temperature logs available and updated daily for storage as per SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "The temperatures of the fridge, storeroom or facility pharmacy should be monitored daily and records maintained. Observe if temperature logs have been completed and maintained daily."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Storeroom and/or fridge temperatures (if the site has a fridge for reagent storage) are monitored daily, and records are maintained as per SOP/job aid"
+                        },
+                        "P": {
+                            "en": "Room and/or fridge temperatures are monitored but inconsistently"
+                        },
+                        "N": {
+                            "en": "No evidence of temperature monitoring no thermometers available, and no SOP/job aid"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "2.10",
+                    "text": {
+                        "en": "Is the appropriate equipment available, calibrated, including timers, thermometers and other small equipment where applicable, and are records available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "All small equipment should be calibrated and serviced as per the quality manual or national guidelines. Thermometers are required to monitor the temperature of storage and testing rooms according to test kit temperature ranges. The calibration process should be supported by the national entity overseeing the facility where the POC testing is conducted or the structure/department in charge of servicing health equipment."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Calibration of small equipment is routinely performed and documented"
+                        },
+                        "P": {
+                            "en": "Some small equipment is calibrated documented or inconsistently documented"
+                        },
+                        "N": {
+                            "en": "No evidence of any calibration of small equipment"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                }
+            ]
+        },
+        {
+            "number": 3,
+            "code": "3",
+            "title": {
+                "en": "Safety"
+            },
+            "scope": "assessment",
+            "questions": [
+                {
+                    "code": "3.1",
+                    "text": {
+                        "en": "Are there current general SOPs/ job aids in place to implement safety practices (e.g., use of aprons/coats, gloves, hand washing, waste management, etc.)?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Review safety SOPs for accuracy. Check for job aids displayed (e.g., handwashing, PPE, PEP, waste management, etc.)."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Safety SOPs/job aids are available and current"
+                        },
+                        "P": {
+                            "en": "Safety SOPs/job aids are available, but outdated"
+                        },
+                        "N": {
+                            "en": "No evidence of safety practices, SOPs or job aids"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.2",
+                    "text": {
+                        "en": "Are current SOPs and/or job aids available to address accidental exposure to potential pathogens (e.g., spills, needle sticks, injuries, or cuts)?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe evidence of SOP/job aid specifically on how to address spillage and needle sticks, including a job aid on how to make diluted bleach for decontamination of spillage. Job aids, such as Post-Exposure Prophylaxis (PEP) instructions, should be posted. A current SOP that addresses all responses to accidents should also be available."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "SOPs/job aids are available for how to address spillages and PEP, and how to make diluted bleach for disinfecting work surfaces and spills"
+                        },
+                        "P": {
+                            "en": "Some SOPs/job aids are available, but not all, or SOP/job aids that address accidental exposure to potential pathogens are available but outdated"
+                        },
+                        "N": {
+                            "en": "No evidence of SOPs or job aids for spills or needlestick injuries"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.3",
+                    "text": {
+                        "en": "Is personal protective equipment (PPE) available to testers in the testing area?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Verify that an adequate supply of appropriate PPE is present and accessible to testers (at a minimum, gloves and coat/apron) to support uninterrupted testing."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Appropriate PPE is available and readily accessible to testers at the testing area (e.g., adequate supply of gloves in relevant sizes and coats/aprons available)"
+                        },
+                        "P": {
+                            "en": "PPE is available but not consistently adequate or accessible (e.g., limited quantities, intermittent stock-outs, available only in the storeroom/not in the testing area, missing components such as gloves or coats/aprons, wrong sizes). Specify what is missing/limited."
+                        },
+                        "N": {
+                            "en": "Appropriate PPE is not available or not accessible to testers (e.g., no gloves and/or no coat/apron available for use)"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.4",
+                    "text": {
+                        "en": "Do all testers properly and consistently use PPE throughout the testing process?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe testers wearing the appropriate PPE designated by national guidelines (e.g., use of gloves, aprons, lab coats, etc., during testing). Used gloves are discarded after testing and placed in the contaminated waste bin."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All testers wear appropriate PPE (e.g., gloves and aprons) for testing and gloves are appropriately discarded after testing"
+                        },
+                        "P": {
+                            "en": "PPE (gloves, aprons) are not consistently worn by all testers"
+                        },
+                        "N": {
+                            "en": "Testers do not wear PPE during testing or gloves are not discarded when testing clients has ended, or PPE is worn in the “clean” non-contaminated working area"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.5",
+                    "text": {
+                        "en": "Is clean water, soap (or hand sanitizer) and paper/hand towel available for hand washing, and being used by all testers per SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe evidence of a hand-washing area with water, soap, and paper/hand towel. In some instances, running water might not be available. In such cases, testers can use a bucket of water and jug to wash their hands. Ask the tester to wash his/her hands and assess adherence to the SOP/Job aid."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Water and washing supplies are available and consistently used by all testers to wash their hands in accordance with SOP/Job aid"
+                        },
+                        "P": {
+                            "en": "Not all handwashing supplies are available, or not all testers follow the SOP/job aid for handwashing"
+                        },
+                        "N": {
+                            "en": "No handwashing supplies available"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.6",
+                    "text": {
+                        "en": "Is the disinfectant solution available properly labeled with content, date of preparation, and date of expiration?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Verify that the site has appropriate disinfectants. Check if the disinfectant container is labeled with the contents, date of preparation and expiration."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Bleach/disinfectant is freshly made and labeled correctly"
+                        },
+                        "P": {
+                            "en": "Bleach/disinfectant is available, but not labeled or labeled but expired"
+                        },
+                        "N": {
+                            "en": "Bleach/disinfectant container is not labeled or not available"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.7",
+                    "text": {
+                        "en": "Are sharps, infectious, and non-infectious waste separated in accordance with current waste management SOPs?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe segregated waste (infectious, non-infectious, and sharps containers). The waste containers are either color-coded or labeled."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Waste is properly segregated and stored in accordance with the available SOP/job aid"
+                        },
+                        "P": {
+                            "en": "The waste is inconsistently or inappropriately segregated (e.g. sharp container filled beyond the limit, a sharp container properly used but contaminated waste mixed with non-contaminated waste)"
+                        },
+                        "N": {
+                            "en": "No evidence of waste segregation"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.8",
+                    "text": {
+                        "en": "Are infectious waste and sharp containers transported and disposed of safely?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Ask the tester to describe the process for removing and disposing of the infectious waste and the sharps containers. Observe whether the waste is securely stored temporarily before pick-up and/or incinerated. Ask to see where the incinerator area is located."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of proper handling of infectious wastes and sharp containers (e.g., temporary storage, safe transport and disposal)"
+                        },
+                        "P": {
+                            "en": "Infectious waste and sharp containers are not stored appropriately and/or disposed of per the SOP/job aid"
+                        },
+                        "N": {
+                            "en": "No evidence of proper temporary storage or safe removal/disposal of infectious waste and sharp containers"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "3.9",
+                    "text": {
+                        "en": "Is vaccination against Hepatitis B infection available to testers, and is there documented evidence of vaccination or refusal?"
+                    },
+                    "na_allowed": true,
+                    "guidance": {
+                        "en": "Personnel who work with whole blood or serum should be vaccinated in accordance with national health policies and guidelines if available."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Personnel are vaccinated, and records are available"
+                        },
+                        "P": {
+                            "en": "Some, but not all, personnel who handle specimens are vaccinated and records available, or personnel are vaccinated but no records are available"
+                        },
+                        "N": {
+                            "en": "No evidence of vaccination or vaccination refusal"
+                        },
+                        "NA": {
+                            "en": "If (no national requirements for Hep B vaccination, this is question is not applicable)"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                }
+            ]
+        },
+        {
+            "number": 4,
+            "code": "4",
+            "title": {
+                "en": "Testing"
+            },
+            "scope": "pathogen",
+            "questions": [
+                {
+                    "code": "4.1",
+                    "text": {
+                        "en": "Are testers initially trained in-service, deemed competent, and are records available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Testers are required to receive in-service training and be deemed competent. Certificates of training and competence should be available. Ask for personnel files or personnel training records/logs to confirm training was completed."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence that all testers at the site have a record of training in testing procedures (e.g., training certificate, training log attendance sheet, etc.)"
+                        },
+                        "P": {
+                            "en": "Evidence that some testers at the site have a record of training in testing procedures (e.g., training certificate, training log attendance sheet, etc.)"
+                        },
+                        "N": {
+                            "en": "No evidence the testers at site have a record of training in testing procedures (e.g., training certificate, attendance sheet, etc.)"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.2",
+                    "text": {
+                        "en": "Are records of periodic competency assessments conducted for all testers?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe evidence of periodic competency assessments and records for all testers. Ask for the personnel file, personnel training records, or log to confirm that periodic competency assessments occur."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All testers have records of recent competency assessments"
+                        },
+                        "P": {
+                            "en": "Some testers have records of recent competency assessments, or the assessments are not current"
+                        },
+                        "N": {
+                            "en": "None of the testers have competency assessments or records"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.3",
+                    "text": {
+                        "en": "Is the test conducted nationally approved as per SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Each test conducted should be an approved test and follow the per SOP/job aid. Observe that the tests being conducted are the same tests as per SOP/job aid."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence that all tests used are nationally approved"
+                        },
+                        "P": {
+                            "en": "Evidence that some tests used are nationally approved (e.g., Two of three HIV tests are approved, but the third is not included in the national testing algorithm). For single test algorithms, evidence of inconsistent use of nationally approved test"
+                        },
+                        "N": {
+                            "en": "No evidence of use of nationally approved tests"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.4",
+                    "text": {
+                        "en": "Is the testing SOP/job aid available and current?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "The POCT sites are not required to write their own SOPs and/or job aids. These should be readily available from the supporting level above or the regional/national levels. If SOPs and/or job aids are outdated according to the quality manual or national guidelines, the facility manager should request updated SOPs and/or job aids. The testers must read the SOPs/job aids, and records of reading and comprehension must be available."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "The SOPs/job aid is current and available, and there is evidence that testers have read and understand the SOP."
+                        },
+                        "P": {
+                            "en": "The SOP or job aid is outdated and/or there is no evidence that testers have read the SOP/job aid."
+                        },
+                        "N": {
+                            "en": "No SOP nor job aid available"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.5",
+                    "text": {
+                        "en": "Is the job aid displayed or accessible?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Job aids should be available/provided at the national/regional laboratory level, posted where testers perform testing, and made available for all tests."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "The job is available and displayed at the testing site"
+                        },
+                        "P": {
+                            "en": "The job aid is available, but is torn or difficult to read, or not posted"
+                        },
+                        "N": {
+                            "en": "No job aid is available"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.6",
+                    "text": {
+                        "en": "Is Quality Control (QC) testing performed routinely as per SOP?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "All tests must use quality control materials in accordance with the national guidelines. The type of QC and how often they are run will depend on the type of test and the availability of QC. This question depends on the test and the SOP/guidelines. For some tests, QC might be run daily, while others might be run weekly or monthly."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "There is evidence of QC being run and recorded in accordance with SOP/guidelines/quality manual"
+                        },
+                        "P": {
+                            "en": "QC is run irregularly and/or not recorded consistently"
+                        },
+                        "N": {
+                            "en": "No evidence of QC being run"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.7",
+                    "text": {
+                        "en": "Are QC results documented and reviewed by the tester prior to reporting patient results?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Check that QC results are properly documented in the testing register or QC log as per SOP and/or job aid. Is there evidence that the QC results are reviewed by the supervisor or the lab technician/technologist? Check that failed QC is also recorded, and corrective actions are documented."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "QC results are run and recorded consistently and correctly. Evidence that QC results are reviewed, failed QC runs are investigated, and corrective actions documented"
+                        },
+                        "P": {
+                            "en": "Inconsistent documentation of QC runs or review of QC results, or lack of follow-up actions for failed QC runs"
+                        },
+                        "N": {
+                            "en": "No documentation of evidence of QC runs nor review of results"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.8",
+                    "text": {
+                        "en": "Is the site enrolled in an External Quality Assessment (EQA) program (e.g., Proficiency Testing (PT), re-testing or inter-facility comparison) for the test performed?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "The national or regional/district provides PT panels to laboratories and testing sites per the national guidelines. Sites not enrolled in EQA are scored zero (N), and this might highlight gaps at higher levels within the tiered laboratory network. If available, PT panels should be provided to all sites and laboratories for the diagnostic tests performed. However, when no PT panel is available, verify that the laboratory or testing site is implementing another method of EQA (re-testing/rechecking or inter-site comparison)."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence that the site consistently participates in any EQA program. Check the most recent EQA cycle. PT panels are provided for the POC test performed, or any other EQA method is conducted (state which type of EQA is used in the Comments section) in accordance with national guidelines/policy"
+                        },
+                        "P": {
+                            "en": "Evidence of inconsistent participation in an EQA program: PT panels distributed to the POC site is irregular or there is a lack of alternative EQA methods"
+                        },
+                        "N": {
+                            "en": "No evidence of participation in any EQA program"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.9",
+                    "text": {
+                        "en": "Are EQA reports (e.g., PT, re-testing, inter-facility comparison) reviewed and is there recorded evidence of corrective actions for failed EQA results?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Confirm that, regardless of the EQA method used, the reports are available, reviewed, and appropriate corrective actions are implemented and recorded for failed EQA results."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "The site participates in an EQA program for the test performed, the EQA reports are available and reviewed, and there is evidence of corrective actions taken for failed EQA results"
+                        },
+                        "P": {
+                            "en": "The site participates in an EQA program for the test performed and the EQA reports are available, but there is no evidence of corrective actions taken for failed EQA results"
+                        },
+                        "N": {
+                            "en": "No evidence of EQA reports reviewed, nor corrective action taken for failed EQA results"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.10",
+                    "text": {
+                        "en": "Does the site have appropriate equipment for the test performed?"
+                    },
+                    "na_allowed": true,
+                    "guidance": {
+                        "en": "In some settings, the site may use some equipment (e.g., timers, pipettes, thermometers, fridges, centrifuges)."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Necessary equipment is available for the test. Thermometers should be available to monitor the temperature of test kits."
+                        },
+                        "P": {
+                            "en": "Some, but not all, necessary equipment is available for the test"
+                        },
+                        "N": {
+                            "en": "The necessary equipment is not available for the test"
+                        },
+                        "NA": {
+                            "en": "No equipment required"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.11",
+                    "text": {
+                        "en": "Are test kit inserts available for all tests at the testing site?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Kit inserts should be available for testers to refer to as necessary, e.g., for lot numbers or additional information not provided in the job aid."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Kit inserts are available at the testing site"
+                        },
+                        "P": {
+                            "en": "Kit inserts are available for some but not all tests"
+                        },
+                        "N": {
+                            "en": "No evidence of any kit inserts"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.12",
+                    "text": {
+                        "en": "Are the test kits stored according to the manufacturer’s instructions?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe how and where kits are stored. Kits should be well organized and stored, observing First Expired First Out (FEFO). Check that temperatures are suitable for the kit storage. For example, if kits should be stored between 20 – 30 degrees Celsius, but the room temperature is 35 degrees, this is not appropriate for storage."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Test kits are stored appropriately at room temperature or refrigerated at appropriate temperatures in an organized and logical FEFO."
+                        },
+                        "P": {
+                            "en": "Test kits are stored under appropriate temperatures, although temperatures are not routinely monitored, or the kit storage is unorganized according to FEFO"
+                        },
+                        "N": {
+                            "en": "Tests are stored outside of the accepted range of temperatures"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.13",
+                    "text": {
+                        "en": "Are new batches/lots/shipments of kits verified prior to use and records available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "It is important that new batches or shipments of kits be verified before testing client specimens. QCs should be included in the verification of the new batch/lot/shipment. Records of new batch results should be maintained and made available, e.g., by checking whether the current in-use batch has been verified and whether records are available. The instructions should be in an available SOP and/or job aid."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of QCs being used on new test batches and records available"
+                        },
+                        "P": {
+                            "en": "According to the tester, QCs are run on new batches/lots to verify the lot, but no records available"
+                        },
+                        "N": {
+                            "en": "No evidence of verification of new lots/batches using QC materials"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.14",
+                    "text": {
+                        "en": "Are adequate test kits available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Ask whether the site experienced any test kit stockouts and when the last one occurred. Review the testing register to confirm that no testing was performed during that period; review the monthly/quarterly statistics to calculate the number of tests conducted. Then check the stock cards or storage area to confirm that the site has an adequate stock level of kits for the month or quarter."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Adequate test kits are available"
+                        },
+                        "P": {
+                            "en": "Inadequate stock level of test kits"
+                        },
+                        "N": {
+                            "en": "There is a stockout of tests"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.15",
+                    "text": {
+                        "en": "Are adequate consumables available?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Ask whether the site experienced any stockout of consumables needed to perform the test (e.g., lancets, needles, swabs, stationery, any non-test kit items) and when the last occurrence was. Review the monthly or quarterly statistics. Check the stock cards or storage area to confirm that the site has an adequate stock level of consumables for the month or quarter."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Adequate stock level of consumables"
+                        },
+                        "P": {
+                            "en": "Some consumables, but not all available (list in the comment section the consumables that are not available and since when)"
+                        },
+                        "N": {
+                            "en": "No consumables available to perform the test"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.16",
+                    "text": {
+                        "en": "Are expired kits safely disposed of or removed from the testing site as per SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "No expired kits should be stored on-site. They should be disposed of/removed from the testing site in accordance with the national SOP/guidelines."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "No expired kits are stored at the testing site nor used for patient testing as per SOP/guidelines, and the tester understands the facility-level procedure for handling expired test kits."
+                        },
+                        "P": {
+                            "en": "Expired kits are stored at the site OR used for patient testing"
+                        },
+                        "N": {
+                            "en": "Expired kits are stored at the site AND used for patient testing"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.17",
+                    "text": {
+                        "en": "Is there a specific workflow for pre-testing, testing, and post-testing?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe the workflow of all three phases. Is there a logical and standardized workflow for pre-testing, testing and post-testing processes? Could the workflow be improved? Observe the process, or the tester can describe the process if observation isn’t possible."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Evidence of an optimal workflow for the test or the testing algorithm from sample collection to reporting"
+                        },
+                        "P": {
+                            "en": "Some areas of workflow are sub-optimal (results aren’t recorded immediately, e.g.)"
+                        },
+                        "N": {
+                            "en": "No evidence of optimal workflow. The process is not streamlined. Examples: Testers testing more than one client at a time. This could lead to mismatched results or a breach of patient confidentiality. Tester writes client details in the logbook after testing, instead of before testing No waiting place for clients, or no logical queue of clients to be tested Tester does not have all the reagents/supplies in hand before testing Test results are written in the logbook after the client has left Tester does not wash his/her hands after testing"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.18",
+                    "text": {
+                        "en": "Is testing conducted in accordance with the SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe, if possible, whether the tester is performing the test per the SOP and/or job aid. If no testing can be performed, ask the tester to walk the assessor through the procedure."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All testers conduct testing in accordance with a SOP/job aid"
+                        },
+                        "P": {
+                            "en": "Some testers conduct testing in accordance with SOPs/job aids, or evidence that the tester deviates from the procedure sometimes"
+                        },
+                        "N": {
+                            "en": "Evidence of deviation from the testing procedure as outlined in the SOP/job aid/kit insert"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.19",
+                    "text": {
+                        "en": "Are nationally approved algorithms used where applicable (e.g. HIV testing algorithm)?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe, if possible, the tester is performing the test per the SOP and/or job aid. If no testing can be performed, ask the tester to walk the assessor through the procedure. Observe all testers for each specific test."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All testers conduct testing in accordance with a SOP/job aid"
+                        },
+                        "P": {
+                            "en": "Some testers conduct testing in accordance with SOPs/job aids, or evidence that the tester deviates from the procedure sometimes"
+                        },
+                        "N": {
+                            "en": "Evidence of deviation from the testing procedure as outlined in the SOP/job aid/kit insert"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.20",
+                    "text": {
+                        "en": "Are corrective measures recorded and documented, as per SOP/job aid, when a test result is invalid or incorrect?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Occasionally, a test result might be invalid or incorrect. Invalid results may be caused by a defective test device (e.g., strip, cassette), tester error, expired kits, or sub-optimal storage conditions. On the other hand, incorrect test results may be due to specimen mix-up, a deviation from the testing procedure, or a clerical error. Therefore, it is important that testers identify the root cause, take and document the corrective action as per the SOP/job aid. Ask the tester if they have had invalid or incorrect results; if so, have them describe the process. Review the testing register for the past 3-6 months, depending on the volume tested, to identify any invalid or incorrect test results and the related corrective actions taken."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "For invalid and incorrect results, the site documented the corrective action implemented in accordance with the SOP"
+                        },
+                        "P": {
+                            "en": "Inconsistent documentation of invalid and incorrect test results and/or corrective actions records"
+                        },
+                        "N": {
+                            "en": "The site does not document invalid results or corrective actions"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.21",
+                    "text": {
+                        "en": "When errors/incidents or accidents occur (e.g. per site assessment report), are corrective measures recorded and documented as per SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Apart from invalid results, various other mistakes/errors can occur (e.g., incorrect result reported, needle stick, failed PT etc.) and these errors need to be resolved and records maintained."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Corrective action records are available and carried out in accordance with the SOP/job aid"
+                        },
+                        "P": {
+                            "en": "Corrective action records are available, but no SOP/job aid available or partial/incomplete documentation, or SOP/job aid is available, but corrective actions are not taken"
+                        },
+                        "N": {
+                            "en": "No evidence of corrective actions recorded and no SOP available"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.22",
+                    "text": {
+                        "en": "Is a standardized logbook/register available and correctly completed?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "All test results should be properly documented, and each testing site should use standardized logbooks/registers to record the testing results, which should be available for all testing. Review that the logbook or testing register for accuracy and completeness is correctly completed. If an electronic system is used, check the system's records for completeness and accuracy."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Standardized logbooks/testing registers are available and have been correctly completed for all fields"
+                        },
+                        "P": {
+                            "en": "Standardized logbooks/testing registers are available, but are incomplete"
+                        },
+                        "N": {
+                            "en": "No standardized logbook/testing register used by the testing site"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "4.23",
+                    "text": {
+                        "en": "Are completed logbooks/registers properly archived?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Completed logbooks/registers need to be stored neatly, labeled, and safely. The site should have a system for archiving all completed logbooks. If an electronic system is used, check the procedure for correct and consistent backup."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Completed logbooks/registers are labeled, stored properly, and tidy in a secure room"
+                        },
+                        "P": {
+                            "en": "Completed logbooks/registers are stored, but not properly archived or not in a clean, secure place"
+                        },
+                        "N": {
+                            "en": "Logbooks/registers are not archived"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                }
+            ]
+        },
+        {
+            "number": 5,
+            "code": "5",
+            "title": {
+                "en": "Specimen Referral"
+            },
+            "scope": "assessment",
+            "questions": [
+                {
+                    "code": "5.1",
+                    "text": {
+                        "en": "Is there a current SOP/job aid for referring specimens which includes collection, storage, transportation, tracking and reporting?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "If the site refers specimens to a referral site (e.g., dried blood spots for HIV Viral Load), a general SOP/job aid should be available that describes the step-by-step process of referring specimens (including specimen collection, storage, packaging and transportation)."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "SOP/job aid is available and current and describes the general referral procedure"
+                        },
+                        "P": {
+                            "en": "The SOP/job aid is available but outdated"
+                        },
+                        "N": {
+                            "en": "No SOP/job aid available for specimen referral"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.2",
+                    "text": {
+                        "en": "Are records and results of referred specimens available based on the current SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Records/logs and the monitoring of report receipt from the referred laboratory need to be updated and current. Expected turnaround times for each referred test should be available. The testers should have a process in place, as per SOP/job aid, to monitor the return of reports. If reports are delayed, they should be followed up by the tester, and all referred specimens and reports received should be maintained in a Referral Logbook."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Consistent and complete record keeping for all specimens sent for additional testing in a referral log per the SOP/job aid"
+                        },
+                        "P": {
+                            "en": "The site has records as per above, but they are not consistently maintained"
+                        },
+                        "N": {
+                            "en": "No records exist for referred specimens for testing"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.3",
+                    "text": {
+                        "en": "Are adequate packaging materials available and correctly used per SOP/job aid?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe if the facility has the appropriate materials to package specimens safely, and if feasible, observe how they package specimens for shipping. Ideally, some form of triple packaging should be used. Do personnel understand triple packaging and is triple packaging used? At lower levels, expensive triple packaging might not be available, but there should be a procedure for safely packing specimens per SOP and/or job aid."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Adequate triple packaging available and correctly used"
+                        },
+                        "P": {
+                            "en": "Some triple packaging available or materials available, but incorrectly used"
+                        },
+                        "N": {
+                            "en": "Stock out of triple packaging materials"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.4",
+                    "text": {
+                        "en": "Are referral specimen transportation logs included with specimens for tracking?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "When specimens are transferred, a completed log describing the number of specimens referred and a list of identifying numbers should accompany them. This log is transported with the specimens and used at the referral laboratories to verify that the specimens referred are the same as those received. This information is also transferred into the on-site referral log."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "A referral log form is completed and transported with the referred specimens"
+                        },
+                        "P": {
+                            "en": "A referral log form is incomplete, or not transported with the referred specimens"
+                        },
+                        "N": {
+                            "en": "No referral transport logs are used"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.5",
+                    "text": {
+                        "en": "Is a referral record/logbook available and maintained?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "This logbook should be available and maintained. The list of specimens being referred should be complete and dated upon receipt of reports. If reports are not received, the tester should follow up with the referral laboratory and the log updated until the reports are received. In some cases, referred specimens are logged into the routine client register/logbook. In such cases, check the register for complete information."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "A referral logbook is available, complete and updated"
+                        },
+                        "P": {
+                            "en": "A referral logbook is available, but incomplete, or delayed reports lack follow-up"
+                        },
+                        "N": {
+                            "en": "No logbook is available. Referred specimens are not recorded."
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.6",
+                    "text": {
+                        "en": "Does the facility receive copies of referred test reports from the reference lab and are these distributed to the test requester?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "When reports are returned to the referral site, there should be logged evidence of when they were received and when they were sent out to the requester or as per Referral SOP and/or job aid."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "POC site receives the result reports from the reference lab, updates the logbook, and sends results to the requester."
+                        },
+                        "P": {
+                            "en": "POC site receives some results but does not update the logbook or does not report to requesters"
+                        },
+                        "N": {
+                            "en": "No system is in place for sending referred results to requesters"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.7",
+                    "text": {
+                        "en": "Does the testing site monitor the turnaround time (TAT) of referred specimens from the referring facility to receipt of reports from the reference laboratory?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Turnaround times (set by the referral laboratory) should be available and posted at the testing site."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Turnaround times are monitored for all referral tests"
+                        },
+                        "P": {
+                            "en": "Turnaround times are monitored for some referral tests"
+                        },
+                        "N": {
+                            "en": "Turnaround times are not monitored for referral testing"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.8",
+                    "text": {
+                        "en": "Where the result reports are delayed, does the site follow up with the referral laboratory and document the action?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "If result reports are delayed, the tester should follow up with the referral laboratory, and records of the follow-up (e.g., phone call, email, SMS, etc.) should be maintained. If turnaround times become chronically delayed, this is an ongoing problem that needs to be resolved between the two labs and corrective actions recorded."
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "Where TAT is delayed, the facility has followed up and recorded communication"
+                        },
+                        "P": {
+                            "en": "Facility follows up on the delayed TAT of results, but there is no record"
+                        },
+                        "N": {
+                            "en": "Delayed TAT results are not followed up"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                },
+                {
+                    "code": "5.9",
+                    "text": {
+                        "en": "Is there appropriate temporary storage space for referral specimens prior to transportation?"
+                    },
+                    "na_allowed": false,
+                    "guidance": {
+                        "en": "Observe where the referral specimens are stored (e.g. refrigerator, ambient temperature, etc.) before being transported to the referral site. Are the space and temperature appropriate according to established SOPs/job aids, separated from reagents and testing consumables, and safe and secure until shipment?"
+                    },
+                    "criteria": {
+                        "Y": {
+                            "en": "All referral specimens are appropriately stored prior to transportation"
+                        },
+                        "P": {
+                            "en": "Not all specimens are stored correctly prior to transportation. (e.g., either the ambient temperature is too high, or there is no fridge/cooler for specimens requiring refrigeration"
+                        },
+                        "N": {
+                            "en": "Referred specimens are improperly stored"
+                        }
+                    },
+                    "comment_required_for": [
+                        "P",
+                        "N",
+                        "NA"
+                    ]
+                }
+            ],
+            "optional": true,
+            "applicability_field": "refers_specimens"
+        }
+    ]
+}

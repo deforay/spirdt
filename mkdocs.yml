@@ -45,6 +45,7 @@ nav:
   - Reference:
       - Architecture: architecture.md
       - Data Model: data-model.md
+      - Templates: templates.md
       - Scoring: scoring.md
   - Design Brief: design-brief.md
 

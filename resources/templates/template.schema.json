@@ -1,0 +1,239 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://deforay.github.io/spirdt/schema/template.schema.json",
+    "title": "SPI-RDT assessment template",
+    "description": "The full instrument: Part A context fields, the five scored sections, and the scoring rules. Stored as the JSON document in templates.definition. Immutable once published — editing copy-on-writes to a new version.",
+    "type": "object",
+    "required": ["schema_version", "code", "version", "title", "locales", "default_locale", "scoring", "sections"],
+    "additionalProperties": false,
+
+    "properties": {
+        "schema_version": {
+            "description": "Version of THIS schema, not of the template. Lets a reader tell a structural change from a content change.",
+            "type": "integer",
+            "minimum": 1
+        },
+        "code": {
+            "description": "Instrument identifier. 'spi-rdt' for the canonical instrument; forks keep it so scores stay comparable.",
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+        },
+        "version": {
+            "description": "Semver. Publishing freezes it; edits produce a new version.",
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "title": { "$ref": "#/$defs/localised" },
+        "description": { "$ref": "#/$defs/localised" },
+
+        "locales": {
+            "description": "Locales this template carries text for. Every localised string must have a key for default_locale at minimum.",
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "default_locale": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+
+        "source": {
+            "description": "Provenance of the content, so a generated template can be traced back and regenerated.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "documents": { "type": "array", "items": { "type": "string" } },
+                "generated_by": { "type": "string" },
+                "note": { "type": "string" }
+            }
+        },
+
+        "scoring": { "$ref": "#/$defs/scoring" },
+        "context_fields": {
+            "description": "Part A. Characterises the facility and testing site. NOT scored.",
+            "type": "array",
+            "items": { "$ref": "#/$defs/contextField" }
+        },
+        "sections": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/section" }
+        }
+    },
+
+    "$defs": {
+        "localised": {
+            "description": "Text keyed by locale. Never a bare string — translations are a launch requirement, and a bare string here is what makes them a retrofit.",
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+            "additionalProperties": { "type": "string" }
+        },
+
+        "scoring": {
+            "type": "object",
+            "required": ["responses", "round_dp", "bands"],
+            "additionalProperties": false,
+            "properties": {
+                "responses": {
+                    "description": "Point value per response. NA is excluded from BOTH numerator and denominator — it is not a zero.",
+                    "type": "object",
+                    "required": ["Y", "P", "N", "NA"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "Y": { "$ref": "#/$defs/responseOption" },
+                        "P": { "$ref": "#/$defs/responseOption" },
+                        "N": { "$ref": "#/$defs/responseOption" },
+                        "NA": { "$ref": "#/$defs/responseOption" }
+                    }
+                },
+                "round_dp": {
+                    "description": "Decimal places the percentage is rounded to BEFORE banding. Rounding first means 89.995 becomes 90.00 and lands in the top band; banding on the unrounded value would not, and the boundaries are where certification disputes happen.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4
+                },
+                "bands": {
+                    "description": "Certification levels, ascending by min_percent. Each band runs up to the next band's min_percent; the last is open-ended. Expressed as a lower bound only so bands cannot overlap or leave gaps. Localised per the User's Guide, which states countries adjust these during tool customisation.",
+                    "type": "array",
+                    "minItems": 2,
+                    "items": {
+                        "type": "object",
+                        "required": ["level", "min_percent", "label"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "level": { "type": "integer", "minimum": 0 },
+                            "min_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+                            "label": { "$ref": "#/$defs/localised" },
+                            "description": { "$ref": "#/$defs/localised" }
+                        }
+                    }
+                }
+            }
+        },
+
+        "responseOption": {
+            "type": "object",
+            "required": ["label"],
+            "additionalProperties": false,
+            "properties": {
+                "points": {
+                    "description": "Null only for an excluded response.",
+                    "type": ["integer", "null"]
+                },
+                "excluded": {
+                    "description": "When true this response is removed from the possible total rather than scored zero.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "label": { "$ref": "#/$defs/localised" }
+            }
+        },
+
+        "section": {
+            "type": "object",
+            "required": ["number", "code", "title", "scope", "questions"],
+            "additionalProperties": false,
+            "properties": {
+                "number": { "type": "integer", "minimum": 1 },
+                "code": { "type": "string", "pattern": "^[0-9]+$" },
+                "title": { "$ref": "#/$defs/localised" },
+                "intro": { "$ref": "#/$defs/localised" },
+                "scope": {
+                    "description": "'assessment' answers once per assessment. 'pathogen' repeats for every pathogen assessed — this is what makes Section 4 work, and why the possible total scales with pathogen count.",
+                    "enum": ["assessment", "pathogen"]
+                },
+                "optional": {
+                    "description": "When true the whole section can be marked not applicable, contributing nothing to score or possible total. Section 5 where a site refers no specimens.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "applicability_field": {
+                    "description": "Assessment field deciding whether an optional section applies, e.g. refers_specimens. One question instead of nine N/A answers.",
+                    "type": "string"
+                },
+                "questions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "$ref": "#/$defs/question" }
+                }
+            }
+        },
+
+        "question": {
+            "type": "object",
+            "required": ["code", "text", "na_allowed"],
+            "additionalProperties": false,
+            "properties": {
+                "code": {
+                    "description": "Stable identifier such as 1.1 or 4.23. This is the join key for exports, reporting and the question catalog — never row position, which silently misaligns once templates are customised.",
+                    "type": "string",
+                    "pattern": "^[0-9]+\\.[0-9]+$"
+                },
+                "text": { "$ref": "#/$defs/localised" },
+                "guidance": {
+                    "description": "How to assess it: what to look for, what evidence counts. From the User's Guide.",
+                    "$ref": "#/$defs/localised"
+                },
+                "criteria": {
+                    "description": "What each response means for THIS question. Shown inline while answering — the single cheapest way to get consistent scoring between assessors, and something the paper form cannot do.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "Y": { "$ref": "#/$defs/localised" },
+                        "P": { "$ref": "#/$defs/localised" },
+                        "N": { "$ref": "#/$defs/localised" },
+                        "NA": { "$ref": "#/$defs/localised" }
+                    }
+                },
+                "na_allowed": {
+                    "description": "Whether Not Applicable may be selected. Deliberately per-question data rather than code: the Checklist prints an N/A box on every row while the User's Guide defines a condition for only six, and allowing N/A everywhere inflates percentages and undermines the certification banding.",
+                    "type": "boolean"
+                },
+                "comment_required_for": {
+                    "description": "Responses that oblige a comment. The checklist requires describing the gap for P and N, and stating why the question does not apply for NA.",
+                    "type": "array",
+                    "items": { "enum": ["Y", "P", "N", "NA"] },
+                    "uniqueItems": true,
+                    "default": ["P", "N", "NA"]
+                }
+            }
+        },
+
+        "contextField": {
+            "type": "object",
+            "required": ["code", "type", "label"],
+            "additionalProperties": false,
+            "properties": {
+                "code": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+                "type": {
+                    "enum": ["date", "time", "text", "textarea", "integer", "select_one", "repeat"]
+                },
+                "label": { "$ref": "#/$defs/localised" },
+                "hint": { "$ref": "#/$defs/localised" },
+                "required": { "type": "boolean", "default": false },
+                "options": {
+                    "description": "For select_one. Stored by key, so labels can be localised or relabelled without rewriting stored answers.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["key", "label"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "key": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+                            "label": { "$ref": "#/$defs/localised" },
+                            "specify": {
+                                "description": "Whether choosing this option opens a free-text box — the checklist's 'Other (Specify):' pattern.",
+                                "type": "boolean",
+                                "default": false
+                            }
+                        }
+                    }
+                },
+                "fields": {
+                    "description": "For repeat: the per-row fields, e.g. the Part A staff roster of name and title.",
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/contextField" }
+                }
+            }
+        }
+    }
+}

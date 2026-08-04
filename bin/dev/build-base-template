@@ -1,0 +1,359 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Generate the canonical SPI-RDT template from the source documents.
+ *
+ * The base template is ~59 questions each carrying question text, assessment
+ * guidance and per-response criteria. Hand-transcribing that is both tedious
+ * and unauditable, so it is DERIVED from the two source documents and the
+ * derivation is committed. When the instrument is revised, re-run this rather
+ * than hand-editing JSON.
+ *
+ * Inputs (see bin/dev/extract-source-docs, which produces them):
+ *   resources/source/checklist-extracted.txt   canonical question text
+ *   resources/source/guidelines-extracted.txt  guidance + Y/P/N/NA criteria
+ *
+ * Output:
+ *   resources/templates/spi-rdt-<version>.json
+ *
+ * WHICH DOCUMENT WINS: question text comes from the Checklist, because that is
+ * the instrument assessors actually complete. Guidance and criteria come from
+ * the User's Guide. Where the two disagree on wording the Checklist wins and
+ * the difference is reported, since drift between them is a documentation bug
+ * worth surfacing rather than silently resolving.
+ *
+ * Usage:
+ *   bin/dev/build-base-template                 write the template
+ *   bin/dev/build-base-template --dry-run       report only, write nothing
+ *   bin/dev/build-base-template --version=1.1.0 set the template version
+ *   bin/dev/build-base-template --help          print this docblock
+ *
+ * Exit codes: 0 success, 1 the sources could not be parsed into a complete
+ * instrument.
+ */
+
+require __DIR__ . '/../lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/../lib/console.php';
+
+$root = dirname(__DIR__, 2);
+chdir($root);
+
+$dryRun  = in_array('--dry-run', $argv, true);
+$version = '1.0.0';
+
+foreach ($argv as $arg) {
+    if (str_starts_with($arg, '--version=')) {
+        $version = substr($arg, 10);
+    }
+}
+
+if (preg_match('/^\d+\.\d+\.\d+$/', $version) !== 1) {
+    con_fail("Version '{$version}' is not semver.");
+}
+
+const LOCALE = 'en';
+
+/** Expected question count per section — a guard against a partial parse. */
+const EXPECTED = [1 => 8, 2 => 10, 3 => 9, 4 => 23, 5 => 9];
+
+/** Sections whose questions repeat per pathogen rather than per assessment. */
+const PATHOGEN_SECTIONS = [4];
+
+/** Section that can be skipped wholesale when the site refers no specimens. */
+const OPTIONAL_SECTIONS = [5];
+
+const SECTION_TITLES = [
+    1 => 'Organization and Management',
+    2 => 'Physical Facility and Equipment',
+    3 => 'Safety',
+    4 => 'Testing',
+    5 => 'Specimen Referral',
+];
+
+// ─── Load sources ───
+
+$checklistPath  = $root . '/resources/source/checklist-extracted.txt';
+$guidelinesPath = $root . '/resources/source/guidelines-extracted.txt';
+
+foreach ([$checklistPath, $guidelinesPath] as $path) {
+    if (!is_file($path)) {
+        con_fail('Missing source: ' . $path . ' — run bin/dev/extract-source-docs first.');
+    }
+}
+
+con_print('header', 'Building base SPI-RDT template');
+
+/**
+ * Pull "CODE | text..." rows out of an extracted table dump.
+ *
+ * @return array<string,string> code => the rest of the row
+ */
+function harvest_rows(string $path): array
+{
+    $rows = [];
+
+    foreach (file($path, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+        if (preg_match('/^(\d+\.\d+)\s*\|\s*(.+)$/u', trim($line), $m) === 1) {
+            // First occurrence wins: the Checklist repeats some rows in its
+            // summary tables, and the first is the authoritative one.
+            $rows[$m[1]] ??= trim($m[2]);
+        }
+    }
+
+    return $rows;
+}
+
+/** Normalise whitespace and strip the trailing empty-cell pipes the dump leaves. */
+function tidy(string $text): string
+{
+    $text = preg_replace('/\s*\|\s*/u', ' ', $text) ?? $text;
+    $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+    return trim($text);
+}
+
+/**
+ * Split a User's Guide row into guidance and per-response criteria.
+ *
+ * Rows are " / "-delimited: question text, then one or more guidance
+ * fragments, then criteria introduced by "Y =", "P =", "N =" or "N/A =".
+ * Criteria can themselves span several fragments — 4.17 continues into an
+ * "Examples:" list under N — so fragments are appended to whichever marker
+ * last opened rather than assumed to be one apiece.
+ *
+ * @return array{guidance:string,criteria:array<string,string>}
+ */
+function split_guidance(string $body): array
+{
+    $parts    = preg_split('/\s+\/\s+/u', $body) ?: [];
+    $guidance = [];
+    $criteria = [];
+    $current  = null;
+
+    // Skip the first fragment: it repeats the question text.
+    foreach (array_slice($parts, 1) as $part) {
+        $part = trim($part);
+
+        if ($part === '') {
+            continue;
+        }
+
+        if (preg_match('/^(N\/A|Y|P|N)\s*=\s*(.*)$/us', $part, $m) === 1) {
+            $current            = $m[1] === 'N/A' ? 'NA' : $m[1];
+            $criteria[$current] = trim($m[2]);
+
+            continue;
+        }
+
+        if ($current === null) {
+            $guidance[] = $part;
+        } else {
+            $criteria[$current] .= ' ' . $part;
+        }
+    }
+
+    return [
+        'guidance' => tidy(implode(' ', $guidance)),
+        'criteria' => array_map(static fn (string $v): string => tidy($v), $criteria),
+    ];
+}
+
+$checklistRows  = harvest_rows($checklistPath);
+$guidelineRows  = harvest_rows($guidelinesPath);
+
+con_print('info', sprintf(
+    'Parsed %d checklist rows, %d guideline rows',
+    count($checklistRows),
+    count($guidelineRows),
+));
+
+// ─── Build sections ───
+
+$sections = [];
+$drift    = [];
+$missing  = [];
+$naCodes  = [];
+
+foreach (EXPECTED as $number => $expectedCount) {
+    $questions = [];
+
+    for ($i = 1; $i <= $expectedCount; $i++) {
+        $code = $number . '.' . $i;
+
+        if (!isset($checklistRows[$code])) {
+            $missing[] = $code . ' (checklist)';
+
+            continue;
+        }
+
+        // The checklist row is the question followed by empty answer cells.
+        $text = tidy(preg_split('/\s+\/\s+/u', $checklistRows[$code])[0] ?? '');
+
+        $guidance = '';
+        $criteria = [];
+
+        if (isset($guidelineRows[$code])) {
+            $split    = split_guidance($guidelineRows[$code]);
+            $guidance = $split['guidance'];
+            $criteria = $split['criteria'];
+
+            $guideText = tidy(preg_split('/\s+\/\s+/u', $guidelineRows[$code])[0] ?? '');
+            if ($guideText !== '' && $guideText !== $text) {
+                $drift[$code] = ['checklist' => $text, 'guidelines' => $guideText];
+            }
+        } else {
+            $missing[] = $code . ' (guidelines)';
+        }
+
+        // N/A eligibility is DERIVED, not assumed: a question allows it only
+        // where the User's Guide actually defines what N/A means for it. That
+        // yields the restrictive set the guide describes rather than the box
+        // the Checklist prints on every row. Section 5 is handled separately,
+        // as a whole-section opt-out.
+        $naAllowed = isset($criteria['NA']);
+
+        if ($naAllowed) {
+            $naCodes[] = $code;
+        }
+
+        $question = [
+            'code'       => $code,
+            'text'       => [LOCALE => $text],
+            'na_allowed' => $naAllowed,
+        ];
+
+        if ($guidance !== '') {
+            $question['guidance'] = [LOCALE => $guidance];
+        }
+
+        if ($criteria !== []) {
+            $question['criteria'] = [];
+            foreach (['Y', 'P', 'N', 'NA'] as $key) {
+                if (isset($criteria[$key])) {
+                    $question['criteria'][$key] = [LOCALE => $criteria[$key]];
+                }
+            }
+        }
+
+        $question['comment_required_for'] = ['P', 'N', 'NA'];
+
+        $questions[] = $question;
+    }
+
+    $section = [
+        'number'    => $number,
+        'code'      => (string) $number,
+        'title'     => [LOCALE => SECTION_TITLES[$number]],
+        'scope'     => in_array($number, PATHOGEN_SECTIONS, true) ? 'pathogen' : 'assessment',
+        'questions' => $questions,
+    ];
+
+    if (in_array($number, OPTIONAL_SECTIONS, true)) {
+        $section['optional']            = true;
+        $section['applicability_field'] = 'refers_specimens';
+    }
+
+    $sections[] = $section;
+
+    con_print(
+        count($questions) === $expectedCount ? 'success' : 'error',
+        sprintf('Section %d — %d/%d questions', $number, count($questions), $expectedCount),
+    );
+}
+
+if ($missing !== []) {
+    con_print('error', 'Missing rows: ' . implode(', ', $missing));
+    con_fail('Source parse incomplete — the template would be wrong.');
+}
+
+// ─── Report findings the sources themselves contain ───
+
+con_print('step', 'Source observations');
+
+con_print('info', sprintf(
+    'N/A permitted on %d of 59 questions: %s',
+    count($naCodes),
+    implode(', ', $naCodes),
+));
+con_print('info', 'Plus Section 5 in full, via refers_specimens.');
+
+if ($drift !== []) {
+    con_print('warn', sprintf('Wording differs between the two documents for %d question(s):', count($drift)));
+    foreach ($drift as $code => $pair) {
+        con_print('info', "  {$code}");
+        con_print('info', '    checklist:  ' . $pair['checklist']);
+        con_print('info', '    guidelines: ' . $pair['guidelines']);
+    }
+    con_print('info', 'The checklist wording is used. Worth raising with the instrument authors.');
+}
+
+// ─── Assemble ───
+
+$template = [
+    'schema_version' => 1,
+    'code'           => 'spi-rdt',
+    'version'        => $version,
+    'title'          => [LOCALE => 'SPI-RDT Checklist'],
+    'description'    => [LOCALE => 'Stepwise Process for Improving the Quality of Rapid Diagnostic Testing — site assessment checklist.'],
+    'locales'        => [LOCALE],
+    'default_locale' => LOCALE,
+    'source'         => [
+        'documents'    => ['SPI-RDT Checklist.docx', 'SPI-RDT Checklist Guidelines.docx'],
+        'generated_by' => 'bin/dev/build-base-template',
+        'note'         => 'Generated from resources/source/. Re-run rather than hand-editing.',
+    ],
+    'scoring' => [
+        'responses' => [
+            'Y'  => ['points' => 2, 'label' => [LOCALE => 'Yes']],
+            'P'  => ['points' => 1, 'label' => [LOCALE => 'Partial']],
+            'N'  => ['points' => 0, 'label' => [LOCALE => 'No']],
+            'NA' => ['points' => null, 'excluded' => true, 'label' => [LOCALE => 'Not Applicable']],
+        ],
+        'round_dp' => 2,
+        'bands'    => [
+            ['level' => 0, 'min_percent' => 0,  'label' => [LOCALE => 'Level 0'], 'description' => [LOCALE => 'Needs improvement in all areas and immediate remediation']],
+            ['level' => 1, 'min_percent' => 40, 'label' => [LOCALE => 'Level 1'], 'description' => [LOCALE => 'Needs improvement in specific areas']],
+            ['level' => 2, 'min_percent' => 60, 'label' => [LOCALE => 'Level 2'], 'description' => [LOCALE => 'Partially eligible for site certification']],
+            ['level' => 3, 'min_percent' => 80, 'label' => [LOCALE => 'Level 3'], 'description' => [LOCALE => 'Close to national site certification']],
+            ['level' => 4, 'min_percent' => 90, 'label' => [LOCALE => 'Level 4'], 'description' => [LOCALE => 'Eligible for national site certification']],
+        ],
+    ],
+    'context_fields' => require __DIR__ . '/base-template-context.php',
+    'sections'       => $sections,
+];
+
+$outPath = $root . '/resources/templates/spi-rdt-' . $version . '.json';
+
+$json = json_encode(
+    $template,
+    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+) . "\n";
+
+con_print('step', 'Result');
+
+$totalQuestions = array_sum(array_map(
+    static fn (array $s): int => count($s['questions']),
+    $sections,
+));
+
+con_print('info', sprintf('%d questions across %d sections', $totalQuestions, count($sections)));
+con_print('info', sprintf('%s (%s)', basename($outPath), number_format(strlen($json) / 1024, 1) . ' KB'));
+
+if ($dryRun) {
+    con_print('warn', 'Dry run — nothing written.');
+    exit(0);
+}
+
+if (!is_dir(dirname($outPath))) {
+    mkdir(dirname($outPath), 0o775, true);
+}
+
+file_put_contents($outPath, $json);
+con_print('success', 'Written to ' . str_replace($root . '/', '', $outPath));
+con_print('info', 'Validate it with: bin/dev/validate-template ' . str_replace($root . '/', '', $outPath));
+
+exit(0);

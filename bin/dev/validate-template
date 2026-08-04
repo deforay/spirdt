@@ -1,0 +1,260 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Validate a template JSON document against the template schema.
+ *
+ * Two layers, because JSON Schema cannot express all of it:
+ *
+ *   1. Structural — resources/templates/template.schema.json
+ *   2. Semantic   — rules that span the document: unique question codes,
+ *                   bands ascending with a band at 0, every localised string
+ *                   carrying the default locale, exactly one excluded
+ *                   response, an applicability_field on optional sections.
+ *
+ * The semantic layer exists because the failures it catches are the expensive
+ * ones. A band list missing its zero entry, or a percentage falling into no
+ * band at all, produces a wrong certification level rather than an error.
+ *
+ * Usage:
+ *   bin/dev/validate-template <path>       validate one template
+ *   bin/dev/validate-template              validate every resources/templates/*.json
+ *   bin/dev/validate-template --help       print this docblock
+ *
+ * Exit codes: 0 all valid, 1 one or more failed.
+ */
+
+require __DIR__ . '/../lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/../lib/console.php';
+
+$root = dirname(__DIR__, 2);
+chdir($root);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    con_fail('vendor/ missing — run composer install.');
+}
+
+require $root . '/vendor/autoload.php';
+
+use Opis\JsonSchema\Errors\ErrorFormatter;
+use Opis\JsonSchema\Validator;
+
+$schemaPath = $root . '/resources/templates/template.schema.json';
+
+if (!is_file($schemaPath)) {
+    con_fail('Schema not found: ' . $schemaPath);
+}
+
+$targets = array_values(array_filter(
+    array_slice($argv, 1),
+    static fn (string $a): bool => !str_starts_with($a, '-'),
+));
+
+if ($targets === []) {
+    $targets = array_values(array_filter(
+        glob($root . '/resources/templates/*.json') ?: [],
+        static fn (string $p): bool => basename($p) !== 'template.schema.json',
+    ));
+}
+
+if ($targets === []) {
+    con_fail('No templates found to validate.');
+}
+
+$schema    = json_decode((string) file_get_contents($schemaPath), false, 512, JSON_THROW_ON_ERROR);
+$validator = new Validator();
+$validator->resolver()?->registerRaw($schema, 'https://deforay.github.io/spirdt/schema/template.schema.json');
+
+$failed = 0;
+
+foreach ($targets as $path) {
+    con_print('header', basename($path));
+
+    $raw = @file_get_contents($path);
+
+    if ($raw === false) {
+        con_print('error', 'Unreadable');
+        $failed++;
+
+        continue;
+    }
+
+    try {
+        $data = json_decode($raw, false, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        con_print('error', 'Invalid JSON: ' . $e->getMessage());
+        $failed++;
+
+        continue;
+    }
+
+    // ─── Structural ───
+
+    $result = $validator->validate($data, $schema);
+
+    if (!$result->isValid()) {
+        $errors = (new ErrorFormatter())->format($result->error());
+
+        con_print('error', 'Schema validation failed:');
+        foreach ($errors as $pointer => $messages) {
+            foreach ((array) $messages as $message) {
+                con_print('info', '  ' . ($pointer === '' ? '(root)' : $pointer) . ': ' . $message);
+            }
+        }
+
+        $failed++;
+
+        continue;
+    }
+
+    con_print('success', 'Structure valid');
+
+    // ─── Semantic ───
+
+    $problems = semantic_check($data);
+
+    if ($problems !== []) {
+        con_print('error', 'Semantic checks failed:');
+        foreach ($problems as $problem) {
+            con_print('info', '  ' . $problem);
+        }
+        $failed++;
+
+        continue;
+    }
+
+    con_print('success', 'Semantics valid');
+
+    // ─── Summary ───
+
+    $questionCount = 0;
+    $naCount       = 0;
+
+    foreach ($data->sections as $section) {
+        $questionCount += count($section->questions);
+        foreach ($section->questions as $question) {
+            if ($question->na_allowed) {
+                $naCount++;
+            }
+        }
+    }
+
+    // The maximum possible score assuming one pathogen and no N/A — the figure
+    // to sanity-check scoring against.
+    $possibleSinglePathogen = $questionCount * 2;
+
+    con_print('info', sprintf(
+        '%s v%s — %d sections, %d questions, %d allow N/A',
+        $data->code,
+        $data->version,
+        count($data->sections),
+        $questionCount,
+        $naCount,
+    ));
+    con_print('info', sprintf(
+        'Max possible with 1 pathogen, no N/A: %d points',
+        $possibleSinglePathogen,
+    ));
+}
+
+con_print('header', $failed === 0 ? 'All templates valid.' : sprintf('%d template(s) failed.', $failed));
+
+exit($failed === 0 ? 0 : 1);
+
+/**
+ * Cross-document rules JSON Schema cannot express.
+ *
+ * @return list<string>
+ */
+function semantic_check(object $data): array
+{
+    $problems = [];
+    $locale   = $data->default_locale;
+
+    if (!in_array($locale, $data->locales, true)) {
+        $problems[] = "default_locale '{$locale}' is not listed in locales";
+    }
+
+    // Bands must ascend and start at 0, otherwise a low percentage falls into
+    // no band and the assessment has no level.
+    $bands = $data->scoring->bands;
+    $mins  = array_map(static fn (object $b): float => (float) $b->min_percent, $bands);
+    $sorted = $mins;
+    sort($sorted);
+
+    if ($mins !== $sorted) {
+        $problems[] = 'scoring.bands are not in ascending min_percent order';
+    }
+
+    if (count(array_unique($mins)) !== count($mins)) {
+        $problems[] = 'scoring.bands contain duplicate min_percent values';
+    }
+
+    if ($mins !== [] && min($mins) > 0) {
+        $problems[] = 'scoring.bands have no band starting at 0 — low scores would fall into no level';
+    }
+
+    $levels = array_map(static fn (object $b): int => $b->level, $bands);
+    if (count(array_unique($levels)) !== count($levels)) {
+        $problems[] = 'scoring.bands contain duplicate level values';
+    }
+
+    // Exactly one response may be excluded from the denominator. Two would make
+    // the possible total ambiguous; none would break the N/A rule entirely.
+    $excluded = 0;
+    foreach ((array) $data->scoring->responses as $key => $response) {
+        if (($response->excluded ?? false) === true) {
+            $excluded++;
+
+            if (($response->points ?? null) !== null) {
+                $problems[] = "scoring.responses.{$key} is excluded but still carries points";
+            }
+        } elseif (($response->points ?? null) === null) {
+            $problems[] = "scoring.responses.{$key} has no points and is not excluded";
+        }
+    }
+
+    if ($excluded !== 1) {
+        $problems[] = "expected exactly one excluded response, found {$excluded}";
+    }
+
+    // Question codes must be unique across the whole template — they are the
+    // join key for answers, exports and reporting.
+    $seen = [];
+
+    foreach ($data->sections as $section) {
+        if (($section->optional ?? false) === true && ($section->applicability_field ?? '') === '') {
+            $problems[] = "section {$section->code} is optional but names no applicability_field";
+        }
+
+        foreach ($section->questions as $question) {
+            if (isset($seen[$question->code])) {
+                $problems[] = "duplicate question code {$question->code}";
+            }
+            $seen[$question->code] = true;
+
+            if (!str_starts_with($question->code, $section->code . '.')) {
+                $problems[] = "question {$question->code} does not belong to section {$section->code}";
+            }
+
+            if (!isset($question->text->{$locale}) || trim($question->text->{$locale}) === '') {
+                $problems[] = "question {$question->code} has no text in the default locale";
+            }
+
+            // An N/A option with no stated meaning is how N/A becomes a
+            // dumping ground and percentages inflate.
+            if ($question->na_allowed && !isset($question->criteria->NA)) {
+                $problems[] = "question {$question->code} allows N/A but defines no NA criterion";
+            }
+
+            if (!$question->na_allowed && isset($question->criteria->NA)) {
+                $problems[] = "question {$question->code} defines an NA criterion but does not allow N/A";
+            }
+        }
+    }
+
+    return $problems;
+}
