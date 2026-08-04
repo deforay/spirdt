@@ -1,0 +1,318 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Pull the latest code and bring this checkout back into a runnable state.
+ *
+ * The useful part is not the pull — it is that every expensive step is GATED
+ * ON WHAT ACTUALLY CHANGED in the diff. A code-only pull should not pay for a
+ * composer install or a migration run. So:
+ *
+ *   composer install   only when composer.lock changed
+ *   bin/migrate        only when anything under migrations/ changed
+ *
+ * When the checkout is already at the target commit, the pull itself is
+ * skipped too and the whole thing is a fast no-op.
+ *
+ * Works on both runtimes. Git always runs on the host; composer and migrate
+ * are routed into the Compose container when .env points at the "mysql"
+ * service and you are not already inside it. Nothing to remember, no second
+ * command to learn.
+ *
+ * A dirty working tree ABORTS rather than stashing. Silently stashing someone's
+ * work in progress is a nasty surprise on a development machine — pass --stash
+ * to opt into it explicitly.
+ *
+ * Usage:
+ *   bin/refresh                 fetch, pull, then install/migrate as needed
+ *   bin/refresh --status        show local vs remote state, change nothing
+ *   bin/refresh --dry-run       print every step, execute none
+ *   bin/refresh --stash         stash local changes first, then pull
+ *   bin/refresh --branch=dev    target a branch other than main
+ *   bin/refresh --help          print this docblock
+ *
+ * Exit codes: 0 success, 1 failure.
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+
+$root = dirname(__DIR__);
+chdir($root);
+
+$dryRun     = in_array('--dry-run', $argv, true);
+$showStatus = in_array('--status', $argv, true);
+$doStash    = in_array('--stash', $argv, true);
+
+$branch = 'main';
+foreach ($argv as $arg) {
+    if (str_starts_with($arg, '--branch=')) {
+        $branch = substr($arg, strlen('--branch='));
+    }
+}
+
+$tty = stream_isatty(STDOUT);
+
+function paint(string $text, string $colour): string
+{
+    global $tty;
+
+    if (!$tty) {
+        return $text;
+    }
+
+    $codes = ['green' => 32, 'red' => 31, 'yellow' => 33, 'cyan' => 36, 'dim' => 2, 'bold' => 1];
+
+    return "\033[" . ($codes[$colour] ?? 0) . 'm' . $text . "\033[0m";
+}
+
+function out(string $message, string $colour = ''): void
+{
+    echo ($colour === '' ? $message : paint($message, $colour)) . "\n";
+}
+
+/** @return array{0:string,1:int} */
+function run(string $command, bool $simulate = false): array
+{
+    if ($simulate) {
+        out('  would run: ' . $command, 'yellow');
+
+        return ['', 0];
+    }
+
+    $output = [];
+    $code   = 0;
+    exec($command . ' 2>&1', $output, $code);
+
+    return [implode("\n", $output), $code];
+}
+
+function step(string $label): void
+{
+    out("\n" . paint($label, 'bold'));
+}
+
+// ─── Runtime detection ───
+
+/**
+ * Where should composer and bin/migrate run?
+ *
+ * Inside a container we are already in the right place. On the host, a
+ * DB_HOST of "mysql" can only mean the Compose service, so the commands
+ * belong inside the php container. Anything else is the native path.
+ */
+function commandPrefix(string $root): string
+{
+    if (is_file('/.dockerenv')) {
+        return '';
+    }
+
+    $envFile = $root . '/.env';
+    if (!is_file($envFile)) {
+        return '';
+    }
+
+    $env = (string) file_get_contents($envFile);
+    if (preg_match('/^\s*DB_HOST\s*=\s*mysql\s*$/mi', $env) !== 1) {
+        return '';
+    }
+
+    [, $code] = run('docker compose ps --quiet php');
+
+    return $code === 0 ? 'docker compose exec -T php ' : '';
+}
+
+// ─── Preconditions ───
+
+[, $gitCode] = run('git --version');
+if ($gitCode !== 0) {
+    out('git not found on PATH.', 'red');
+    exit(1);
+}
+
+[$currentBranch] = run('git rev-parse --abbrev-ref HEAD');
+[$shortHead]     = run('git rev-parse --short HEAD');
+[$dirty]         = run('git status --porcelain');
+$currentBranch   = trim($currentBranch);
+$dirty           = trim($dirty);
+
+$prefix = commandPrefix($root);
+$where  = $prefix === '' ? 'native' : 'docker';
+
+// ─── Status mode ───
+
+if ($showStatus) {
+    $version = is_file($root . '/VERSION') ? trim((string) file_get_contents($root . '/VERSION')) : 'unknown';
+
+    out(paint('SPI-RDT — checkout status', 'bold'));
+    out('  Version:   ' . $version);
+    out('  Branch:    ' . $currentBranch);
+    out('  Commit:    ' . trim($shortHead));
+    out('  Runs via:  ' . $where);
+
+    run('git fetch origin --quiet');
+    [$behind] = run('git rev-list --count HEAD..origin/' . escapeshellarg($currentBranch));
+    [$ahead]  = run('git rev-list --count origin/' . escapeshellarg($currentBranch) . '..HEAD');
+    $behind   = (int) trim($behind);
+    $ahead    = (int) trim($ahead);
+
+    if ($behind === 0 && $ahead === 0) {
+        out('  Remote:    up to date', 'green');
+    } else {
+        out(sprintf('  Remote:    %d behind, %d ahead', $behind, $ahead), 'yellow');
+    }
+
+    if ($dirty === '') {
+        out('  Tree:      clean', 'green');
+    } else {
+        out('  Tree:      uncommitted changes', 'yellow');
+        out('    ' . str_replace("\n", "\n    ", $dirty), 'dim');
+    }
+
+    exit(0);
+}
+
+// ─── Refresh ───
+
+out(paint('SPI-RDT refresh', 'cyan') . paint("  ({$where})", 'dim'));
+
+if ($dryRun) {
+    out(paint('  *** DRY RUN — nothing will be changed ***', 'yellow'));
+}
+
+step('[1/4] Checking working tree');
+
+if ($dirty !== '') {
+    if (!$doStash) {
+        out('  Uncommitted changes present:', 'red');
+        out('    ' . str_replace("\n", "\n    ", $dirty), 'dim');
+        out("\n  Commit them, or re-run with --stash to set them aside.", 'yellow');
+        exit(1);
+    }
+
+    out('  Stashing local changes', 'yellow');
+    [$stashOut, $stashCode] = run('git stash push --include-untracked -m "bin/refresh"', $dryRun);
+    if ($stashCode !== 0 && !$dryRun) {
+        out('  Stash failed: ' . $stashOut, 'red');
+        exit(1);
+    }
+    out('  Restore later with: git stash pop', 'dim');
+} else {
+    out('  Clean', 'green');
+}
+
+step("[2/4] Fetching origin/{$branch}");
+
+[$fetchOut, $fetchCode] = run('git fetch origin --tags --quiet');
+if ($fetchCode !== 0) {
+    out('  Fetch failed: ' . $fetchOut, 'red');
+    exit(1);
+}
+
+[$head]              = run('git rev-parse HEAD');
+[$target, $tgtCode]  = run('git rev-parse ' . escapeshellarg('origin/' . $branch));
+$head                = trim($head);
+$target              = trim($target);
+
+if ($tgtCode !== 0) {
+    out("  No such remote branch: origin/{$branch}", 'red');
+    exit(1);
+}
+
+// Hash inequality is NOT the same as being behind: a checkout with unpushed
+// commits differs from the target while having nothing to pull. Count the
+// two directions separately and drive everything off "behind".
+[$behindOut] = run('git rev-list --count ' . escapeshellarg($head . '..' . $target));
+[$aheadOut]  = run('git rev-list --count ' . escapeshellarg($target . '..' . $head));
+$behind      = (int) trim($behindOut);
+$ahead       = (int) trim($aheadOut);
+
+if ($behind === 0) {
+    out(
+        '  Already up to date' . ($ahead > 0 ? " ({$ahead} local commit(s) not pushed)" : ''),
+        'green',
+    );
+} else {
+    out("  {$behind} new commit(s) to apply" . ($ahead > 0 ? " ({$ahead} local, will need a rebase)" : ''));
+}
+
+// Diff against the RESOLVED TARGET rather than post-pull HEAD, so --dry-run
+// reports exactly the set a real run would act on.
+$changed = [];
+if ($behind > 0) {
+    [$diff] = run('git diff --name-only ' . escapeshellarg($head) . ' ' . escapeshellarg($target));
+    $changed = array_values(array_filter(array_map('trim', explode("\n", $diff))));
+}
+
+if ($behind > 0) {
+    if ($currentBranch !== $branch) {
+        [$coOut, $coCode] = run('git checkout ' . escapeshellarg($branch), $dryRun);
+        if ($coCode !== 0 && !$dryRun) {
+            out('  Checkout failed: ' . $coOut, 'red');
+            exit(1);
+        }
+    }
+
+    [$pullOut, $pullCode] = run('git pull --ff-only origin ' . escapeshellarg($branch), $dryRun);
+    if ($pullCode !== 0 && !$dryRun) {
+        // --ff-only rather than a merge: on a dev checkout a diverged branch
+        // is something a human should look at, not something a refresh script
+        // should silently resolve.
+        out('  Pull failed: ' . $pullOut, 'red');
+        out('  Branch has diverged — rebase or merge by hand.', 'yellow');
+        exit(1);
+    }
+
+    if (!$dryRun) {
+        [$newShort] = run('git rev-parse --short HEAD');
+        out('  Now at ' . trim($newShort), 'green');
+    }
+}
+
+// ─── Gated follow-up ───
+
+$lockChanged       = in_array('composer.lock', $changed, true);
+$migrationsChanged = array_filter($changed, static fn (string $f): bool => str_starts_with($f, 'migrations/')) !== [];
+
+step('[3/4] Dependencies');
+
+if ($lockChanged) {
+    out('  composer.lock changed — installing');
+    [$ciOut, $ciCode] = run($prefix . 'composer install --no-interaction', $dryRun);
+    if ($ciCode !== 0 && !$dryRun) {
+        out('  composer install failed:', 'red');
+        out('  ' . $ciOut);
+        exit(1);
+    }
+    out('  Done', 'green');
+} else {
+    out('  composer.lock unchanged — skipped', 'dim');
+}
+
+step('[4/4] Schema');
+
+if ($migrationsChanged) {
+    $files = array_filter($changed, static fn (string $f): bool => str_starts_with($f, 'migrations/'));
+    out('  ' . count($files) . ' migration file(s) changed — migrating');
+    [$mgOut, $mgCode] = run($prefix . 'php bin/migrate', $dryRun);
+    if (!$dryRun) {
+        out('  ' . str_replace("\n", "\n  ", trim($mgOut)), 'dim');
+    }
+    if ($mgCode !== 0 && !$dryRun) {
+        out('  Migration failed', 'red');
+        exit(1);
+    }
+    out('  Done', 'green');
+} else {
+    out('  No migration changes — skipped', 'dim');
+}
+
+out("\n" . paint('Refresh complete.', 'green'));
+
+if ($doStash && $dirty !== '') {
+    out('Your changes are stashed — restore with: git stash pop', 'yellow');
+}
+
+exit(0);

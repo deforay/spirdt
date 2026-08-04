@@ -37,6 +37,7 @@
         }
     },
     "scripts": {
+        "refresh": "php bin/refresh",
         "preflight": "php bin/preflight",
         "serve": "php bin/serve",
         "migrate": "php bin/migrate",
@@ -55,6 +56,7 @@
         "post-update-cmd": "git config core.hooksPath .githooks || true"
     },
     "scripts-descriptions": {
+        "refresh": "Pull the latest code and bring the checkout back to runnable. Runs composer install only when composer.lock changed, and migrations only when migrations/ changed. Supports --status, --dry-run, --stash, --branch=.",
         "preflight": "Check this machine can run the app: PHP version, extensions, .env, writable paths, DB reachability. Works the same inside Docker and on a bare host.",
         "serve": "Run the API on PHP's built-in server (no Docker). Dev only. Pass a port or host:port.",
         "migrate": "Apply pending schema migrations from migrations/. Supports --status, --dry-run, --verbose.",

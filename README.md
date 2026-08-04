@@ -114,6 +114,8 @@ Native, run directly. Under Docker, prefix with `docker compose exec php`.
 
 | Command | What it does |
 |---|---|
+| `composer refresh` | Pull latest, then install/migrate only if needed |
+| `composer refresh -- --status` | Local vs remote state, changes nothing |
 | `composer preflight` | Check this machine can run the app |
 | `composer serve` | Built-in server on 8080 (native path, dev only) |
 | `composer migrate` | Apply pending migrations |
@@ -127,6 +129,25 @@ Native, run directly. Under Docker, prefix with `docker compose exec php`.
 
 `composer run-script --list` prints every script with a description. Every
 `bin/` script takes `--help` and prints its own docblock.
+
+### Staying up to date
+
+```bash
+composer refresh
+```
+
+Fetches, fast-forwards, and then gates the expensive work on what the diff
+actually contains — `composer install` runs only when `composer.lock` changed,
+and migrations only when something under `migrations/` changed. If the checkout
+is already at the target commit the whole thing is a fast no-op.
+
+It figures out for itself whether to run those follow-up commands natively or
+inside the Compose container, so it is the same command on both paths.
+
+A dirty working tree **aborts** rather than stashing — silently setting aside
+work in progress is a nasty surprise. Pass `--stash` to opt in. Pulls are
+`--ff-only`: a diverged branch is something a human should look at, not
+something a refresh script should quietly resolve.
 
 ---
 
