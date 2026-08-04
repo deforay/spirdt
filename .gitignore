@@ -15,3 +15,8 @@ phpstan-baseline.neon
 
 # mkdocs build output
 /site/
+
+# Source instrument documents are NOT distributed with this repository.
+# Obtain them separately to regenerate the base template.
+*.docx
+*.doc

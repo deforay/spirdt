@@ -89,6 +89,9 @@ composer template:build
 
 Reads `resources/source/`, writes `resources/templates/spi-rdt-<version>.json`. When the instrument is revised, re-run this rather than hand-editing the JSON.
 
+!!! note "The source documents are not distributed"
+    The Word originals are deliberately not committed to this repository and are gitignored. The generated template is committed, so a fresh clone works without them — but regenerating requires obtaining the sources separately.
+
 Question text comes from the **Checklist**, since that is what assessors complete. Guidance and criteria come from the **User's Guide**. Where the two disagree the Checklist wins, and the difference is reported rather than silently resolved:
 
 ```

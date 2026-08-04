@@ -12,9 +12,13 @@ declare(strict_types=1);
  * derivation is committed. When the instrument is revised, re-run this rather
  * than hand-editing JSON.
  *
- * Inputs (see bin/dev/extract-source-docs, which produces them):
+ * Inputs:
  *   resources/source/checklist-extracted.txt   canonical question text
  *   resources/source/guidelines-extracted.txt  guidance + Y/P/N/NA criteria
+ *
+ * The Word documents these were extracted from are NOT distributed with this
+ * repository and are gitignored. Obtain them separately when the instrument is
+ * revised; a fresh clone can read the committed template without them.
  *
  * Output:
  *   resources/templates/spi-rdt-<version>.json
