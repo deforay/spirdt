@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory="var/cache/phpunit"
+         failOnWarning="true"
+         failOnRisky="true">
+    <testsuites>
+        <!-- Unit: no DB, fast. The scoring-engine fixtures live here and
+             must stay runnable without any infrastructure. -->
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+        <!-- Feature: full HTTP through the Slim stack. The cross-tenant
+             isolation suite lives here — see docs/KICKOFF.md section 5. -->
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_DEBUG" value="true"/>
+        <env name="DB_NAME" value="spirdt_test"/>
+        <env name="JWT_SECRET" value="testing-secret-not-for-any-real-deployment-0123456789"/>
+    </php>
+</phpunit>

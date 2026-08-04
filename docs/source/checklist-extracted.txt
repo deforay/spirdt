@@ -1,0 +1,187 @@
+Stepwise Process for Improving the Quality of Rapid Diagnostic Testing (SPI-RDT)
+SPI-RDT Checklist
+2026
+Note: Refer to User’s Guide for Site Assessment Using the SPI-RDT Checklist  for information on how to conduct the assessment
+PART A: CHARACTERISTICS OF THE FACILITY AND TESTING SITE ASSESSED
+Before completing the checklist, it is important to characterize the testing site to be assessed (one testing site per checklist). Please provide relevant information in the summary table below.
+--- TABLE ---
+Date of Assessment: / Testing Facility Name: | Time of Assessment: / Testing Site Name: | Date of Previous Assessment:
+Physical address or location of the testing facility: / Number of POC testing sites within the same facility (contextual information only): / Name of testing site(s) location(s) assessed:
+List of Point of care (POC) tests conducted at this testing site:
+Type of Facility (Check one that is most applicable) / ☐ Health Center                                         ☐ Mobile Clinic                              ☐ Laboratory (Specify): / ☐ Specialized Clinic (Specify):                  ☐ Hospital Bedside                       ☐ Other (Specify):
+Level (Check one) / ☐ Region, province or zone / ☐ District / ☐ Health center / ☐ Other (Specify): | Affiliation (Check one) / ☐ Government / ☐ Private / ☐ Faith-based Organization / ☐ Non-governmental organization / ☐ Other (Specify):
+Name of staff | Title of staff
+ | 
+ | 
+ | 
+ | 
+ | 
+Name of interviewee:                                                              Title:                                                                              Phone number:
+--- END TABLE ---
+Part B. SPI-RDT Checklist
+Part B constitutes the main body of the SPI-RDT Checklist for conducting the assessment and scoring. The Checklist is laid out in five sections that align with the national standard requirements.
+Instructions as per guidelines
+For each question, answer as follows:
+Tick Yes (Y), only if full compliance is demonstrated
+Tick Partial (P), if some compliance is demonstrated
+Tick No (N), if there is no evidence of compliance
+Tick Not Applicable (N/A), if the question is not applicable or irrelevant to the country context, a score is not required
+In the Comment box, describe the specific gap (Partial and No scores) or the reason the question does not apply (N/A)
+Sections 1 (Organization and Management), 2 (Physical Facility and Equipment) and 3 (Safety) pertain to the overall facility incorporating the testing sites. Section 4 (Testing) assesses the testing site(s) and Section 5 (Specimen Referral) assesses the testing site(s).
+--- TABLE ---
+ | 1.0 ORGANISATION AND MANAGEMENT | Y | P | N | N/A |  | Comments | Score
+1.1 | Are lines of authority and roles and responsibilities clearly defined and an organogram available? |  |  |  |  |  | 
+1.2 | Does each staff member involved in testing have a current job description? |  |  |  |  |  | 
+1.3 | Where there is more than one tester, is there a duty roster? |  |  |  |  |  | 
+1.4 | Are there adequate staff for the testing volume? |  |  |  |  |  | 
+1.5 | Are minutes of routine (at least monthly) staff meetings available? |  |  |  |  |  | 
+1.6 | Are training records available on general basic quality activities for staff performing point of care testing? |  |  |  |  |  | 
+1.7 | Are copies of previous assessment reports available? |  |  |  |  |  | 
+1.8 | Have gaps and recommendations from the last assessment been addressed? |  |  |  |  |  | 
+ | TOTAL POSSIBLE SCORE: | SITE SCORE: | 
+--- END TABLE ---
+--- TABLE ---
+ | 2.0 PHYSICAL FACILITY AND EQUIPMENT | Y | P | N | N/A | Comments | Score
+2.1 | Is there a designated (private if needed) specimen/patient collection/reception area where appropriate? |  |  |  |  |  | 
+2.2 | Is the testing area access-controlled and secure? |  |  |  |  |  | 
+2.3 | Is there an area for staff to store food and personal items, separate from the testing area? |  |  |  |  |  | 
+2.4 | Is there a designated area for testing only, separate from the “clean” administrative area? |  |  |  |  |  | 
+2.5 | Is the testing area clean and organized? |  |  |  |  |  | 
+2.6 | Is sufficient lighting available in the designated testing area? |  |  |  |  |  | 
+2.7 | Does the site have adequate and appropriate storage for test kits, consumables and ancillary equipment? |  |  |  |  |  | 
+2.8 | Is there a current inventory SOP/job aid available and a system in place for ordering and managing reagents and consumables? |  |  |  |  |  | 
+2.9 | Are temperature logs available and updated daily for storage as per SOP/job aid? |  |  |  |  |  | 
+2.10 | Is the appropriate equipment available, calibrated, including timers, thermometers and other small equipment where applicable, and are records available? |  |  |  |  |  | 
+ | TOTAL POSSIBLE SCORE: | SITE SCORE: | 
+--- END TABLE ---
+--- TABLE ---
+ | 3.0 SAFETY | Y | P | N | N/A |  | Comments | Score
+3.1 | Are there current general SOPs/ job aids in place to implement safety practices (e.g., use of aprons/coats, gloves, hand washing, waste management, etc.)? |  |  |  |  |  | 
+3.2 | Are current SOPs and/or job aids available to address accidental exposure to potential pathogens (e.g., spills, needle sticks, injuries, or cuts)? |  |  |  |  |  | 
+3.3 | Is personal protective equipment (PPE) available to testers in the testing area? |  |  |  |  |  | 
+3.4 | Do all testers properly and consistently use PPE throughout the testing process? |  |  |  |  |  | 
+3.5 | Is clean water, soap (or hand sanitizer) and paper/hand towel available for hand washing, and being used by all testers per SOP/job aid? |  |  |  |  |  | 
+3.6 | Is the disinfectant solution available properly labeled with content, date of preparation, and date of expiration? |  |  |  |  |  | 
+3.7 | Are sharps, infectious, and non-infectious waste separated in accordance with current waste management SOPs? |  |  |  |  |  | 
+3.8 | Are infectious waste and sharp containers transported and disposed of safely? |  |  |  |  |  | 
+3.9 | Is vaccination against Hepatitis B infection available to testers, and is there documented evidence of vaccination or refusal? |  |  |  |  |  | 
+TOTAL POSSIBLE SCORE: |  | SITE SCORE: | 
+--- END TABLE ---
+--- TABLE ---
+4.0 TESTING | 
+Name of pathogen tested / e.g. HIV |  |  |  |  |  |  | 
+Manufacturer name of test(s). Name all tests where there are testing algorithms |  |  |  |  |  |  | 
+* N/A is only an option if / The question does not apply | Y | P | N | N/A | Y | P | N | N/A | Y | P | N | N/A | Y | P | N | N/A | Y | P | N | N/A | Y | P | N | N/A | Y | P | N | N/A
+4.1 | Are testers initially trained in-service, deemed competent, and are records available? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.2 | Are records of periodic competency assessments conducted for all testers? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.3 | Is the test conducted nationally approved as per SOP/job aid? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.4 | Is the testing SOP/job aid available and current? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.5 | Is the job aid displayed or accessible? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.6 | Is Quality Control (QC) testing performed routinely as per SOP? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.7 | Are QC results documented and reviewed by the tester prior to reporting patient results? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.8 | Is the site enrolled in an External Quality Assessment (EQA) program (e.g., Proficiency Testing (PT), re-testing or inter-facility comparison) for the test performed? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.9 | Are EQA reports (e.g., PT, re-testing, inter-facility comparison) reviewed and is there recorded evidence of corrective actions for failed EQA results? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.10 | Does the site have appropriate equipment for the test performed? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.11 | Are test kit inserts available for all tests at the testing site? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.12 | Are the test kits stored according to the manufacturer’s instructions? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.13 | Are new batches/lots/shipments of kits verified prior to use and records available? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.14 | Are adequate test kits available? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.15 | Are adequate consumables available? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.16 | Are expired kits safely disposed of or removed from the testing site as per SOP/job aid? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.17 | Is there a specific workflow for pre-testing, testing, and post-testing? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.18 | Is testing conducted in accordance with the SOP/job aid? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.19 | Are nationally approved algorithms used where applicable (e.g. HIV testing algorithm)? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.20 | Are corrective measures recorded and documented, as per SOP/job aid, when a test result is invalid or incorrect? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.21 | When errors/incidents or accidents occur (e.g. per site assessment report), are corrective measures recorded and documented as per SOP/job aid? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.22 | Is a standardized logbook/register available and correctly completed? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+4.23 | Are completed logbooks/registers properly archived? |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
+Total possible score and actual score obtained per pathogen | / | / | / | / | / | / | /
+Total scores for all pathogens out of the total possible scores | /
+--- END TABLE ---
+4: Gaps or observations from Section 4 above
+--- TABLE ---
+Test Program Name | Question Number | Score / (P   or   N) | Gaps/ Observations for improvement | Comments
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+ |  |  |  | 
+--- END TABLE ---
+--- TABLE ---
+(Note: If the testing site does not refer specimens, mark N/A for Section 5.0 and document ‘No specimen referral conducted at this site)
+ | 5.0 SPECIMEN REFERRAL | Y | P | N | N/A | Comments | Score
+5.1 | Is there a current SOP/job aid for referring specimens which includes collection, storage, transportation, tracking and reporting? |  |  |  |  |  | 
+5.2 | Are records and results of referred specimens available based on the current SOP/job aid? |  |  |  |  |  | 
+5.3 | Are adequate packaging materials available and correctly used per SOP/job aid? |  |  |  |  |  | 
+5.4 | Are referral specimen transportation logs included with specimens for tracking? |  |  |  |  |  | 
+5.5 | Is a referral record/logbook available and maintained? |  |  |  |  |  | 
+5.6 | Does the facility receive copies of referred test reports from the reference lab and are these distributed to the test requester? |  |  |  |  |  | 
+5.7 | Does the testing site monitor the turnaround time (TAT) of referred specimens from the referring facility to receipt of reports from the reference laboratory? |  |  |  |  |  | 
+5.8 | Where the result reports are delayed, does the site follow up with the referral laboratory and document the action? |  |  |  |  |  | 
+5.9 | Is there appropriate temporary storage space for referral specimens prior to transportation? |  |  |  |  |  | 
+TOTAL POSSIBLE SCORE: | SITE SCORE: | 
+--- END TABLE ---
+PART C: Scoring
+Each element marked will be assigned a point value: ￼
+Items marked “Yes or Y” receive 2 points each
+Items marked “Partial or P” receive 1 point each
+Items marked “No or N” receive 0 point each
+Total points scored for each section should be tallied and recorded at the end of each section. The possible total number of points obtained for all 5 sections will depend on the numbers of test types and where N/A is observed. Refer to guidelines for detailed instructions.
+--- TABLE ---
+Assessment Score Sheet Summary
+Section B | Section Name | Total Possible Score | Total Score Obtained
+Section B1 | Organization and Management |  | 
+Section B2 | Physical Facility |  | 
+Section B3 | Safety |  | 
+Section B4 | Testing |  | 
+Section B5 | Specimen Referral |  | 
+TOTAL SCORE |  | 
+--- END TABLE ---
+TOTAL SITE PERCENTAGE SCORE =
+Total site score/possible total score for this assessment * 100
+SITE LEVEL OBTAINED =
+--- TABLE ---
+Levels | % Score | Description of results
+Level 0 | Less than 40% | Needs improvement in all areas and immediate remediation
+Level 1 | 40% to 59% | Needs improvement in specific areas
+Level 2 | 60%-79% | Partially eligible
+Level 3 | 80%-89% | Close to national site certification
+Level 4 | 90% or higher | Eligible to national site certification
+--- END TABLE ---
+Assessor 1 Name:							Assessor 2 Name:
+Assessor 1 Signature: 					             Assessor 2 Signature:
+Time at end of audit (HH:MM):
+PART D: Site Assessment Report and Recommendations
+--- TABLE ---
+SPI-RDT SITE ASSESSMENT REPORT
+Name of Site/Facility: | Date:
+Question Number | Test Name if applicable | Score / P/ N | Gap/observation for improvement | Recommendation | Site/Facility/District/ Regional or National Responsibility | Date Completed | Responsible / Person
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+ |  |  |  |  |  |  | 
+--- END TABLE ---
+Assessor(s) Name:	                                               Signature:	                                                               Date:

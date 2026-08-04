@@ -1,0 +1,64 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Run the API on PHP's built-in server — the no-Docker development path.
+ *
+ * The application is environment-agnostic: it reads DB_HOST/DB_PORT from
+ * .env and neither knows nor cares whether MySQL is a Compose service or a
+ * local install. So running natively needs no code change, only .env values
+ * pointed at a reachable server.
+ *
+ * The built-in server is single-threaded and for development only. Never
+ * put it in front of real traffic — use nginx/Apache with php-fpm, which is
+ * what docker/nginx/default.conf documents.
+ *
+ * Usage:
+ *   bin/serve                 serve on 127.0.0.1:8080
+ *   bin/serve 9000            serve on 127.0.0.1:9000
+ *   bin/serve 0.0.0.0:8080    bind all interfaces (for a device on your LAN
+ *                             to reach it — useful when testing the PWA on
+ *                             a real phone or tablet)
+ *   bin/serve --help          print this docblock
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+
+$root = dirname(__DIR__);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    fwrite(STDERR, "vendor/ is missing — run: composer install\n");
+    exit(1);
+}
+
+if (!is_file($root . '/.env')) {
+    fwrite(STDERR, "No .env — run: cp .env.example .env\n");
+    exit(1);
+}
+
+$arg  = $argv[1] ?? '8080';
+$bind = str_contains($arg, ':') ? $arg : '127.0.0.1:' . $arg;
+
+if (!preg_match('/^[\w.:\[\]]+:\d{2,5}$/', $bind)) {
+    fwrite(STDERR, "Invalid address '{$arg}'. Expected a port or host:port.\n");
+    exit(1);
+}
+
+// -t public/ makes the front controller the document root, matching nginx.
+// Without it, every path under the project would be web-reachable.
+$command = sprintf(
+    '%s -S %s -t %s',
+    escapeshellarg(PHP_BINARY),
+    escapeshellarg($bind),
+    escapeshellarg($root . '/public'),
+);
+
+echo "SPI-RDT API on http://{$bind}\n";
+echo "Health check: http://{$bind}/api/health\n";
+echo "Ctrl-C to stop.\n\n";
+
+passthru($command, $exitCode);
+exit($exitCode);

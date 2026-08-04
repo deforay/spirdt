@@ -1,0 +1,14 @@
+/vendor/
+/node_modules/
+/var/log/*
+/var/cache/*
+/var/exports/*
+/var/backups/*
+/var/uploads/*
+!/var/**/.gitkeep
+.env
+.php-cs-fixer.cache
+.phpunit.result.cache
+phpstan-baseline.neon
+.DS_Store
+/public/build/

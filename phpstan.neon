@@ -1,0 +1,15 @@
+parameters:
+    level: 6
+    phpVersion: 80400
+    paths:
+        - src
+        - tests
+    bootstrapFiles:
+        - vendor/autoload.php
+    universalObjectCratesClasses:
+        # Eloquent models expose any DB column as a dynamic property via __get.
+        # Treat them as object crates so $model->column doesn't trip property.notFound.
+        - Illuminate\Database\Eloquent\Model
+    # ignoreErrors is intentionally empty. The Eloquent __callStatic and
+    # local-scope patterns belong here, but an unmatched ignore is itself an
+    # error — add them alongside the first model, not before it.

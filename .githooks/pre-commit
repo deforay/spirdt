@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# Fast, local-only gate. Anything slow belongs in CI, not here — a hook that
+# takes ten seconds is a hook people bypass.
+#
+# Enabled repo-wide via core.hooksPath=.githooks (set by composer
+# post-install / post-update). Bypass once with `git commit --no-verify`.
+
+# Lint every staged PHP file. Catches the parse error before it reaches CI.
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.php$' || true)
+if [ -n "$staged" ]; then
+    for file in $staged; do
+        if ! php -l "$file" > /dev/null 2>&1; then
+            echo "pre-commit: PHP syntax error in $file" >&2
+            php -l "$file" >&2
+            exit 1
+        fi
+    done
+fi
+
+# error_log() is banned outside src/Helper/Log.php — it bypasses the
+# UidProcessor, so the line lands with no request UID to correlate against.
+leaks=$(git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^src/.*\.php$' \
+    | grep -v '^src/Helper/Log\.php$' || true)
+if [ -n "$leaks" ]; then
+    for file in $leaks; do
+        if grep -qn 'error_log(' "$file" 2>/dev/null; then
+            echo "pre-commit: error_log() in $file — use App\\Helper\\Log instead." >&2
+            exit 1
+        fi
+    done
+fi
+
+exit 0

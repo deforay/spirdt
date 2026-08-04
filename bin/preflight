@@ -1,0 +1,202 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Environment doctor — checks this machine can actually run the app.
+ *
+ * Runs identically inside Docker and on a bare host, because the app itself
+ * is environment-agnostic: only .env differs between the two. That is the
+ * whole point of this script — it tells you which of the two you are pointed
+ * at and whether that target is reachable, instead of leaving you to decode
+ * a PDO connection error.
+ *
+ * Checks, in order:
+ *   1. PHP version and required extensions
+ *   2. vendor/ installed
+ *   3. .env present and required keys set
+ *   4. var/ directories writable
+ *   5. Database reachable, and whether migrations have run
+ *
+ * Usage:
+ *   bin/preflight            run all checks
+ *   bin/preflight --quiet    only print failures (for CI / hooks)
+ *   bin/preflight --help     print this docblock
+ *
+ * Exit codes: 0 all passed, 1 one or more failed.
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+
+$root  = dirname(__DIR__);
+$quiet = in_array('--quiet', $argv, true);
+
+const PF_OK   = 'ok';
+const PF_WARN = 'warn';
+const PF_FAIL = 'fail';
+
+/** @var list<array{status:string,label:string,detail:string}> $results */
+$results = [];
+
+function check(string $label, string $status, string $detail = ''): void
+{
+    global $results;
+    $results[] = ['status' => $status, 'label' => $label, 'detail' => $detail];
+}
+
+// ─── 1. PHP ───
+
+$phpOk = PHP_VERSION_ID >= 80400;
+check(
+    'PHP >= 8.4',
+    $phpOk ? PF_OK : PF_FAIL,
+    PHP_VERSION . ($phpOk ? '' : ' — composer.json requires ^8.4'),
+);
+
+// opcache is deliberately NOT required: it is a performance extension, and
+// the PHP CLI ships with it disabled. Nothing here depends on it.
+foreach (['pdo_mysql', 'intl', 'zip', 'mbstring', 'bcmath'] as $ext) {
+    $has = extension_loaded($ext);
+    check(
+        "ext-{$ext}",
+        $has ? PF_OK : PF_FAIL,
+        $has ? '' : ($ext === 'zip' ? 'required by openspout for .xlsx export' : 'required'),
+    );
+}
+
+// ─── 2. Dependencies ───
+
+$hasVendor = is_file($root . '/vendor/autoload.php');
+check('vendor/ installed', $hasVendor ? PF_OK : PF_FAIL, $hasVendor ? '' : 'run: composer install');
+
+if (!$hasVendor) {
+    render($results, $quiet);
+    exit(1);
+}
+
+require $root . '/vendor/autoload.php';
+
+// ─── 3. Configuration ───
+
+$hasEnv = is_file($root . '/.env');
+check('.env present', $hasEnv ? PF_OK : PF_FAIL, $hasEnv ? '' : 'run: cp .env.example .env');
+
+if ($hasEnv) {
+    Dotenv\Dotenv::createImmutable($root)->safeLoad();
+}
+
+$secret = (string) env('JWT_SECRET', '');
+check(
+    'JWT_SECRET set',
+    strlen($secret) >= 32 ? PF_OK : PF_FAIL,
+    strlen($secret) >= 32 ? '' : 'generate: php -r "echo bin2hex(random_bytes(32));"',
+);
+
+$appEnv   = (string) env('APP_ENV', 'production');
+$appDebug = (bool) env('APP_DEBUG', false);
+check(
+    'APP_DEBUG safe for APP_ENV',
+    ($appEnv === 'production' && $appDebug) ? PF_FAIL : PF_OK,
+    "APP_ENV={$appEnv} APP_DEBUG=" . ($appDebug ? 'true' : 'false'),
+);
+
+// ─── 4. Writable paths ───
+
+foreach (['var/log', 'var/cache', 'var/exports', 'var/uploads'] as $dir) {
+    $path = $root . '/' . $dir;
+    if (!is_dir($path)) {
+        @mkdir($path, 0o775, true);
+    }
+    $writable = is_dir($path) && is_writable($path);
+    check("{$dir} writable", $writable ? PF_OK : PF_FAIL, $writable ? '' : 'check permissions');
+}
+
+// ─── 5. Database ───
+
+$host = (string) env('DB_HOST', '127.0.0.1');
+$port = (string) env('DB_PORT', '3306');
+$name = (string) env('DB_NAME', 'spirdt');
+
+// Naming the target explicitly is the point: "mysql" means you are pointed
+// at the Compose service, "127.0.0.1" at a local server. Getting this wrong
+// is the single most common reason the app appears broken.
+$target = $host === 'mysql' ? 'Docker Compose service' : 'local/remote server';
+check('DB target', PF_OK, "{$host}:{$port}/{$name} ({$target})");
+
+try {
+    $pdo = new PDO(
+        sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $name),
+        (string) env('DB_USER', 'root'),
+        (string) env('DB_PASS', ''),
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5],
+    );
+    check('DB reachable', PF_OK);
+
+    $version = null;
+    try {
+        $stmt = $pdo->query("SELECT value FROM system_config WHERE `key` = 'app_version'");
+        $version = $stmt === false ? null : ($stmt->fetchColumn() ?: null);
+    } catch (PDOException) {
+        // system_config absent — migrations have never run here.
+    }
+
+    check(
+        'Schema migrated',
+        $version === null ? PF_WARN : PF_OK,
+        $version === null ? 'no schema yet — run: composer migrate' : "version {$version}",
+    );
+} catch (PDOException $e) {
+    check('DB reachable', PF_FAIL, $e->getMessage());
+}
+
+render($results, $quiet);
+
+$failed = array_filter($results, static fn (array $r): bool => $r['status'] === PF_FAIL);
+exit($failed === [] ? 0 : 1);
+
+/** @param list<array{status:string,label:string,detail:string}> $results */
+function render(array $results, bool $quiet): void
+{
+    $tty    = stream_isatty(STDOUT);
+    $green  = $tty ? "\033[32m" : '';
+    $yellow = $tty ? "\033[33m" : '';
+    $red    = $tty ? "\033[31m" : '';
+    $dim    = $tty ? "\033[2m" : '';
+    $reset  = $tty ? "\033[0m" : '';
+
+    $counts = [PF_OK => 0, PF_WARN => 0, PF_FAIL => 0];
+
+    foreach ($results as $r) {
+        $counts[$r['status']]++;
+
+        if ($quiet && $r['status'] === PF_OK) {
+            continue;
+        }
+
+        [$mark, $colour] = match ($r['status']) {
+            PF_OK   => ['PASS', $green],
+            PF_WARN => ['WARN', $yellow],
+            default => ['FAIL', $red],
+        };
+
+        printf(
+            "  %s%s%s  %-26s %s%s%s\n",
+            $colour,
+            $mark,
+            $reset,
+            $r['label'],
+            $dim,
+            $r['detail'],
+            $reset,
+        );
+    }
+
+    printf(
+        "\n  %d passed, %d warning(s), %d failed\n",
+        $counts[PF_OK],
+        $counts[PF_WARN],
+        $counts[PF_FAIL],
+    );
+}
