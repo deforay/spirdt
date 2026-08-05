@@ -8,6 +8,7 @@ use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\AssessmentPathogen;
 use App\Models\AssessmentScore;
+use App\Models\Finding;
 use App\Service\SyncService;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
@@ -38,7 +39,7 @@ final class SyncServiceTest extends TestCase
         TenantContext::withoutScope(function (): void {
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
-                ['assessment_scores', 'answers', 'assessment_pathogens', 'assessments',
+                ['assessment_scores', 'findings', 'answers', 'assessment_pathogens', 'assessments',
                     'templates', 'testing_sites', 'facilities', 'organizations'] as $table
             ) {
                 Capsule::table($table)->delete();
@@ -93,6 +94,72 @@ final class SyncServiceTest extends TestCase
         self::assertSame(4, (int) $score->total_score);
         self::assertSame(6, (int) $score->total_possible);
         self::assertFalse($result['score']['is_complete'], 'a partial visit is not complete');
+    }
+
+    public function testFindingsAreStoredAndNotDuplicatedOnRetry(): void
+    {
+        $sync = new SyncService();
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'question_code'        => '3.2',
+                'response'             => 'N',
+                'gap'                  => 'No exposure SOP on site.',
+                'recommendation'       => 'Adapt the national SOP and post it at the bench.',
+                'responsibility_level' => 'facility',
+                'responsible_person'   => 'Lab manager',
+                'due_date'             => '2026-09-30',
+            ],
+        ];
+
+        $first = $sync->accept($payload);
+        self::assertSame(['3.2|'], $first['accepted_findings']);
+
+        $sync->accept($payload);
+
+        self::assertSame(1, Finding::query()->count(), 'a retry corrects, it does not duplicate');
+
+        $finding = Finding::query()->first();
+        self::assertNotNull($finding);
+        self::assertSame('facility', $finding->responsibility_level);
+        self::assertSame('open', $finding->status);
+    }
+
+    public function testAFindingAgainstAPassingAnswerIsDropped(): void
+    {
+        // Only a Partial or a No describes a shortfall. Anything else would sit
+        // in the site's action list with nothing behind it.
+        $payload = $this->payload();
+        $payload['findings'] = [
+            ['question_code' => '3.1', 'response' => 'Y', 'gap' => 'Nothing wrong.'],
+            ['question_code' => '3.2', 'response' => 'N', 'gap' => ''],
+        ];
+
+        $result = (new SyncService())->accept($payload);
+
+        self::assertSame([], $result['accepted_findings']);
+        self::assertSame(0, Finding::query()->count());
+    }
+
+    public function testASyncDoesNotReopenAClosedFinding(): void
+    {
+        $sync = new SyncService();
+        $payload = $this->payload();
+        $payload['findings'] = [
+            ['question_code' => '3.2', 'response' => 'N', 'gap' => 'No exposure SOP on site.'],
+        ];
+
+        $sync->accept($payload);
+
+        // An administrator closes it while the device is out of coverage.
+        Finding::query()->update(['status' => 'closed', 'closed_on' => '2026-08-06']);
+
+        // The device syncs again, still holding the version it recorded.
+        $sync->accept($payload);
+
+        $finding = Finding::query()->first();
+        self::assertNotNull($finding);
+        self::assertSame('closed', $finding->status, 'the device must not reopen closed work');
     }
 
     public function testADraftBacksUpWithoutBecomingASubmission(): void

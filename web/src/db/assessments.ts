@@ -3,6 +3,7 @@ import {
     db,
     type StoredAnswer,
     type StoredAssessment,
+    type StoredFinding,
     type StoredPathogen,
     type StoredResponse,
 } from './database'
@@ -192,6 +193,170 @@ export async function saveContext(
     })
 }
 
+/**
+ * Set which pathogens the visit covers.
+ *
+ * Section 4 repeats once per entry, so changing this changes what counts as a
+ * complete assessment. Answers belonging to a removed pathogen are left alone
+ * rather than deleted: the scoring engine reports them as unexpected and
+ * ignores them, and a pathogen removed by mistake can be added back with its
+ * answers intact. The server drops them from the payload for the same reason.
+ */
+export async function savePathogens(
+    assessmentId: string,
+    pathogens: StoredPathogen[],
+): Promise<void> {
+    await chain(`pathogens:${assessmentId}`, async () => {
+        const now = new Date().toISOString()
+
+        await db.transaction('rw', db.assessments, db.journal, async () => {
+            await db.assessments.update(assessmentId, {
+                pathogens,
+                updatedAt: now,
+                syncState: 'pending',
+                syncError: null,
+            })
+            await db.journal.add({
+                assessmentId,
+                at: now,
+                kind: 'pathogens',
+                subject: assessmentId,
+                payload: pathogens,
+            })
+        })
+    })
+}
+
+export interface FindingPatch {
+    response: 'P' | 'N'
+    gap?: string
+    recommendation?: string
+    responsibilityLevel?: StoredFinding['responsibilityLevel']
+    responsiblePerson?: string
+    dueDate?: string | null
+}
+
+/**
+ * Write one finding.
+ *
+ * Journalled like an answer, and for the same reason: this is the part of the
+ * visit the site is debriefed on, and it is typed at the end of a long day.
+ */
+export async function saveFinding(
+    assessmentId: string,
+    questionCode: string,
+    pathogen: string | null,
+    patch: FindingPatch,
+): Promise<StoredFinding> {
+    const key = answerKey(assessmentId, questionCode, pathogen)
+
+    return chain(`finding:${key}`, async () => {
+        const now = new Date().toISOString()
+
+        return db.transaction('rw', db.findings, db.assessments, db.journal, async () => {
+            const existing = await db.findings.get(key)
+
+            const row: StoredFinding = {
+                key,
+                assessmentId,
+                questionCode,
+                pathogen,
+                response: patch.response,
+                gap: patch.gap ?? existing?.gap ?? '',
+                recommendation: patch.recommendation ?? existing?.recommendation ?? '',
+                responsibilityLevel:
+                    patch.responsibilityLevel ?? existing?.responsibilityLevel ?? 'site',
+                responsiblePerson: patch.responsiblePerson ?? existing?.responsiblePerson ?? '',
+                dueDate: patch.dueDate !== undefined ? patch.dueDate : (existing?.dueDate ?? null),
+                updatedAt: now,
+                revision: (existing?.revision ?? 0) + 1,
+                dirty: true,
+            }
+
+            await db.findings.put(row)
+            await db.journal.add({
+                assessmentId,
+                at: now,
+                kind: 'finding',
+                subject: key,
+                payload: row,
+            })
+            await db.assessments.update(assessmentId, {
+                updatedAt: now,
+                syncState: 'pending',
+                syncError: null,
+            })
+
+            return row
+        })
+    })
+}
+
+export function loadFindings(assessmentId: string): Promise<StoredFinding[]> {
+    return db.findings.where('assessmentId').equals(assessmentId).toArray()
+}
+
+/**
+ * Drop a finding that no longer has an answer to hang on.
+ *
+ * Called when a Partial or No is corrected to Yes or Not applicable. The gap
+ * text is kept in the journal, so a finding removed by a mis-tap is still
+ * recoverable, but it stops being reported against a question that no longer
+ * records a shortfall.
+ */
+export async function discardFinding(
+    assessmentId: string,
+    questionCode: string,
+    pathogen: string | null,
+): Promise<void> {
+    const key = answerKey(assessmentId, questionCode, pathogen)
+
+    await chain(`finding:${key}`, async () => {
+        const existing = await db.findings.get(key)
+
+        if (existing === undefined) {
+            return
+        }
+
+        const now = new Date().toISOString()
+
+        await db.transaction('rw', db.findings, db.journal, async () => {
+            await db.journal.add({
+                assessmentId,
+                at: now,
+                kind: 'finding',
+                subject: key,
+                payload: { discarded: true, was: existing },
+            })
+            await db.findings.delete(key)
+        })
+    })
+}
+
+/** Mark the assessment ready to submit, and then submitted. */
+export async function setStatus(
+    assessmentId: string,
+    status: StoredAssessment['status'],
+): Promise<void> {
+    const now = new Date().toISOString()
+
+    await db.transaction('rw', db.assessments, db.journal, async () => {
+        await db.assessments.update(assessmentId, {
+            status,
+            updatedAt: now,
+            syncState: 'pending',
+            syncError: null,
+        })
+        await db.journal.add({
+            assessmentId,
+            at: now,
+            kind: 'assessment',
+            subject: assessmentId,
+            payload: { status },
+        })
+    })
+}
+
 /** What was sent, as it was at the moment it was sent. */
 export interface AcknowledgedAnswer {
     key: string
@@ -219,10 +384,11 @@ export interface AcknowledgedAnswer {
 export async function markSynced(
     assessmentId: string,
     acknowledged: AcknowledgedAnswer[],
+    acknowledgedFindings: AcknowledgedAnswer[] = [],
 ): Promise<void> {
     const now = new Date().toISOString()
 
-    await db.transaction('rw', db.answers, db.assessments, async () => {
+    await db.transaction('rw', db.answers, db.findings, db.assessments, async () => {
         for (const entry of acknowledged) {
             const row = await db.answers.get(entry.key)
 
@@ -233,6 +399,22 @@ export async function markSynced(
             await db.answers.update(entry.key, { dirty: false })
         }
 
+        for (const entry of acknowledgedFindings) {
+            const row = await db.findings.get(entry.key)
+
+            if (row === undefined || row.revision !== entry.revision) {
+                continue
+            }
+
+            await db.findings.update(entry.key, { dirty: false })
+        }
+
+        const dirtyFindings = await db.findings
+            .where('assessmentId')
+            .equals(assessmentId)
+            .filter((row) => row.dirty)
+            .count()
+
         const stillDirty = await db.answers
             .where('assessmentId')
             .equals(assessmentId)
@@ -241,7 +423,7 @@ export async function markSynced(
 
         await db.assessments.update(assessmentId, {
             syncedAt: now,
-            syncState: stillDirty === 0 ? 'synced' : 'pending',
+            syncState: stillDirty === 0 && dirtyFindings === 0 ? 'synced' : 'pending',
             syncError: null,
         })
     })

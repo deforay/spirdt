@@ -2,15 +2,28 @@ import { computed, reactive, ref, shallowRef } from 'vue'
 
 import {
     createAssessment,
+    discardFinding,
+    type FindingPatch,
     flushWrites,
     loadAnswers,
+    loadFindings,
     saveAnswer,
     saveContext,
+    saveFinding,
+    savePathogens,
+    setStatus,
 } from '@/db/assessments'
-import { answerKey, type StoredAssessment, type StoredResponse } from '@/db/database'
+import {
+    answerKey,
+    type StoredAssessment,
+    type StoredFinding,
+    type StoredPathogen,
+    type StoredResponse,
+} from '@/db/database'
 import { checkStorage, type StorageReport } from '@/db/storage'
 import { questionKey, score } from '@/scoring/engine'
 import type { AnswerInput, Context, Template } from '@/scoring/types'
+import { syncAssessment } from '@/sync/engine'
 
 /**
  * An assessment, backed by the local database.
@@ -31,6 +44,7 @@ export function useAssessment(template: Template) {
     const assessment = shallowRef<StoredAssessment | null>(null)
     const responses = reactive(new Map<string, StoredResponse | null>())
     const comments = reactive(new Map<string, string>())
+    const findings = reactive(new Map<string, StoredFinding>())
 
     const storage = ref<StorageReport | null>(null)
     const saveState = ref<SaveState>('idle')
@@ -83,11 +97,16 @@ export function useAssessment(template: Template) {
 
         responses.clear()
         comments.clear()
+        findings.clear()
 
         for (const row of await loadAnswers(existing.id)) {
             const key = questionKey(row.questionCode, row.pathogen)
             responses.set(key, row.response)
             comments.set(key, row.comment)
+        }
+
+        for (const row of await loadFindings(existing.id)) {
+            findings.set(questionKey(row.questionCode, row.pathogen), row)
         }
     }
 
@@ -142,6 +161,95 @@ export function useAssessment(template: Template) {
     function setResponse(questionCode: string, pathogen: string | null, value: StoredResponse | null) {
         responses.set(keyOf(questionCode, pathogen), value)
         void write(questionCode, pathogen, { response: value })
+
+        // A finding describes a shortfall. Once the answer no longer records
+        // one, the finding has nothing to hang on and must stop being reported
+        // against it — the site would otherwise be handed an action for a
+        // question the assessment says is fine. The gap text stays in the
+        // journal, so a mis-tap is recoverable.
+        const current = assessment.value
+
+        if (current && value !== 'P' && value !== 'N' && findings.has(keyOf(questionCode, pathogen))) {
+            findings.delete(keyOf(questionCode, pathogen))
+            void discardFinding(current.id, questionCode, pathogen)
+        }
+    }
+
+    function findingFor(questionCode: string, pathogen: string | null): StoredFinding | null {
+        return findings.get(keyOf(questionCode, pathogen)) ?? null
+    }
+
+    async function setFinding(
+        questionCode: string,
+        pathogen: string | null,
+        patch: Omit<FindingPatch, 'response'>,
+    ) {
+        const current = assessment.value
+        const response = responseFor(questionCode, pathogen)
+
+        if (!current || (response !== 'P' && response !== 'N')) {
+            return
+        }
+
+        const saved = await saveFinding(current.id, questionCode, pathogen, { ...patch, response })
+
+        findings.set(keyOf(questionCode, pathogen), saved)
+    }
+
+    async function updatePathogens(next: StoredPathogen[]) {
+        const current = assessment.value
+
+        if (!current) {
+            return
+        }
+
+        await savePathogens(current.id, next)
+        assessment.value = { ...current, pathogens: next }
+    }
+
+    /**
+     * Mark the visit submitted, then push it.
+     *
+     * The completeness gate is here rather than in the sync: the server accepts
+     * an incomplete draft on purpose, because backing work up mid-visit is the
+     * point. What must not happen is a visit being *declared* finished while
+     * questions are unanswered, since the percentage of a partial assessment
+     * reads high — every unanswered question is absent from the denominator as
+     * well as the numerator.
+     */
+    async function submit(): Promise<{ ok: boolean; reason?: string }> {
+        const current = assessment.value
+
+        if (!current) {
+            return { ok: false, reason: 'There is no assessment to submit.' }
+        }
+
+        await flushWrites()
+
+        if (!result.value.isComplete) {
+            return {
+                ok: false,
+                reason: `${result.value.missing.length} questions still need an answer.`,
+            }
+        }
+
+        if (!result.value.isValid) {
+            return { ok: false, reason: 'Some answers are not allowed for their question.' }
+        }
+
+        await setStatus(current.id, 'submitted')
+        assessment.value = { ...current, status: 'submitted' }
+
+        // Best effort. The visit is submitted on this device either way, and
+        // the engine keeps trying — being out of coverage at the end of a visit
+        // is normal and must not block finishing one.
+        try {
+            await syncAssessment(current.id)
+        } catch {
+            // Left pending; the retry loop owns it from here.
+        }
+
+        return { ok: true }
     }
 
     function setComment(questionCode: string, pathogen: string | null, value: string) {
@@ -197,6 +305,11 @@ export function useAssessment(template: Template) {
         setResponse,
         setComment,
         updateContext,
+        findings,
+        findingFor,
+        setFinding,
+        updatePathogens,
+        submit,
         flush: flushWrites,
         answerKey,
     }

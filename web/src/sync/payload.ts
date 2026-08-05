@@ -1,5 +1,5 @@
 import type { AcknowledgedAnswer } from '../db/assessments'
-import type { StoredAnswer, StoredAssessment } from '../db/database'
+import type { StoredAnswer, StoredAssessment, StoredFinding } from '../db/database'
 
 /**
  * Turning what is on the device into what the server accepts.
@@ -34,12 +34,24 @@ export interface SyncPayload {
         comment?: string
         answered_at?: string
     }>
+    findings: Array<{
+        question_code: string
+        pathogen?: string
+        response: string
+        gap: string
+        recommendation?: string
+        responsibility_level: string
+        responsible_person?: string
+        due_date?: string
+    }>
 }
 
 export interface BuiltPayload {
     payload: SyncPayload
     /** Exactly what went in `answers`, as it was when it went. */
     sent: AcknowledgedAnswer[]
+    /** The same, for `findings`. */
+    sentFindings: AcknowledgedAnswer[]
 }
 
 /** Why an assessment cannot be sent yet. Shown to a person, so it says what to do. */
@@ -49,6 +61,7 @@ export function buildPayload(
     assessment: StoredAssessment,
     answers: StoredAnswer[],
     deviceId: string,
+    findings: StoredFinding[] = [],
 ): BuiltPayload {
     if (assessment.siteId === null || assessment.facilityId === null) {
         // The server stores a visit against a real site, so there is nothing
@@ -62,6 +75,12 @@ export function buildPayload(
     }
 
     const sendable = answers.filter((answer) => answer.dirty && answer.response !== null)
+
+    // A finding with no gap described is one the assessor opened and did not
+    // fill in. Sending it would put an empty row in the site's action list.
+    const sendableFindings = findings.filter(
+        (finding) => finding.dirty && finding.gap.trim() !== '',
+    )
 
     return {
         payload: {
@@ -88,8 +107,24 @@ export function buildPayload(
                 ...(answer.comment === '' ? {} : { comment: answer.comment }),
                 ...(answer.answeredAt === null ? {} : { answered_at: answer.answeredAt }),
             })),
+            findings: sendableFindings.map((finding) => ({
+                question_code: finding.questionCode,
+                ...(finding.pathogen === null ? {} : { pathogen: finding.pathogen }),
+                response: finding.response,
+                gap: finding.gap,
+                ...(finding.recommendation === '' ? {} : { recommendation: finding.recommendation }),
+                responsibility_level: finding.responsibilityLevel,
+                ...(finding.responsiblePerson === ''
+                    ? {}
+                    : { responsible_person: finding.responsiblePerson }),
+                ...(finding.dueDate === null ? {} : { due_date: finding.dueDate }),
+            })),
         },
         sent: sendable.map((answer) => ({ key: answer.key, revision: answer.revision })),
+        sentFindings: sendableFindings.map((finding) => ({
+            key: finding.key,
+            revision: finding.revision,
+        })),
     }
 }
 

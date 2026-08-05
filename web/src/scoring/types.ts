@@ -57,6 +57,30 @@ export interface Section {
     questions: Question[]
 }
 
+/**
+ * One choice in a select_one field.
+ *
+ * `specify` marks an option that needs a free-text companion — "Other", and
+ * also "Laboratory", which the source form asks to be qualified. The value is
+ * stored under `<code>_other` so the chosen key stays a stable key.
+ */
+export interface ContextOption {
+    key: string
+    label: Localised
+    specify?: boolean
+}
+
+export interface ContextField {
+    code: string
+    type: 'date' | 'time' | 'text' | 'textarea' | 'integer' | 'select_one' | 'repeat'
+    label: Localised
+    hint?: Localised
+    required?: boolean
+    options?: ContextOption[]
+    /** For `repeat`: the fields making up one row. */
+    fields?: ContextField[]
+}
+
 export interface Template {
     schema_version: number
     code: string
@@ -65,6 +89,8 @@ export interface Template {
     locales: string[]
     default_locale: string
     scoring: Scoring
+    /** Part A — everything asked before the checklist starts. */
+    context_fields: ContextField[]
     sections: Section[]
     [key: string]: unknown
 }

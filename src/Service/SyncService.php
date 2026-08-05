@@ -9,6 +9,7 @@ use App\Models\Assessment;
 use App\Models\AssessmentPathogen;
 use App\Models\AssessmentScore;
 use App\Models\Facility;
+use App\Models\Finding;
 use App\Models\Template;
 use App\Models\TestingSite;
 use App\Scoring\ScoringEngine;
@@ -82,13 +83,15 @@ final class SyncService
             $assessment = $this->upsertAssessment($payload, $organizationId, $assessmentId, (int) $template->id);
             $pathogenIds = $this->upsertPathogens($payload, $organizationId, $assessmentId);
             $accepted = $this->upsertAnswers($payload, $organizationId, $assessmentId, $pathogenIds);
+            $acceptedFindings = $this->upsertFindings($payload, $organizationId, $assessmentId, $pathogenIds);
 
             $score = $this->snapshotScore($assessment, $template, $organizationId);
 
             return [
-                'assessment_id' => $assessmentId,
-                'accepted'      => $accepted,
-                'score'         => $score,
+                'assessment_id'     => $assessmentId,
+                'accepted'          => $accepted,
+                'accepted_findings' => $acceptedFindings,
+                'score'             => $score,
             ];
         });
     }
@@ -244,6 +247,95 @@ final class SyncService
             $existing->response = $response;
             $existing->comment = $row['comment'] ?? null;
             $existing->answered_at = $row['answered_at'] ?? gmdate('Y-m-d H:i:s');
+            $existing->save();
+
+            $accepted[] = $questionCode . '|' . ($pathogenKey ?? '');
+        }
+
+        return $accepted;
+    }
+
+    /**
+     * Gaps recorded during the visit.
+     *
+     * Upserted on the same natural key as an answer — one finding per answer —
+     * so a retry corrects rather than duplicates. A duplicate matters more here
+     * than elsewhere: findings become a site's action list, and the same gap
+     * listed three times is three things for someone to chase.
+     *
+     * Only a Partial or a No may carry one. Anything else is dropped rather
+     * than stored, because a finding against a Yes has nothing to describe and
+     * would sit in the action list with no shortfall behind it.
+     *
+     * @param  array<string,mixed>  $payload
+     * @param  array<string,string> $pathogenIds
+     * @return list<string>         natural keys the device may now mark clean
+     */
+    private function upsertFindings(
+        array $payload,
+        int $organizationId,
+        string $assessmentId,
+        array $pathogenIds,
+    ): array {
+        $rows = is_array($payload['findings'] ?? null) ? $payload['findings'] : [];
+        $accepted = [];
+
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $questionCode = (string) ($row['question_code'] ?? '');
+            $response = (string) ($row['response'] ?? '');
+            $gap = trim((string) ($row['gap'] ?? ''));
+
+            if ($questionCode === '' || $gap === '' || !in_array($response, ['P', 'N'], true)) {
+                continue;
+            }
+
+            $pathogenKey = $row['pathogen'] ?? null;
+            $pathogenId = is_string($pathogenKey) && $pathogenKey !== ''
+                ? ($pathogenIds[$pathogenKey] ?? null)
+                : null;
+
+            if (is_string($pathogenKey) && $pathogenKey !== '' && $pathogenId === null) {
+                continue;
+            }
+
+            $level = (string) ($row['responsibility_level'] ?? 'site');
+
+            if (!in_array($level, ['site', 'facility', 'district', 'regional', 'national'], true)) {
+                $level = 'site';
+            }
+
+            $existing = Finding::query()
+                ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
+                ->where('question_code', $questionCode)
+                ->where(
+                    'pathogen_id',
+                    $pathogenId === null ? null : BinaryUuid::toBytes($pathogenId),
+                )
+                ->first();
+
+            if ($existing === null) {
+                $existing = new Finding();
+                $existing->id = $this->uuidv7();
+                $existing->assessment_id = $assessmentId;
+                $existing->question_code = $questionCode;
+                $existing->pathogen_id = $pathogenId;
+            }
+
+            $existing->organization_id = $organizationId;
+            $existing->response = $response;
+            $existing->gap = $gap;
+            $existing->recommendation = $row['recommendation'] ?? null;
+            $existing->responsibility_level = $level;
+            $existing->responsible_person = $row['responsible_person'] ?? null;
+            $existing->due_date = $row['due_date'] ?? null;
+
+            // status and closure are NOT taken from the payload. A device holds
+            // a stale copy of a finding an administrator may have closed since,
+            // and letting a sync carry it would reopen closed work.
             $existing->save();
 
             $accepted[] = $questionCode . '|' . ($pathogenKey ?? '');

@@ -88,6 +88,35 @@ export interface StoredAnswer {
 }
 
 /**
+ * A gap, and what is to be done about it.
+ *
+ * The User's Guide has the assessor debrief the site on gaps and actions before
+ * leaving, so these are recorded during the visit rather than written up later
+ * from the scores. Only a Partial or No can carry one — a finding against a Yes
+ * would have nothing to describe.
+ *
+ * Responsibility matters more than it looks: many gaps are not the site's to
+ * fix, and one recorded against a site that cannot act on it is a gap that
+ * stays open forever.
+ */
+export interface StoredFinding {
+    /** `${assessmentId}|${questionCode}|${pathogen ?? ''}` — one per answer. */
+    key: string
+    assessmentId: string
+    questionCode: string
+    pathogen: string | null
+    response: 'P' | 'N'
+    gap: string
+    recommendation: string
+    responsibilityLevel: 'site' | 'facility' | 'district' | 'regional' | 'national'
+    responsiblePerson: string
+    dueDate: string | null
+    updatedAt: string
+    revision: number
+    dirty: boolean
+}
+
+/**
  * Every write, in order, kept after the row it wrote.
  *
  * Deliberately redundant. If the answers table is ever lost or partially
@@ -98,7 +127,7 @@ export interface JournalEntry {
     id?: number
     assessmentId: string
     at: string
-    kind: 'answer' | 'context' | 'assessment'
+    kind: 'answer' | 'context' | 'assessment' | 'finding' | 'pathogens'
     /** The natural key this entry concerns, where it has one. */
     subject: string
     payload: unknown
@@ -107,6 +136,7 @@ export interface JournalEntry {
 export class SpirdtDatabase extends Dexie {
     assessments!: Table<StoredAssessment, string>
     answers!: Table<StoredAnswer, string>
+    findings!: Table<StoredFinding, string>
     journal!: Table<JournalEntry, number>
 
     constructor(name = 'spirdt') {
@@ -158,6 +188,15 @@ export class SpirdtDatabase extends Dexie {
                         row.revision ??= 1
                     })
             })
+
+        // Version 3 adds findings. Nothing to migrate — there were none — but
+        // the store has to be declared before anything can write to it.
+        this.version(3).stores({
+            assessments: 'id, status, syncState, syncedAt, updatedAt',
+            answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
+            findings: 'key, assessmentId, dirty',
+            journal: '++id, assessmentId, at',
+        })
     }
 }
 

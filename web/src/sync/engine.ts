@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { ApiError, apiRequest } from '../api/client'
 import { deviceId, isSignedIn } from '../auth/session'
-import { flushWrites, loadAnswers, markBlocked, markSynced } from '../db/assessments'
+import { flushWrites, loadAnswers, loadFindings, markBlocked, markSynced } from '../db/assessments'
 import { db } from '../db/database'
 import { acknowledged, buildPayload, NotSendable } from './payload'
 
@@ -41,6 +41,7 @@ export const syncStatus = ref<SyncStatus>({
 interface SyncAck {
     assessment_id: string
     accepted: string[]
+    accepted_findings?: string[]
     score: Record<string, unknown>
 }
 
@@ -65,10 +66,11 @@ export async function syncAssessment(assessmentId: string): Promise<SyncOutcome>
     }
 
     const answers = await loadAnswers(assessmentId)
+    const findings = await loadFindings(assessmentId)
 
     let built
     try {
-        built = buildPayload(assessment, answers, deviceId())
+        built = buildPayload(assessment, answers, deviceId(), findings)
     } catch (error) {
         if (error instanceof NotSendable) {
             // Incomplete rather than refused. It stays pending, and the reason
@@ -82,7 +84,10 @@ export async function syncAssessment(assessmentId: string): Promise<SyncOutcome>
     }
 
     const nothingChanged =
-        built.sent.length === 0 && assessment.syncedAt !== null && assessment.syncState === 'synced'
+        built.sent.length === 0 &&
+        built.sentFindings.length === 0 &&
+        assessment.syncedAt !== null &&
+        assessment.syncState === 'synced'
 
     if (nothingChanged) {
         return 'nothing-to-send'
@@ -94,6 +99,7 @@ export async function syncAssessment(assessmentId: string): Promise<SyncOutcome>
         await markSynced(
             assessmentId,
             acknowledged(assessmentId, built.sent, result.accepted ?? []),
+            acknowledged(assessmentId, built.sentFindings, result.accepted_findings ?? []),
         )
 
         return 'synced'
