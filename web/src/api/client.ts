@@ -39,7 +39,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
-    method?: 'GET' | 'POST'
+    method?: 'GET' | 'POST' | 'PATCH'
     /**
      * Serialised as JSON, unless it is a FormData.
      *

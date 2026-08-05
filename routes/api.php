@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\ChangePasswordAction;
 use App\Http\Action\Auth\LoginAction;
@@ -72,6 +73,18 @@ return static function (App $app): void {
         // staff at the place being assessed — neither has any business filing
         // an assessment against a site.
         ->add(new RequireRoleMiddleware('assessor', 'admin', 'superadmin'))
+        ->add(new AuthMiddleware());
+
+    // Management. Everything here is behind a role gate as well as
+    // authentication, because these routes are the difference between reading
+    // an organisation's data and running it.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->get('/users', [UsersAction::class, 'index']);
+        $group->post('/users', [UsersAction::class, 'create']);
+        $group->patch('/users/{id}', [UsersAction::class, 'update']);
+        $group->post('/users/{id}/password', [UsersAction::class, 'resetPassword']);
+    })
+        ->add(new RequireRoleMiddleware('admin', 'superadmin'))
         ->add(new AuthMiddleware());
 
     // Reference data the device caches to work offline.
