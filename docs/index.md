@@ -7,11 +7,11 @@ SPI-RDT is a quality audit instrument for point-of-care (POC) rapid diagnostic t
 This platform replaces a paper/Word checklist and supersedes the earlier ODK-based SPI-RRT tool.
 
 !!! info "Status"
-    Early development. The API scaffold, database schema, and setup/upgrade tooling are in place. The auditor PWA, admin interface, exports and dashboard are not yet built.
+    Early development. The API scaffold, database schema, and setup/upgrade tooling are in place. The assessor PWA, admin interface, exports and dashboard are not yet built.
 
 ## What it does
 
-**Auditor PWA** — offline-first. Assessors work in labs and clinics where connectivity is unreliable. They complete the checklist, score the site, record gaps and signatures, and sync when back in coverage.
+**Assessor PWA** — offline-first. Assessors work in labs and clinics where connectivity is unreliable. They complete the checklist, score the site, record gaps and signatures, and sync when back in coverage.
 
 **Admin area** — online only. Users and roles, facility and testing-site registry, assessment campaigns, questionnaire template management.
 

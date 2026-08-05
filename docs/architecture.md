@@ -7,7 +7,7 @@
 | Backend | Slim 4, PHP 8.4 |
 | Database | MySQL 8 |
 | Frontend | Vue 3 + Vite + TypeScript *(not yet scaffolded)* |
-| Auditor app | Offline-first PWA *(not yet scaffolded)* |
+| Assessor app | Offline-first PWA *(not yet scaffolded)* |
 | Runtime | Docker Compose, or native PHP + MySQL |
 | Backups | `amitdugar/db-tools` |
 
@@ -44,7 +44,7 @@ Discipline is not a control:
 | Platform admin | Installation | Create organisations and their first superadmin, suspend an organisation. **No access to assessment data** |
 | Organisation superadmin | One org | Full control within their organisation |
 | Admin | One org | Day-to-day administration |
-| Auditor | Org + geographic scope | Conduct assessments |
+| Assessor | Org + geographic scope | Conduct assessments |
 | Viewer | Org + geographic scope | Read-only dashboards and reports |
 | Site user | Org + their facility | View and close findings assigned to them |
 
@@ -56,7 +56,7 @@ Platform admins live in a **separate table** from users, not as a flag. That mak
 
 ## Offline and sync
 
-An assessment is a **long-lived, single-owner document** — one auditor, one site, one visit. There is no concurrent editing in the real world, which means no CRDTs, no operational transform, and no field-level merge.
+An assessment is a **long-lived, single-owner document** — one assessor, one site, one visit. There is no concurrent editing in the real world, which means no CRDTs, no operational transform, and no field-level merge.
 
 - **Down-sync**: templates, facility and testing-site lists, prior findings. Read-mostly and versioned.
 - **Up-sync**: the whole assessment as one payload, upserted on a client-generated ID so a retry is idempotent rather than duplicating.
@@ -66,14 +66,14 @@ Two assessors per visit is the norm. One device is the scribe and holds the reco
 
 ### Client-side rules
 
-These are not negotiable, because the failure mode is an auditor losing an hour of work after leaving the site:
+These are not negotiable, because the failure mode is an assessor losing an hour of work after leaving the site:
 
 1. **Authentication expiry must never destroy local drafts.** A token expiring offline must not trigger a redirect-and-clear.
 2. **Autosave on every answer change**, not on section navigation.
 3. **Prompt for service-worker updates, never auto-apply** — and suppress the prompt entirely while an assessment is in progress with unsynced data. A silent update can swap app code underneath a database written by the previous version.
 4. **iOS requires install-to-home-screen** for durable storage, and has no Background Sync API, so sync is foreground-triggered.
 5. **Never render all 160+ inputs at once.** One section, or one question, per screen — older tablets will not cope, and it matches how the work actually happens.
-6. **Namespace local storage by organisation and user.** Shared tablets are normal in these settings; a second auditor must not inherit the first one's cached sites or drafts.
+6. **Namespace local storage by organisation and user.** Shared tablets are normal in these settings; a second assessor must not inherit the first one's cached sites or drafts.
 
 ## Request handling
 

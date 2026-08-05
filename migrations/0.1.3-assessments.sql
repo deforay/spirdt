@@ -4,7 +4,7 @@
 -- The core of the system. Read 0.1.2 first for why templates are JSON.
 --
 -- ID STRATEGY HERE
---   Everything an auditor creates during a visit is BINARY(16) UUIDv7,
+--   Everything an assessor creates during a visit is BINARY(16) UUIDv7,
 --   generated on the device: assessments, assessment_pathogens, findings,
 --   attachments. Answers are the exception — see the note on that table.
 
@@ -57,11 +57,11 @@ CREATE TABLE IF NOT EXISTS campaign_sites (
 -- refers_specimens drives Section 5. When 0, the whole section is N/A and
 -- contributes nothing to either the score or the possible total. Storing it
 -- as one flag rather than nine N/A answers means the scoring engine can skip
--- the section outright and the auditor answers one question instead of nine.
+-- the section outright and the assessor answers one question instead of nine.
 --
 -- previous_assessment_id is what lets question 1.8 ("have gaps from the last
 -- assessment been addressed?") answer itself from prior findings, instead of
--- relying on the auditor remembering.
+-- relying on the assessor remembering.
 --
 -- NO UNIQUE on (testing_site_id, assessed_on): a repeat visit on the same day
 -- is legitimate, and two assessors both syncing is a data-stewardship

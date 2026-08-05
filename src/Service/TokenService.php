@@ -12,7 +12,7 @@ use Throwable;
 /**
  * Access tokens.
  *
- * Short lived on purpose. An auditor's device goes to sites, gets left in
+ * Short lived on purpose. An assessor's device goes to sites, gets left in
  * vehicles and occasionally does not come back, and a token that never expires
  * is a standing key to an organisation's data. The refresh token in the
  * database is what survives a long offline stretch, and it can be revoked.

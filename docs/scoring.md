@@ -93,7 +93,7 @@ A comment is required whenever N/A is selected — the checklist asks assessors 
 
 ## Implementation
 
-The scoring engine is built **twice, deliberately**: in PHP server-side (authoritative) and in TypeScript client-side, because the auditor must see the score on-device before leaving the site. The User's Guide requires debriefing the site team with findings before the visit ends.
+The scoring engine is built **twice, deliberately**: in PHP server-side (authoritative) and in TypeScript client-side, because the assessor must see the score on-device before leaving the site. The User's Guide requires debriefing the site team with findings before the visit ends.
 
 Two implementations of the same rules will drift unless something stops them. Three things do:
 

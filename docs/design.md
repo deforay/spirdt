@@ -1,6 +1,6 @@
 # Design
 
-The app is used on a bench. An auditor stands, sometimes wears gloves, works
+The app is used on a bench. An assessor stands, sometimes wears gloves, works
 through 59 questions, and is usually offline. Every decision below follows from
 that.
 
@@ -44,7 +44,7 @@ nothing else, so the accent had to be the one hue that never signals anything.
 
 Every one of these clears WCAG AA on both the surface and the ground, in both
 themes. Measure a replacement before you make one — the first draft of this
-palette put tertiary text at 2.51:1, which is the text an auditor reads most.
+palette put tertiary text at 2.51:1, which is the text an assessor reads most.
 
 Both themes are built from the same tokens. Define the palette on `:root`,
 redefine the tokens for dark, and style components through the tokens only.
@@ -83,7 +83,7 @@ grid of four identical cards means nothing.
 A grouped list, in the style of iOS Settings. The whole section is on one
 scrollable screen. Each question is a row with an inline segmented control.
 
-This beats one question per screen because an auditor has to check a section
+This beats one question per screen because an assessor has to check a section
 before submitting, and 59 separate screens make that expensive.
 
 Two rules the screen enforces, both from the template rather than from code:
@@ -106,7 +106,7 @@ Simple sentences. Direct voice. One noun per thing, every time.
 |---|---|
 | assessment | audit, survey, visit |
 | site | location, facility (a facility is a different record) |
-| auditor | assessor, inspector, user |
+| assessor | auditor, inspector, user |
 | question | item, check |
 | finding | issue, gap, problem |
 | level | grade, rating, band |

@@ -12,7 +12,7 @@ import { uuidv7 } from './uuid'
  * Writes to the same key are chained rather than fired in parallel. Typing a
  * comment produces a write per keystroke, and without ordering the last write
  * to finish wins rather than the last write made, which silently truncates
- * whatever the auditor typed last.
+ * whatever the assessor typed last.
  */
 
 const chains = new Map<string, Promise<unknown>>()
@@ -99,7 +99,7 @@ export interface AnswerPatch {
  * Write one answer.
  *
  * Awaited by the caller so a failure is surfaced rather than swallowed. An
- * unreported failed write is worse than a crash: the auditor sees the answer
+ * unreported failed write is worse than a crash: the assessor sees the answer
  * on screen and has no reason to doubt it.
  */
 export async function saveAnswer(
@@ -166,7 +166,7 @@ export async function saveContext(
 /**
  * Mark rows the server has acknowledged.
  *
- * Nothing is deleted. The device keeps the assessment so the auditor can still
+ * Nothing is deleted. The device keeps the assessment so the assessor can still
  * read what they filed, and so a server that later says it never received it
  * can be contradicted.
  */

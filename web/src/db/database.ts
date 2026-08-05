@@ -12,7 +12,7 @@ import Dexie, { type Table } from 'dexie'
  *
  * Rows carry their own sync state rather than being moved to an outbox. A row
  * that has reached the server is marked, never deleted — the device keeps the
- * assessment so the auditor can still read what they filed.
+ * assessment so the assessor can still read what they filed.
  */
 
 /** Mirrors answers.response in the database. */

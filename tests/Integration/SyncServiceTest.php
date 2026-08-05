@@ -119,7 +119,7 @@ final class SyncServiceTest extends TestCase
 
         $sync->accept($payload);
 
-        // The auditor corrected 3.2 from No to Yes before syncing again.
+        // The assessor corrected 3.2 from No to Yes before syncing again.
         $payload['answers'][1]['response'] = 'Y';
         $second = $sync->accept($payload);
 

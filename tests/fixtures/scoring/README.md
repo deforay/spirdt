@@ -1,7 +1,7 @@
 # Scoring fixtures
 
 These files are the contract between the two scoring engines. The server-side
-PHP engine is authoritative, but the auditor has to see a score on the device
+PHP engine is authoritative, but the assessor has to see a score on the device
 before leaving the site — the User's Guide requires debriefing the site team
 with the findings before the visit ends — so the same rules are implemented in
 TypeScript as well.

@@ -1,7 +1,7 @@
 import { db } from './database'
 
 /**
- * Whether this device will actually keep what the auditor writes.
+ * Whether this device will actually keep what the assessor writes.
  *
  * Writing to IndexedDB is the easy half. The half that loses data:
  *
@@ -15,7 +15,7 @@ import { db } from './database'
  *     indistinguishable from a saved one.
  *
  * None of this is detectable after the fact, so it is all checked before the
- * auditor starts rather than after they have filled in fifty-nine questions.
+ * assessor starts rather than after they have filled in fifty-nine questions.
  */
 
 export type StorageRisk = 'safe' | 'at-risk' | 'broken'
@@ -30,7 +30,7 @@ export interface StorageReport {
     writable: boolean
     usageBytes: number | null
     quotaBytes: number | null
-    /** What to tell the auditor. Empty when there is nothing to say. */
+    /** What to tell the assessor. Empty when there is nothing to say. */
     message: string
 }
 
@@ -70,7 +70,7 @@ export async function verifyWritable(): Promise<boolean> {
  * Ask the browser not to evict this data.
  *
  * Browsers decide for themselves and may say no. A refusal is not a failure to
- * handle — it is a fact to report, because it changes what the auditor should
+ * handle — it is a fact to report, because it changes what the assessor should
  * do: install the app, and sync sooner rather than at the end of the day.
  */
 export async function requestPersistence(): Promise<boolean> {

@@ -95,7 +95,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testATamperedTokenIsRefused(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'auditor');
+        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
         $response = $this->send($this->payload(), $token . 'x');
 
         self::assertSame(401, $response->getStatusCode());
@@ -103,7 +103,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testAValidTokenStoresTheAssessment(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'auditor');
+        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
         $response = $this->send($this->payload(), $token);
 
         self::assertSame(200, $response->getStatusCode());
@@ -118,9 +118,9 @@ final class SyncEndpointTest extends TestCase
     public function testTheOrganizationComesFromTheTokenNotTheBody(): void
     {
         // The body claims organisation A's site while the token says B. The
-        // token has to win, or an auditor could write into any tenant by
+        // token has to win, or an assessor could write into any tenant by
         // editing a field.
-        $token = (new TokenService())->issue(1, $this->orgB, 'auditor');
+        $token = (new TokenService())->issue(1, $this->orgB, 'assessor');
         $response = $this->send($this->payload(), $token);
 
         self::assertSame(200, $response->getStatusCode());
@@ -134,7 +134,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testARefusedPayloadIsStillFiled(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'auditor');
+        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
 
         $payload = $this->payload();
         $payload['template_version'] = '9.9.9';
@@ -153,7 +153,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testTheSamePayloadTwiceProducesOneAssessment(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'auditor');
+        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
 
         self::assertSame(200, $this->send($this->payload(), $token)->getStatusCode());
         self::assertSame(200, $this->send($this->payload(), $token)->getStatusCode());

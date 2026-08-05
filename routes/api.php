@@ -11,7 +11,7 @@ use Slim\Routing\RouteCollectorProxy;
  * Route registration entry point.
  *
  * Routes are split by audience under routes/api/ as they are added —
- * auditor sync, admin, platform. Keeping the split by WHO CALLS IT (rather
+ * assessor sync, admin, platform. Keeping the split by WHO CALLS IT (rather
  * than by entity) makes the permission boundary visible in the file tree,
  * and gives the OpenAPI generator a natural grouping.
  *

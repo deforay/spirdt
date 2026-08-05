@@ -21,7 +21,7 @@ import type { AnswerInput, Context, Template } from '@/scoring/types'
  * dies, and all three happen on a site visit.
  *
  * `saveState` exists because a silent failed write is the worst outcome
- * available: the answer is on screen, so the auditor has no reason to doubt it,
+ * available: the answer is on screen, so the assessor has no reason to doubt it,
  * and they find out when they get back to the office.
  */
 

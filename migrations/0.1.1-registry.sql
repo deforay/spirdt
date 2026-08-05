@@ -7,18 +7,18 @@
 -- facilities — is what an assessment points at.
 --
 -- WHY THESE TWO CARRY CLIENT-GENERATED IDs
---   An auditor can arrive at a facility or a testing site that is not in the
+--   An assessor can arrive at a facility or a testing site that is not in the
 --   registry (a newly opened TB clinic, a site the office never listed) and
 --   must be able to create it on the spot, offline. That makes both tables
 --   device-originating, so both take BINARY(16) UUIDv7 primary keys on the
 --   same reasoning as assessments: the client generates the ID, and a retried
 --   sync upserts instead of duplicating.
 --
---   The cost is duplicates — two auditors will eventually create "Makonya
+--   The cost is duplicates — two assessors will eventually create "Makonya
 --   Health Center" independently. That is a data-stewardship problem, not a
 --   schema one, so it is handled with `source` (registry vs field) and
 --   `merged_into_id` rather than by trying to prevent it with constraints
---   that would only push the failure onto the auditor mid-visit.
+--   that would only push the failure onto the assessor mid-visit.
 
 -- ─────────────────────────────────────────────
 -- FACILITIES
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS facilities (
     affiliation         VARCHAR(50) NULL,
     affiliation_other   VARCHAR(255) NULL,
     -- 'registry' = created by an admin online. 'field' = created offline by an
-    -- auditor and not yet reconciled against the registry.
+    -- assessor and not yet reconciled against the registry.
     source              ENUM('registry', 'field') NOT NULL DEFAULT 'registry',
     -- Set when an admin merges this record into a canonical one. Never delete
     -- the loser of a merge: assessments already reference it, and the audit

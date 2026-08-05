@@ -14,7 +14,7 @@ namespace App\Scoring;
  *   isScorable()  — there was something to divide by. False for an assessment
  *                   where every applicable question came back Not Applicable.
  *   isComplete()  — every expected question has an answer. False mid-visit,
- *                   which is normal: the auditor watches a running score while
+ *                   which is normal: the assessor watches a running score while
  *                   working. Required before anything is snapshotted.
  *   isValid()     — nothing was recorded that the template forbids, such as
  *                   Not Applicable on a question where it is not allowed.

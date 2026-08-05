@@ -15,7 +15,7 @@ import type {
  * Turns a template plus a set of answers into a certification level.
  *
  * This is the second implementation of the rules. src/Scoring/ScoringEngine.php
- * is the first and is authoritative; this one exists because the auditor has to
+ * is the first and is authoritative; this one exists because the assessor has to
  * see a score on the device before leaving the site, and the User's Guide
  * requires debriefing the site team with the findings before the visit ends.
  *

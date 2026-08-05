@@ -2,7 +2,7 @@
     "name": "spirdt-web",
     "private": true,
     "type": "module",
-    "description": "SPI-RDT auditor app. Offline first: it reads and writes locally and syncs when there is a connection.",
+    "description": "SPI-RDT assessor app. Offline first: it reads and writes locally and syncs when there is a connection.",
     "scripts": {
         "dev": "vite",
         "build": "vue-tsc --build && vite build",

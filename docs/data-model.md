@@ -22,7 +22,7 @@ Two strategies, split on a single rule: **can this record originate on a device 
 
 **`INT UNSIGNED AUTO_INCREMENT`** — no. Server-owned reference data, created online and down-synced.
 
-Facilities and testing sites are in the first group because an auditor can arrive at a site that is not in the registry — a newly opened TB clinic, a site the office never listed — and must be able to create it on the spot. The cost is duplicates, handled with `source` (`registry` vs `field`) and `merged_into_id` rather than by constraints that would push the failure onto the auditor mid-visit.
+Facilities and testing sites are in the first group because an assessor can arrive at a site that is not in the registry — a newly opened TB clinic, a site the office never listed — and must be able to create it on the spot. The cost is duplicates, handled with `source` (`registry` vs `field`) and `merged_into_id` rather than by constraints that would push the failure onto the assessor mid-visit.
 
 Answers deliberately get **no** client-generated ID: the idempotency unit is the assessment, submitted as a whole document, so answers upsert on their natural key.
 
@@ -46,7 +46,7 @@ Answers deliberately get **no** client-generated ID: the idempotency unit is the
 
 `template_id` is **pinned** at creation and never follows the template forward. An assessment must always be readable against the exact instrument it answered.
 
-`refers_specimens` drives Section 5. When false, the whole section is N/A — stored as one flag rather than nine N/A answers, so the scoring engine skips the section outright and the auditor answers one question instead of nine.
+`refers_specimens` drives Section 5. When false, the whole section is N/A — stored as one flag rather than nine N/A answers, so the scoring engine skips the section outright and the assessor answers one question instead of nine.
 
 `previous_assessment_id` is what lets question 1.8 — *"have gaps from the last assessment been addressed?"* — answer itself from prior findings.
 

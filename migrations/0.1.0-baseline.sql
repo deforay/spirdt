@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS geo_units (
 -- (App\Constants\PermissionCatalog), not a table — permissions change with
 -- deploys, not with data, and a catalog in code is greppable and typo-proof.
 --
--- is_system marks the seeded five (superadmin, admin, auditor, viewer,
+-- is_system marks the seeded five (superadmin, admin, assessor, viewer,
 -- site_user). They may be renamed but not deleted, and superadmin's
 -- permission set may not be reduced — otherwise an org can lock itself out.
 
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 -- ─────────────────────────────────────────────
 --
 -- One role per user. Multi-role is a rabbit hole this domain does not need —
--- an auditor is an auditor. If it is ever required, add a user_roles pivot
+-- an assessor is an assessor. If it is ever required, add a user_roles pivot
 -- then, not now.
 --
 -- Email is unique PER ORGANISATION, not globally: the same person may
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- of user_id / platform_admin_id is set. Enforced in application code rather
 -- than a CHECK so the constraint message stays useful.
 --
--- Long TTLs matter here: an auditor may be offline for days between issuing
+-- Long TTLs matter here: an assessor may be offline for days between issuing
 -- a token and syncing. Expiry must never be the thing that destroys local
 -- drafts — the PWA holds drafts independently of auth state.
 --

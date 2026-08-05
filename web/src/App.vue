@@ -13,7 +13,7 @@ import type { ResponseCode, Template } from '@/scoring/types'
  * The section screen, backed by the local database.
  *
  * Answers are written as they are given. The footer says when the last one
- * landed, because an auditor working offline has no other way to tell.
+ * landed, because an assessor working offline has no other way to tell.
  */
 
 // Cast rather than let TypeScript infer a literal type for a 96 KB document.

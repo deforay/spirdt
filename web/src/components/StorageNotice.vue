@@ -7,7 +7,7 @@ import type { SaveState } from '@/composables/useAssessment'
 /**
  * Says whether this device is keeping the assessment.
  *
- * Shown before the auditor starts, because none of what it reports can be
+ * Shown before the assessor starts, because none of what it reports can be
  * fixed afterwards. A browser that is not saving, or that will clear the data
  * in a week, has to be found out at the door of the site and not at the end of
  * the visit.

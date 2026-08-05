@@ -8,7 +8,7 @@ It replaces a paper/Word checklist and supersedes an older ODK-based tool (SPI-R
 
 Three surfaces:
 
-1. **Auditor PWA** — offline-first. Auditors visit testing sites (labs, clinics, health centres) with unreliable connectivity, complete a 59-question checklist, score the site, capture gaps and signatures, then sync when back in coverage.
+1. **Assessor PWA** — offline-first. Assessors visit testing sites (labs, clinics, health centres) with unreliable connectivity, complete a 59-question checklist, score the site, capture gaps and signatures, then sync when back in coverage.
 2. **Admin area** — online-only. User/role management, facility and site registry, assessment campaigns, questionnaire template management.
 3. **Reporting** — Excel exports and a basic dashboard.
 
@@ -21,7 +21,7 @@ Three surfaces:
 Two Word documents define the instrument. They live in `resources/source/` — deliberately outside `docs/`, so the published documentation site does not republish them — alongside plain-text extractions used as the working reference:
 
 - `SPI-RDT Checklist.docx` — the instrument itself (the questions, structure, scoring, report layout)
-- `SPI-RDT Checklist Guidelines.docx` — the User's Guide. **Critically important**: for every one of the 59 questions it gives explicit `Y = … / P = … / N = …` scoring definitions. This text becomes per-question guidance in the app and is the primary mechanism for consistent scoring between auditors.
+- `SPI-RDT Checklist Guidelines.docx` — the User's Guide. **Critically important**: for every one of the 59 questions it gives explicit `Y = … / P = … / N = …` scoring definitions. This text becomes per-question guidance in the app and is the primary mechanism for consistent scoring between assessors.
 
 
 
@@ -107,7 +107,7 @@ Section 4's own header hedges: *"N/A is only an option if the question does not 
 |---|---|
 | Backend | **Slim 4 + PHP 8.4**, MySQL 8, fully Dockerised |
 | Frontend | **Vue 3 + Vite + TypeScript** |
-| Auditor app | **PWA, offline-first** (Dexie.js over IndexedDB) |
+| Assessor app | **PWA, offline-first** (Dexie.js over IndexedDB) |
 | Admin | Separate Vite build, online-only, same framework |
 | API | **API-first.** Every capability is an endpoint before it is a screen. |
 | IDs | **UUIDv7 or ULID, stored `BINARY(16)`** — client-generated for sync idempotency |
@@ -142,7 +142,7 @@ Some installations serve a single organisation; others host several. **Both run 
 | **Platform admin** | Installation | Create organisations, create an org's first superadmin, suspend an org. **Deliberately minimal — no access to assessment data.** Only meaningful in multi-tenant installs. |
 | **Organisation superadmin** | One org | Full control within their org: users, facilities/sites, templates, campaigns |
 | Admin | One org | Day-to-day org administration |
-| Auditor | Org + geographic scope | Conduct assessments |
+| Assessor | Org + geographic scope | Conduct assessments |
 | Viewer | Org + geographic scope | Read-only dashboards and reports |
 | Site/facility user | Org + their facility | View and close findings assigned to them |
 
@@ -166,12 +166,12 @@ Org creation is rare and highly privileged. Do it as a **CLI script** (`bin/crea
 
 #### Impact on the PWA
 
-- The auditor's JWT carries `organization_id`; down-sync only ever returns their org's data.
-- **Namespace local IndexedDB by org + user.** Shared tablets are common in these settings — a second auditor logging into the same device must not see the first one's cached sites, prior findings, or drafts.
+- The assessor's JWT carries `organization_id`; down-sync only ever returns their org's data.
+- **Namespace local IndexedDB by org + user.** Shared tablets are common in these settings — a second assessor logging into the same device must not see the first one's cached sites, prior findings, or drafts.
 
 ### Offline / sync model
 
-An assessment is a **long-lived, single-owner document** — one auditor, one site, one visit. No concurrent editing in practice. So: **no CRDTs, no operational transform, no field-level merge.** Whole-document submit, client-generated IDs for idempotent retry, last-write-wins.
+An assessment is a **long-lived, single-owner document** — one assessor, one site, one visit. No concurrent editing in practice. So: **no CRDTs, no operational transform, no field-level merge.** Whole-document submit, client-generated IDs for idempotent retry, last-write-wins.
 
 - **Down-sync**: templates, facility/site lists, prior findings (for question 1.8). Read-mostly, versioned.
 - **Up-sync**: whole assessment as one payload. Media (signatures, photos) upload on a **separate channel** so a failed 20MB upload on 2G doesn't take the assessment with it.
@@ -180,11 +180,11 @@ An assessment is a **long-lived, single-owner document** — one auditor, one si
 
 ### Non-negotiable client-side rules
 
-1. **Auth expiry must never destroy local drafts.** Token expires offline → app must not redirect-and-clear. This is the single worst failure mode: an hour of work lost after the auditor has left the site.
+1. **Auth expiry must never destroy local drafts.** Token expires offline → app must not redirect-and-clear. This is the single worst failure mode: an hour of work lost after the assessor has left the site.
 2. **Autosave every answer change** to IndexedDB, not on section navigation.
 3. **Prompt for service-worker updates, never auto-apply** — and suppress the prompt entirely while an assessment is in progress with unsynced data.
 4. **iOS requires install-to-home-screen** for durable storage. Detect browser-tab mode on iOS and walk the user through installing before allowing an offline assessment to start.
-5. **Never render all 160+ inputs at once.** One section (or one question) per screen. Older iPads will not cope, and it matches how auditors actually work — walking around a lab, not sitting at a desk.
+5. **Never render all 160+ inputs at once.** One section (or one question) per screen. Older iPads will not cope, and it matches how assessors actually work — walking around a lab, not sitting at a desk.
 
 ---
 
@@ -195,7 +195,7 @@ An assessment is a **long-lived, single-owner document** — one auditor, one si
 - **Simplicity over over-engineering.** No abstraction until there are three callers. No framework-within-a-framework. No premature generalisation.
 - **DRY** — one source of truth for scoring rules, question text, and permissions.
 - **API-first** — the API is the product; UIs are clients.
-- **Extremely simple UI/UX.** Auditors are lab staff, not power users, often on a tablet in poor light. Large touch targets, high contrast, minimal chrome, obvious next action.
+- **Extremely simple UI/UX.** Assessors are lab staff, not power users, often on a tablet in poor light. Large touch targets, high contrast, minimal chrome, obvious next action.
 
 ### Key principles: Security, Performance, UX
 
@@ -215,7 +215,7 @@ An assessment is a **long-lived, single-owner document** — one auditor, one si
 
 **UX**
 - Offline is a hard requirement, not a nice-to-have
-- Auditor must see the score **on-device before leaving** — the Guidelines require debriefing the site team on site
+- Assessor must see the score **on-device before leaving** — the Guidelines require debriefing the site team on site
 - Visible, trustworthy "saved locally / synced" state
 - i18n from day one — no hardcoded strings, even though English ships first (the predecessor tool shipped EN/FR/PT/ES)
 - Date/time format is a documented customisation point per the Guidelines — make it configurable, don't hardcode
@@ -347,7 +347,7 @@ This constraint exists because the output is a certification band. If admins can
 
 ## 9. The scoring engine
 
-Build it **twice, deliberately**: PHP server-side (authoritative) and TypeScript client-side (so the auditor sees the score before leaving the site).
+Build it **twice, deliberately**: PHP server-side (authoritative) and TypeScript client-side (so the assessor sees the score before leaving the site).
 
 To stop them drifting:
 

@@ -16,7 +16,7 @@ Replaces a paper/Word checklist and supersedes the older ODK-based SPI-RRT tool.
 |---|---|
 | Backend | Slim 4, PHP 8.4, MySQL 8.4 |
 | Frontend | Vue 3 + Vite + TypeScript *(not yet scaffolded)* |
-| Auditor app | Offline-first PWA *(not yet scaffolded)* |
+| Assessor app | Offline-first PWA *(not yet scaffolded)* |
 | Runtime | Docker Compose, or native PHP + MySQL |
 | Backups | `amitdugar/db-tools` (zstd) |
 

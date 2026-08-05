@@ -107,7 +107,7 @@ Those four are punctuation and plural differences, but surfacing them is the poi
 
 A question allows *Not Applicable* only where the User's Guide actually defines what N/A means for it. That produces the restrictive set the guide describes — **1.3, 1.7, 1.8, 3.9, 4.10** — rather than the checkbox the Checklist prints on all 59 rows.
 
-Section 5 is separate: it opts out wholesale via `refers_specimens`, so an auditor answers one question instead of nine N/A answers.
+Section 5 is separate: it opts out wholesale via `refers_specimens`, so an assessor answers one question instead of nine N/A answers.
 
 See [Scoring](scoring.md) for why this matters to the certification bands.
 

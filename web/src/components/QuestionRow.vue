@@ -17,7 +17,7 @@ import type { Question, ResponseCode } from '@/scoring/types'
  *   inapplicable, since every Not applicable narrows the denominator.
  *
  *   Partial, No and Not applicable oblige a note, and the row says so until
- *   one is written. The checklist asks the auditor to describe the gap, or to
+ *   one is written. The checklist asks the assessor to describe the gap, or to
  *   state why the question does not apply. Saying it here, at the moment of
  *   the decision, beats saying it at submit when the site visit is over.
  */

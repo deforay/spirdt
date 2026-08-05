@@ -4,7 +4,7 @@ import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 import type { ResponseCode } from '@/scoring/types'
 
 /**
- * The response control. One of these per question, and the auditor taps it
+ * The response control. One of these per question, and the assessor taps it
  * fifty-nine times a visit, so it is the single component most worth getting
  * right.
  *
@@ -12,7 +12,7 @@ import type { ResponseCode } from '@/scoring/types'
  * exclusive choices is a radio group, and the free arrow-key navigation and
  * correct announcement are exactly what we said we would not hand-roll.
  *
- * Tapping the selected option clears it. An auditor who taps the wrong row
+ * Tapping the selected option clears it. An assessor who taps the wrong row
  * needs a way back to unanswered, and there is no other affordance for it.
  */
 
