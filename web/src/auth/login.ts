@@ -24,18 +24,9 @@ export interface Credentials {
     organization?: string
 }
 
-export async function signIn(credentials: Credentials): Promise<Session> {
-    const body = await apiRequest<TokenPair>('/auth/login', {
-        auth: false,
-        body: {
-            email: credentials.email,
-            password: credentials.password,
-            organization: credentials.organization ?? '',
-            device_id: deviceId(),
-        },
-    })
-
-    const next: Session = {
+/** One place where the wire shape becomes a session, because two endpoints return it. */
+function toSession(body: TokenPair): Session {
+    return {
         accessToken: body.access_token,
         refreshToken: body.refresh_token,
         expiresAt: Date.now() + body.expires_in * 1000,
@@ -49,6 +40,44 @@ export async function signIn(credentials: Credentials): Promise<Session> {
             mustChangePassword: body.user.must_change_password,
         },
     }
+}
+
+/**
+ * Change your own password.
+ *
+ * The server revokes every session as it accepts this, the caller's included,
+ * and returns a fresh pair in exchange. Saving that pair is not housekeeping —
+ * without it the client is signed out by its own success, which on a device
+ * holding an unsynced visit is alarming rather than merely annoying.
+ */
+export async function changePassword(current: string, next: string): Promise<Session> {
+    const session = toSession(
+        await apiRequest<TokenPair>('/auth/password', {
+            body: {
+                current_password: current,
+                new_password: next,
+                device_id: deviceId(),
+            },
+        }),
+    )
+
+    saveSession(session)
+
+    return session
+}
+
+export async function signIn(credentials: Credentials): Promise<Session> {
+    const body = await apiRequest<TokenPair>('/auth/login', {
+        auth: false,
+        body: {
+            email: credentials.email,
+            password: credentials.password,
+            organization: credentials.organization ?? '',
+            device_id: deviceId(),
+        },
+    })
+
+    const next = toSession(body)
 
     saveSession(next)
 

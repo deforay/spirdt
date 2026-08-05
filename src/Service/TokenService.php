@@ -49,8 +49,21 @@ final class TokenService
         return $this->ttlSeconds;
     }
 
-    public function issue(int $userId, int $organizationId, string $role, bool $isPlatformAdmin = false): string
-    {
+    /**
+     * `pwd` carries "this password has to be changed before anything else".
+     *
+     * A claim rather than a lookup: the alternative is reading the users table
+     * on every request to check one boolean. It is only as durable as the token
+     * — changing the password issues a new pair without it, and a token minted
+     * before the change expires within the access TTL.
+     */
+    public function issue(
+        int $userId,
+        int $organizationId,
+        string $role,
+        bool $isPlatformAdmin = false,
+        bool $mustChangePassword = false,
+    ): string {
         $now = time();
 
         return JWT::encode(
@@ -63,6 +76,7 @@ final class TokenService
                 'org'   => $organizationId,
                 'role'  => $role,
                 'admin' => $isPlatformAdmin,
+                'pwd'   => $mustChangePassword,
             ],
             $this->secret,
             'HS256',
@@ -74,7 +88,7 @@ final class TokenService
      * signed with a different secret. Deliberately one return for all of them:
      * telling a caller which of those went wrong tells an attacker too.
      *
-     * @return array{sub:int,org:int,role:string,admin:bool}|null
+     * @return array{sub:int,org:int,role:string,admin:bool,pwd:bool}|null
      */
     public function verify(string $token): ?array
     {
@@ -93,6 +107,11 @@ final class TokenService
             'org'   => (int) $claims['org'],
             'role'  => (string) ($claims['role'] ?? ''),
             'admin' => (bool) ($claims['admin'] ?? false),
+            // Absent on a token minted before this claim existed. Defaulting
+            // to false is the safe reading: it lets an old token keep working
+            // rather than locking a signed-in assessor out mid-visit, and the
+            // flag is re-read from the database at the next sign-in anyway.
+            'pwd'   => (bool) ($claims['pwd'] ?? false),
         ];
     }
 }

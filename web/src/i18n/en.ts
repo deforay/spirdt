@@ -30,6 +30,18 @@ export const messages = {
     'signIn.submitting': 'Signing in',
     'signIn.failed': 'Could not sign in.',
 
+    'password.title': 'Choose a password',
+    'password.why': 'Your account is using a password somebody else set. Replace it before you start.',
+    'password.current': 'Current',
+    'password.new': 'New',
+    'password.confirm': 'Repeat',
+    'password.save': 'Save password',
+    'password.saving': 'Saving',
+    'password.failed': 'The password could not be changed.',
+    'password.tooShort': 'Use at least {count} characters.',
+    'password.mismatch': 'The two do not match.',
+    'password.signsOutOthers': 'This signs you out on every other device.',
+
     'sites.title': 'Testing sites',
     'sites.subtitle': 'Choose the site you are assessing.',
     'sites.search': 'Search',

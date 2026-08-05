@@ -58,4 +58,29 @@ final class AuthException extends RuntimeException
     {
         return new self('Your session has ended. Sign in again.', 401);
     }
+
+    /**
+     * The proposed password will not do.
+     *
+     * Unlike the messages above, this one says exactly what is wrong. The
+     * person reading it has already proved who they are, so there is nothing
+     * left to conceal — and "that password is not acceptable" without a reason
+     * is how somebody ends up trying the same thing four times.
+     */
+    public static function passwordUnacceptable(string $reason): self
+    {
+        return new self($reason, 422);
+    }
+
+    /**
+     * Nothing else will answer until the password is changed.
+     *
+     * 403 rather than 401, because the token is perfectly valid and signing in
+     * again would change nothing — a 401 would send the client round a refresh
+     * loop that cannot resolve.
+     */
+    public static function passwordChangeRequired(): self
+    {
+        return new self('Change your password before you continue.', 403);
+    }
 }

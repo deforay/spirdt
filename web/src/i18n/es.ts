@@ -24,6 +24,19 @@ export const messages: Messages = {
     'signIn.submitting': 'Iniciando sesión',
     'signIn.failed': 'No se pudo iniciar sesión.',
 
+    'password.title': 'Elija una contraseña',
+    'password.why':
+        'Su cuenta usa una contraseña que definió otra persona. Sustitúyala antes de empezar.',
+    'password.current': 'Actual',
+    'password.new': 'Nueva',
+    'password.confirm': 'Repetir',
+    'password.save': 'Guardar',
+    'password.saving': 'Guardando',
+    'password.failed': 'No se pudo cambiar la contraseña.',
+    'password.tooShort': 'Use al menos {count} caracteres.',
+    'password.mismatch': 'Las dos no coinciden.',
+    'password.signsOutOthers': 'Esto cierra la sesión en todos los demás dispositivos.',
+
     'sites.title': 'Sitios de prueba',
     'sites.subtitle': 'Elija el sitio que está evaluando.',
     'sites.search': 'Buscar',

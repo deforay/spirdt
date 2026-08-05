@@ -193,6 +193,90 @@ final class AuthService
     }
 
     /**
+     * The floor, matching what bin/provision-org and bin/dev/create-user insist
+     * on. A rule enforced in one of three places is not a rule.
+     */
+    public const MIN_PASSWORD_LENGTH = 12;
+
+    /**
+     * Change your own password.
+     *
+     * The current password is required even though the caller already holds a
+     * valid token. A token can be a borrowed tablet left signed in on a bench;
+     * knowing the password is the thing that says this is the account holder,
+     * and without it an unattended device is a permanent account takeover.
+     *
+     * EVERY SESSION IS REVOKED, including this one, and a fresh pair issued in
+     * return. If the reason for the change was that somebody else had the old
+     * password, leaving their session alive makes the change decorative — which
+     * is the one thing a password change must never be.
+     *
+     * @return array<string,mixed> a new token pair; the caller stays signed in here
+     *
+     * @throws AuthException
+     */
+    public function changePassword(
+        int $userId,
+        string $current,
+        string $next,
+        ?string $deviceId = null,
+        ?string $userAgent = null,
+    ): array {
+        $user = User::acrossOrganizations()->where('users.id', $userId)->first();
+
+        if (!$user instanceof User || !$user->is_active) {
+            throw AuthException::invalidCredentials();
+        }
+
+        if (!password_verify($current, (string) $user->password_hash)) {
+            throw AuthException::invalidCredentials();
+        }
+
+        $this->guardNewPassword($current, $next);
+
+        Capsule::connection()->transaction(function () use ($user, $next): void {
+            User::acrossOrganizations()
+                ->where('users.id', (int) $user->id)
+                ->update([
+                    'password_hash'        => password_hash($next, PASSWORD_DEFAULT),
+                    'must_change_password' => 0,
+                ]);
+
+            $this->revokeAllFor((int) $user->id);
+        });
+
+        // Re-read so the pair below is minted from the stored state rather than
+        // from the in-memory copy, which still says the password must change.
+        $updated = User::acrossOrganizations()->where('users.id', $userId)->first();
+
+        return $this->issue($updated instanceof User ? $updated : $user, $deviceId, $userAgent);
+    }
+
+    /** @throws AuthException */
+    private function guardNewPassword(string $current, string $next): void
+    {
+        if (mb_strlen($next) < self::MIN_PASSWORD_LENGTH) {
+            throw AuthException::passwordUnacceptable(
+                sprintf('Use at least %d characters.', self::MIN_PASSWORD_LENGTH),
+            );
+        }
+
+        // Measured in bytes: bcrypt truncates silently at 72, so anything past
+        // that is not part of the password however long it looks.
+        if (strlen($next) > 72) {
+            throw AuthException::passwordUnacceptable('Use 72 characters or fewer.');
+        }
+
+        if (trim($next) === '') {
+            throw AuthException::passwordUnacceptable('Use something other than spaces.');
+        }
+
+        if ($next === $current) {
+            throw AuthException::passwordUnacceptable('Choose a password you have not just used.');
+        }
+    }
+
+    /**
      * @return array<string,mixed>
      */
     private function issue(User $user, ?string $deviceId, ?string $userAgent): array
@@ -202,7 +286,13 @@ final class AuthService
         $role = Role::acrossOrganizations()->where('roles.id', (int) $user->role_id)->first();
         $roleKey = $role === null ? '' : (string) $role->key;
 
-        $accessToken = $this->tokens->issue((int) $user->id, $organizationId, $roleKey);
+        $accessToken = $this->tokens->issue(
+            (int) $user->id,
+            $organizationId,
+            $roleKey,
+            false,
+            (bool) $user->must_change_password,
+        );
 
         $refreshToken = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
 

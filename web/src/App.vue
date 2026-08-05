@@ -5,6 +5,7 @@ import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 
 import type { Site } from '@/api/sites'
 import { session } from '@/auth/session'
+import ChangePassword from '@/components/ChangePassword.vue'
 import ContextForm from '@/components/ContextForm.vue'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
@@ -44,6 +45,13 @@ const submitError = ref('')
 
 const signedIn = computed(() => session.value !== null)
 
+/**
+ * Signed in, but the server will refuse everything except changing the
+ * password. Shown instead of the app rather than as a prompt, because a
+ * dismissible one produces a screen where nothing works and no explanation.
+ */
+const mustChangePassword = computed(() => session.value?.user.mustChangePassword === true)
+
 /** Part A fields whose value decides whether a section applies. */
 const applicabilityFields = computed(() =>
     template.sections
@@ -55,13 +63,17 @@ const draftContext = ref<Context>({})
 const draftPathogens = ref<StoredPathogen[]>([])
 
 onMounted(() => {
-    if (signedIn.value) {
+    if (signedIn.value && !mustChangePassword.value) {
         startSync()
     }
 })
 
 function onSignedIn() {
-    startSync()
+    // Not while the password is unusable: every sync request would come back
+    // 403, and the retry loop would grow a backoff against a wall.
+    if (!mustChangePassword.value) {
+        startSync()
+    }
 }
 
 async function onSiteChosen(site: Site) {
@@ -206,6 +218,8 @@ async function onSubmit() {
 
 <template>
     <SignIn v-if="!signedIn" @signed-in="onSignedIn" />
+
+    <ChangePassword v-else-if="mustChangePassword" @changed="onSignedIn" />
 
     <SitePicker v-else-if="stage === 'site'" @chosen="onSiteChosen" />
 

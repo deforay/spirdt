@@ -26,6 +26,19 @@ export const messages: Messages = {
     'signIn.submitting': 'Connexion en cours',
     'signIn.failed': 'Connexion impossible.',
 
+    'password.title': 'Choisissez un mot de passe',
+    'password.why':
+        "Votre compte utilise un mot de passe défini par quelqu'un d'autre. Remplacez-le avant de commencer.",
+    'password.current': 'Actuel',
+    'password.new': 'Nouveau',
+    'password.confirm': 'Répéter',
+    'password.save': 'Enregistrer',
+    'password.saving': 'Enregistrement',
+    'password.failed': "Le mot de passe n'a pas pu être modifié.",
+    'password.tooShort': 'Utilisez au moins {count} caractères.',
+    'password.mismatch': 'Les deux ne correspondent pas.',
+    'password.signsOutOthers': 'Cela vous déconnecte de tous les autres appareils.',
+
     'sites.title': 'Sites de test',
     'sites.subtitle': 'Choisissez le site que vous évaluez.',
     'sites.search': 'Rechercher',

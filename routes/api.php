@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use App\Http\Action\AttachmentAction;
+use App\Http\Action\Auth\ChangePasswordAction;
 use App\Http\Action\Auth\LoginAction;
 use App\Http\Action\Auth\LogoutAction;
 use App\Http\Action\Auth\RefreshAction;
 use App\Http\Action\SitesAction;
 use App\Http\Action\SyncAction;
 use App\Middleware\AuthMiddleware;
+use App\Middleware\RequireRoleMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -48,6 +50,13 @@ return static function (App $app): void {
         $group->post('/logout', LogoutAction::class);
     });
 
+    // Authenticated, but exempt from the must-change-password gate — it is the
+    // route that clears it, so gating it would leave the account with no way
+    // out. Every other authenticated route refuses until this has been used.
+    $app->group('/auth', function (RouteCollectorProxy $group): void {
+        $group->post('/password', ChangePasswordAction::class);
+    })->add(new AuthMiddleware(requireUsablePassword: false));
+
     $app->group('/sync', function (RouteCollectorProxy $group): void {
         // Idempotent. A device that cannot tell a failed request from a lost
         // response will send this again, and must not create a second visit.
@@ -57,7 +66,13 @@ return static function (App $app): void {
         // will not complete cannot hold up the assessment it belongs to.
         // Idempotent on the checksum of what arrives.
         $group->post('/attachments', AttachmentAction::class);
-    })->add(new AuthMiddleware());
+    })
+        // Inside AuthMiddleware, which is what establishes the role. A viewer
+        // reads collected data and does not collect it, and a site_user is
+        // staff at the place being assessed — neither has any business filing
+        // an assessment against a site.
+        ->add(new RequireRoleMiddleware('assessor', 'admin', 'superadmin'))
+        ->add(new AuthMiddleware());
 
     // Reference data the device caches to work offline.
     $app->group('', function (RouteCollectorProxy $group): void {
