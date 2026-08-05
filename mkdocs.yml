@@ -47,6 +47,7 @@ nav:
       - Data Model: data-model.md
       - Templates: templates.md
       - Scoring: scoring.md
+      - Design: design.md
   - Design Brief: design-brief.md
 
 markdown_extensions:
