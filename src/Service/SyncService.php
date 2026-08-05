@@ -8,7 +8,9 @@ use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\AssessmentPathogen;
 use App\Models\AssessmentScore;
+use App\Models\Facility;
 use App\Models\Template;
+use App\Models\TestingSite;
 use App\Scoring\ScoringEngine;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
@@ -68,6 +70,8 @@ final class SyncService
         if ($existing === null && $this->existsInAnotherOrganization($assessmentId)) {
             throw new RuntimeException('That assessment belongs to another organisation.');
         }
+
+        $this->requireOwnSite($payload);
 
         return Capsule::connection()->transaction(function () use (
             $payload,
@@ -312,6 +316,51 @@ final class SyncService
             'missing'        => $result->missing,
             'violations'     => $result->violations,
         ];
+    }
+
+    /**
+     * The site and facility must belong to the caller's organisation.
+     *
+     * The foreign keys only require that the rows exist SOMEWHERE, and the
+     * organisation comes from the token rather than the body — so without this
+     * a payload naming another organisation's site is stored happily. Nothing
+     * leaks, because the assessment still lands in the caller's own tenant and
+     * the site itself stays unreadable, but the visit ends up attached to a
+     * site its organisation does not own: it resolves to nothing in every
+     * report, and anyone who learns a site id can plant references into it.
+     *
+     * The pairing is checked too. A site and a facility can each be the
+     * caller's own and still not belong together, which would file the visit
+     * under the wrong facility.
+     *
+     * @param  array<string,mixed>      $payload
+     * @throws InvalidArgumentException
+     */
+    private function requireOwnSite(array $payload): void
+    {
+        $siteId = $this->requireUuid($payload, 'testing_site_id');
+        $facilityId = $this->requireUuid($payload, 'facility_id');
+
+        // Scoped queries: another organisation's row resolves to null here.
+        $site = TestingSite::query()
+            ->where('testing_sites.id', BinaryUuid::toBytes($siteId))
+            ->first();
+
+        if ($site === null) {
+            throw new InvalidArgumentException('That testing site is not in this organisation.');
+        }
+
+        $facility = Facility::query()
+            ->where('facilities.id', BinaryUuid::toBytes($facilityId))
+            ->first();
+
+        if ($facility === null) {
+            throw new InvalidArgumentException('That facility is not in this organisation.');
+        }
+
+        if ((string) $site->facility_id !== $facilityId) {
+            throw new InvalidArgumentException('That testing site does not belong to that facility.');
+        }
     }
 
     /**

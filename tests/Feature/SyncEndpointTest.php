@@ -117,11 +117,17 @@ final class SyncEndpointTest extends TestCase
 
     public function testTheOrganizationComesFromTheTokenNotTheBody(): void
     {
-        // The body claims organisation A's site while the token says B. The
-        // token has to win, or an assessor could write into any tenant by
-        // editing a field.
+        // Nothing in the payload names an organisation, and nothing may. The
+        // assessment lands wherever the signed token says, or an assessor could
+        // write into any tenant by editing a field.
+        [$facilityB, $siteB] = $this->makeSiteIn($this->orgB, 'cc', 'dd');
+
+        $payload = $this->payload();
+        $payload['facility_id'] = $facilityB;
+        $payload['testing_site_id'] = $siteB;
+
         $token = (new TokenService())->issue(1, $this->orgB, 'assessor');
-        $response = $this->send($this->payload(), $token);
+        $response = $this->send($payload, $token);
 
         self::assertSame(200, $response->getStatusCode());
 
@@ -130,6 +136,67 @@ final class SyncEndpointTest extends TestCase
 
         TenantContext::set($this->orgB);
         self::assertSame(1, Assessment::query()->count(), 'it landed in B, from the token');
+    }
+
+    public function testAPayloadNamingAnotherOrganisationsSiteIsRefused(): void
+    {
+        // The foreign keys only require that the site exists somewhere. Without
+        // an ownership check the visit is stored against a site this
+        // organisation does not own — invisible in every report that resolves
+        // the site, and plantable by anyone who learns a site id.
+        $token = (new TokenService())->issue(1, $this->orgB, 'assessor');
+
+        $response = $this->send($this->payload(), $token);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString(
+            'not in this organisation',
+            (string) json_decode((string) $response->getBody(), true)['error']['message'],
+        );
+
+        TenantContext::withoutScope(function (): void {
+            self::assertSame(0, Assessment::acrossOrganizations()->count(), 'nothing was stored anywhere');
+        });
+    }
+
+    public function testASiteFromTheWrongFacilityIsRefused(): void
+    {
+        // Both rows belong to this organisation, but not to each other. Stored
+        // as given, the visit is filed under a facility it did not happen in.
+        [$otherFacility] = $this->makeSiteIn($this->orgA, 'ee', 'ff');
+
+        $payload = $this->payload();
+        $payload['facility_id'] = $otherFacility;
+
+        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
+
+        self::assertSame(422, $this->send($payload, $token)->getStatusCode());
+    }
+
+    /**
+     * @return array{0:string,1:string} facility id, site id
+     */
+    private function makeSiteIn(int $organizationId, string $facilitySlot, string $siteSlot): array
+    {
+        $facilityId = '019fd200-0000-7000-8000-0000000000' . $facilitySlot;
+        $siteId = '019fd200-0000-7000-8000-0000000000' . $siteSlot;
+
+        Capsule::table('facilities')->insert([
+            'id'              => BinaryUuid::toBytes($facilityId),
+            'organization_id' => $organizationId,
+            'name'            => 'Facility ' . $facilitySlot,
+            'source'          => 'registry',
+        ]);
+
+        Capsule::table('testing_sites')->insert([
+            'id'              => BinaryUuid::toBytes($siteId),
+            'organization_id' => $organizationId,
+            'facility_id'     => BinaryUuid::toBytes($facilityId),
+            'name'            => 'Site ' . $siteSlot,
+            'source'          => 'registry',
+        ]);
+
+        return [$facilityId, $siteId];
     }
 
     public function testARefusedPayloadIsStillFiled(): void
