@@ -238,6 +238,30 @@ password unless `--password` is given. Minimum twelve characters.
     request, but nothing reads it. An admin token currently opens exactly the
     same routes as an assessor token.
 
+## Review
+
+### `bin/dev/review`
+
+Runs an adversarial review pass against this repository's standing brief.
+
+```bash
+bin/dev/review                  # the working branch against main
+bin/dev/review <commit-sha>     # one commit
+bin/dev/review --uncommitted    # the working tree, before committing
+```
+
+The reviewing CLI is named by `$REVIEW_AGENT`, read from the untracked `.env`
+and falling back to your shell profile — so the tool can be swapped without
+editing anything, and no vendor name is committed. Only that one key is read
+from `.env`: a reviewer reading a diff has no business inheriting the database
+credentials or the JWT secret.
+
+The brief itself lives in
+[Engineering Standards](engineering-standards.md) and is extracted from there
+at run time rather than duplicated here. Two copies of a checklist means the
+one nobody edits is the one that runs — and the script fails loudly rather than
+reviewing with no brief if that heading ever moves.
+
 ## Reference data
 
 ### `bin/dev/publish-template`

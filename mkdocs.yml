@@ -51,6 +51,7 @@ nav:
       - Signatures: signatures.md
       - Scoring: scoring.md
       - Design: design.md
+      - Engineering Standards: engineering-standards.md
   - Design Brief: design-brief.md
 
 markdown_extensions:

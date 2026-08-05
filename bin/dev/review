@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# review — run the adversarial review pass with this repository's standing brief.
+#
+# Usage:
+#   bin/dev/review                 # review the working branch against main
+#   bin/dev/review <commit-sha>    # review one commit
+#   bin/dev/review --uncommitted   # review the working tree before committing
+#
+# The reviewing CLI is named by $REVIEW_AGENT rather than hard-coded, so the repository
+# carries no vendor name and the reviewer can be swapped without editing anything here.
+#
+# The brief is EXTRACTED from docs/engineering-standards.md §1 rather than duplicated here.
+# Two copies of a review checklist means the one nobody edits is the one that gets used.
+set -euo pipefail
+
+cd "$(dirname "$0")/../.."
+
+# Falls back to the untracked .env, so the reviewer's name lives on the machine rather than
+# in a shell profile — and never in the repository. Only this one key is read: the reviewing
+# CLI has no business inheriting database credentials or the JWT secret just to read a diff.
+if [ -z "${REVIEW_AGENT:-}" ] && [ -f .env ]; then
+    REVIEW_AGENT="$(awk -F= '/^[[:space:]]*REVIEW_AGENT[[:space:]]*=/ {
+        sub(/^[^=]*=[[:space:]]*/, ""); gsub(/^["'\'']|["'\'']$/, ""); print; exit }' .env)"
+fi
+
+if [ -z "${REVIEW_AGENT:-}" ]; then
+    echo "REVIEW_AGENT is not set — it names the CLI that performs the review." >&2
+    echo "Set it in the untracked .env:   REVIEW_AGENT=<your-review-cli>" >&2
+    echo "or in your shell profile:       export REVIEW_AGENT=<your-review-cli>" >&2
+    exit 1
+fi
+
+BRIEF="$(awk '/^\*\*The review brief/{found=1; next} found && /^> /{sub(/^> /,""); gsub(/^"|"$/,""); print; exit}' \
+    docs/engineering-standards.md)"
+
+if [ -z "$BRIEF" ]; then
+    echo "Could not extract the review brief from docs/engineering-standards.md §1." >&2
+    echo "Has the '**The review brief**' heading changed?" >&2
+    exit 1
+fi
+
+# The reviewer reads the repository itself, so it gets pointers rather than pasted files.
+# Naming the invariant docs is the difference between a review of this system and a review
+# of some PHP: without them it cannot know that a registry query missing the programme
+# scope, or a percentage banded before rounding, is a bug rather than a style choice.
+CONTEXT="Before reviewing, read these for the rules this codebase is held to:
+- docs/engineering-standards.md — the bar, and what counts as a finding
+- docs/data-model.md — the two tenant scopes, and why organization_id on the registry
+  is provenance rather than scope
+- docs/scoring.md — integer arithmetic, N/A excluded from both numerator and
+  denominator, rounding to two places BEFORE banding
+- docs/architecture.md — offline-first constraints, and why the device is the source of
+  truth until the server acknowledges a visit
+- docs/signatures.md — why media uploads on a separate channel, and what is deliberately
+  not believed about an upload
+- docs/templates.md — instruments are versioned documents and an assessment pins the
+  version it answered
+
+A finding is a defect with a failure scenario: concrete inputs or state, and the wrong
+output or lost data that results. A trade-off these documents already record is a
+rebuttal, not a fix — say so rather than reporting it.
+
+$BRIEF"
+
+# The scope travels inside the prompt rather than as a --base/--commit flag: those flags
+# select a built-in review mode and are mutually exclusive with custom instructions, and
+# the instructions are the entire point of this script.
+case "${1:-}" in
+    --uncommitted) SCOPE="Review the staged, unstaged and untracked changes in the working tree (\`git status\`, \`git diff\`, \`git diff --cached\`)." ;;
+    "")            SCOPE="Review the changes on the current branch relative to main: \`git diff main...HEAD\`. Ignore code outside that diff except where you need it to judge the diff." ;;
+    *)             SCOPE="Review the changes introduced by commit $1: \`git show $1\`. Ignore code outside that diff except where you need it to judge the diff." ;;
+esac
+
+exec "$REVIEW_AGENT" review "$SCOPE
+
+$CONTEXT"
