@@ -278,6 +278,8 @@ async function onSubmit() {
         :findings="assessment.findings"
         :answers-by-key="answersByKey"
         :site-name="assessment.assessment.value?.siteName ?? ''"
+        :assessment-id="assessment.assessment.value?.id ?? ''"
+        :context="assessment.assessment.value?.context ?? {}"
         :submitting="submitting"
         :submit-error="submitError"
         @back="stage = 'checklist'"

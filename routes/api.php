@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\LoginAction;
 use App\Http\Action\Auth\LogoutAction;
 use App\Http\Action\Auth\RefreshAction;
@@ -51,10 +52,20 @@ return static function (App $app): void {
         // Idempotent. A device that cannot tell a failed request from a lost
         // response will send this again, and must not create a second visit.
         $group->post('/assessments', SyncAction::class);
+
+        // Signatures and photographs, on their own channel so an upload that
+        // will not complete cannot hold up the assessment it belongs to.
+        // Idempotent on the checksum of what arrives.
+        $group->post('/attachments', AttachmentAction::class);
     })->add(new AuthMiddleware());
 
     // Reference data the device caches to work offline.
     $app->group('', function (RouteCollectorProxy $group): void {
         $group->get('/sites', SitesAction::class);
+
+        // Served by the application rather than the web server: these files sit
+        // outside the document root, and the organisation scope is the only
+        // thing keeping one tenant's signatures away from another's.
+        $group->get('/attachments/{id}', [AttachmentAction::class, 'show']);
     })->add(new AuthMiddleware());
 };

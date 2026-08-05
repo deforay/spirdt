@@ -16,6 +16,7 @@ export const plural = (count: number): 'one' | 'other' => (count < 2 ? 'one' : '
 export const messages: Messages = {
     'action.add': 'Ajouter',
     'action.remove': 'Retirer',
+    'action.cancel': 'Annuler',
 
     'signIn.subtitle': 'Connectez-vous pour commencer une évaluation.',
     'signIn.email': 'E-mail',
@@ -119,6 +120,23 @@ export const messages: Messages = {
         one: '{count} question attend encore une réponse.',
         other: '{count} questions attendent encore une réponse.',
     },
+
+    'signature.heading': 'Signatures',
+    'signature.canvasLabel': 'Signez ici',
+    'signature.sign': 'Signer',
+    'signature.signAgain': 'Signer à nouveau',
+    'signature.undo': 'Annuler le trait',
+    'signature.clear': 'Effacer',
+    'signature.done': 'Terminé',
+    'signature.unsigned': 'Non signé',
+    'signature.signedAt': 'Signé à {time}',
+    'signature.pending': 'En attente d’envoi',
+    'signature.assessor': 'Évaluateur',
+    'signature.siteRepresentative': 'Représentant du site',
+    'signature.noName': 'Nom non renseigné',
+    'signature.siteNameHint': 'Renseignez d’abord le nom de la personne interrogée dans la partie A.',
+    'signature.optional':
+        'Les signatures ne sont pas obligatoires pour soumettre, et sont envoyées séparément.',
 
     'submit.failed': "L'évaluation n'a pas pu être soumise.",
     'submit.noAssessment': "Il n'y a aucune évaluation à soumettre.",

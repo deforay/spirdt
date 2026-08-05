@@ -14,6 +14,7 @@ export const plural = (count: number): 'one' | 'other' => (count === 1 ? 'one' :
 export const messages: Messages = {
     'action.add': 'Adicionar',
     'action.remove': 'Remover',
+    'action.cancel': 'Cancelar',
 
     'signIn.subtitle': 'Inicie sessão para começar uma avaliação.',
     'signIn.email': 'E-mail',
@@ -117,6 +118,23 @@ export const messages: Messages = {
         one: '{count} pergunta ainda precisa de resposta.',
         other: '{count} perguntas ainda precisam de resposta.',
     },
+
+    'signature.heading': 'Assinaturas',
+    'signature.canvasLabel': 'Assine aqui',
+    'signature.sign': 'Assinar',
+    'signature.signAgain': 'Assinar novamente',
+    'signature.undo': 'Anular traço',
+    'signature.clear': 'Limpar',
+    'signature.done': 'Concluído',
+    'signature.unsigned': 'Não assinado',
+    'signature.signedAt': 'Assinado às {time}',
+    'signature.pending': 'A aguardar envio',
+    'signature.assessor': 'Avaliador',
+    'signature.siteRepresentative': 'Representante do local',
+    'signature.noName': 'Nome não registado',
+    'signature.siteNameHint': 'Preencha primeiro o nome do entrevistado na parte A.',
+    'signature.optional':
+        'As assinaturas não são obrigatórias para submeter, e são enviadas em separado.',
 
     'submit.failed': 'Não foi possível submeter a avaliação.',
     'submit.noAssessment': 'Não há nenhuma avaliação para submeter.',

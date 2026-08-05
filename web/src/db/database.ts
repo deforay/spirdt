@@ -117,6 +117,60 @@ export interface StoredFinding {
 }
 
 /**
+ * Who signed off on the visit.
+ *
+ * `assessor_1` is whoever is signed in. `site_representative` is the person
+ * debriefed at the site, whose name Part A already collects as
+ * `interviewee_name` — so both roles can print a name beside the mark, which
+ * is most of the difference between evidence and a squiggle. `assessor_2`
+ * exists in the server's vocabulary for a two-person team; nothing offers it
+ * yet.
+ */
+export type SignatureRole = 'assessor_1' | 'assessor_2' | 'site_representative'
+
+/**
+ * A signature, drawn on the device.
+ *
+ * Held as a Blob rather than a data URL. Base64 is a third larger, and this
+ * shares its quota with the assessment it belongs to.
+ *
+ * Uploaded on its own channel once the assessment has landed. Nothing here is
+ * required for a visit to be valid, in both directions: a signature that will
+ * not upload must not hold up the assessment, and an assessment that will not
+ * sync must not lose the signature.
+ */
+export interface StoredAttachment {
+    /** `${assessmentId}|${kind}|${role}` — one per role, replaced when redrawn. */
+    key: string
+    assessmentId: string
+    kind: 'signature' | 'photo'
+    role: SignatureRole | string
+    /** For a photo: the question it is evidence for. Null for a signature. */
+    questionCode: string | null
+    /** Printed beside the mark. Read from the session or Part A, never typed twice. */
+    signedName: string
+    blob: Blob
+    mime: string
+    bytes: number
+    capturedAt: string
+    /** The same counter as answers, for the same reason — see StoredAnswer. */
+    revision: number
+    dirty: boolean
+    /** The server's id, once it has acknowledged this one. */
+    remoteId: string | null
+    /**
+     * Why the server refused this image, for good.
+     *
+     * Set only for a refusal retrying cannot fix, and it clears `dirty` with
+     * it — otherwise a signature the server will never accept is re-uploaded
+     * on every sync for the life of the device. It is shown against the
+     * signature on the review screen, because the assessor can act on it by
+     * drawing again, and nobody else will ever see it.
+     */
+    syncError: string | null
+}
+
+/**
  * Every write, in order, kept after the row it wrote.
  *
  * Deliberately redundant. If the answers table is ever lost or partially
@@ -127,7 +181,7 @@ export interface JournalEntry {
     id?: number
     assessmentId: string
     at: string
-    kind: 'answer' | 'context' | 'assessment' | 'finding' | 'pathogens'
+    kind: 'answer' | 'context' | 'assessment' | 'finding' | 'pathogens' | 'attachment'
     /** The natural key this entry concerns, where it has one. */
     subject: string
     payload: unknown
@@ -137,6 +191,7 @@ export class SpirdtDatabase extends Dexie {
     assessments!: Table<StoredAssessment, string>
     answers!: Table<StoredAnswer, string>
     findings!: Table<StoredFinding, string>
+    attachments!: Table<StoredAttachment, string>
     journal!: Table<JournalEntry, number>
 
     constructor(name = 'spirdt') {
@@ -195,6 +250,22 @@ export class SpirdtDatabase extends Dexie {
             assessments: 'id, status, syncState, syncedAt, updatedAt',
             answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
             findings: 'key, assessmentId, dirty',
+            journal: '++id, assessmentId, at',
+        })
+
+        // Version 4 adds signatures. Also nothing to migrate.
+        //
+        // Indexed by assessment only. `dirty` is deliberately not an index
+        // here: IndexedDB has no boolean key type, so a boolean index stores
+        // nothing and every query against it silently returns none — which is
+        // why the tables above index it and then filter in JavaScript anyway.
+        // With two signatures per visit there is nothing to gain by pretending
+        // otherwise.
+        this.version(4).stores({
+            assessments: 'id, status, syncState, syncedAt, updatedAt',
+            answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
+            findings: 'key, assessmentId, dirty',
+            attachments: 'key, assessmentId',
             journal: '++id, assessmentId, at',
         })
     }

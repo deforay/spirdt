@@ -63,4 +63,36 @@ final class BinaryUuid
     {
         return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid) === 1;
     }
+
+    /**
+     * Mint one, for the rows the server creates rather than receives.
+     *
+     * Version 7 for the same reason the devices use it: the leading 48 bits
+     * are a millisecond timestamp, so ids sort by creation and inserts land at
+     * the end of the index instead of scattering across it the way v4 does.
+     *
+     * The random half comes from random_bytes rather than mt_rand — some of
+     * these ids end up naming files on disk.
+     */
+    public static function v7(): string
+    {
+        $milliseconds = (int) (microtime(true) * 1000);
+
+        // 48 bits of timestamp, then 10 random bytes to fill the other 80.
+        $hex = substr(str_pad(dechex($milliseconds), 12, '0', STR_PAD_LEFT), -12)
+            . bin2hex(random_bytes(10));
+
+        // Version 7, then the RFC 4122 variant bits.
+        $hex[12] = '7';
+        $hex[16] = dechex((hexdec($hex[16]) & 0x3) | 0x8);
+
+        return sprintf(
+            '%s-%s-%s-%s-%s',
+            substr($hex, 0, 8),
+            substr($hex, 8, 4),
+            substr($hex, 12, 4),
+            substr($hex, 16, 4),
+            substr($hex, 20, 12),
+        );
+    }
 }

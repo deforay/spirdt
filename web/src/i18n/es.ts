@@ -14,6 +14,7 @@ export const plural = (count: number): 'one' | 'other' => (count === 1 ? 'one' :
 export const messages: Messages = {
     'action.add': 'Añadir',
     'action.remove': 'Quitar',
+    'action.cancel': 'Cancelar',
 
     'signIn.subtitle': 'Inicie sesión para comenzar una evaluación.',
     'signIn.email': 'Correo',
@@ -116,6 +117,23 @@ export const messages: Messages = {
         one: '{count} pregunta aún necesita respuesta.',
         other: '{count} preguntas aún necesitan respuesta.',
     },
+
+    'signature.heading': 'Firmas',
+    'signature.canvasLabel': 'Firme aquí',
+    'signature.sign': 'Firmar',
+    'signature.signAgain': 'Firmar de nuevo',
+    'signature.undo': 'Deshacer trazo',
+    'signature.clear': 'Borrar',
+    'signature.done': 'Listo',
+    'signature.unsigned': 'Sin firmar',
+    'signature.signedAt': 'Firmado a las {time}',
+    'signature.pending': 'Pendiente de envío',
+    'signature.assessor': 'Evaluador',
+    'signature.siteRepresentative': 'Representante del sitio',
+    'signature.noName': 'Nombre no registrado',
+    'signature.siteNameHint': 'Complete primero el nombre de la persona entrevistada en la parte A.',
+    'signature.optional':
+        'Las firmas no son obligatorias para enviar, y se suben por separado.',
 
     'submit.failed': 'No se pudo enviar la evaluación.',
     'submit.noAssessment': 'No hay ninguna evaluación para enviar.',

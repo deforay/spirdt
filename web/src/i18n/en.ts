@@ -20,6 +20,7 @@ export const plural = (count: number): 'one' | 'other' => (count === 1 ? 'one' :
 export const messages = {
     'action.add': 'Add',
     'action.remove': 'Remove',
+    'action.cancel': 'Cancel',
 
     'signIn.subtitle': 'Sign in to start an assessment.',
     'signIn.email': 'Email',
@@ -121,6 +122,22 @@ export const messages = {
         one: '{count} question still needs an answer.',
         other: '{count} questions still need an answer.',
     },
+
+    'signature.heading': 'Signatures',
+    'signature.canvasLabel': 'Sign here',
+    'signature.sign': 'Sign',
+    'signature.signAgain': 'Sign again',
+    'signature.undo': 'Undo',
+    'signature.clear': 'Clear',
+    'signature.done': 'Done',
+    'signature.unsigned': 'Not signed',
+    'signature.signedAt': 'Signed {time}',
+    'signature.pending': 'Waiting to upload',
+    'signature.assessor': 'Assessor',
+    'signature.siteRepresentative': 'Site representative',
+    'signature.noName': 'Name not recorded',
+    'signature.siteNameHint': 'Fill in the interviewee’s name in Part A first.',
+    'signature.optional': 'Signatures are not required to submit, and upload separately.',
 
     'submit.failed': 'The assessment could not be submitted.',
     'submit.noAssessment': 'There is no assessment to submit.',

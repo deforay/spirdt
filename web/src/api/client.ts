@@ -40,10 +40,20 @@ export class ApiError extends Error {
 
 export interface RequestOptions {
     method?: 'GET' | 'POST'
+    /**
+     * Serialised as JSON, unless it is a FormData.
+     *
+     * An upload carries its own encoding, and the browser has to be the one to
+     * write the Content-Type — the header has to name the multipart boundary
+     * it chose, and setting it by hand is the classic way to produce a request
+     * the server cannot parse.
+     */
     body?: unknown
     /** Send the access token, and refresh it once if the server rejects it. */
     auth?: boolean
     signal?: AbortSignal
+    /** Overrides the default. Uploads take longer than anything else here. */
+    timeoutMs?: number
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -71,12 +81,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS)
 
     // The caller's own cancellation still has to work while the timeout runs.
     options.signal?.addEventListener('abort', () => controller.abort(), { once: true })
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const isForm = options.body instanceof FormData
+    const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' }
     const token = session.value?.accessToken
 
     if ((options.auth ?? true) && token !== undefined) {
@@ -87,7 +98,12 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
         return await fetch(`${BASE_URL}${path}`, {
             method: options.method ?? 'POST',
             headers,
-            body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            body:
+                options.body === undefined
+                    ? undefined
+                    : isForm
+                      ? (options.body as FormData)
+                      : JSON.stringify(options.body),
             signal: controller.signal,
         })
     } catch (cause) {

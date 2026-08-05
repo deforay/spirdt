@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import SignatureSection from '@/components/SignatureSection.vue'
 import type { StoredFinding } from '@/db/database'
 import { formatNumber, formatPercent, t, text } from '@/i18n'
 import type { ScoreResult, Template } from '@/scoring/types'
@@ -30,6 +31,9 @@ const props = defineProps<{
     /** Response by `${questionCode}|${pathogen}`. Passed in rather than re-derived. */
     answersByKey: Map<string, string | null>
     siteName: string
+    /** The visit this review belongs to, and its Part A answers, for signatures. */
+    assessmentId: string
+    context: Record<string, unknown>
     submitting: boolean
     submitError: string
 }>()
@@ -359,6 +363,13 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
 
                 <p v-else class="px-1 text-[15px] text-label-2">{{ t('review.noGaps') }}</p>
             </section>
+
+            <!-- Signed after the gaps have been read out, not before. -->
+            <SignatureSection
+                v-if="assessmentId !== ''"
+                :assessment-id="assessmentId"
+                :context="context"
+            />
 
             <!-- Sections, for the debrief. -->
             <section class="mb-4">

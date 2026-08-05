@@ -2,7 +2,9 @@ import { ref } from 'vue'
 import { ApiError, apiRequest } from '../api/client'
 import { deviceId, isSignedIn } from '../auth/session'
 import { flushWrites, loadAnswers, loadFindings, markBlocked, markSynced } from '../db/assessments'
+import { assessmentsWithPendingAttachments, countPendingAttachments } from '../db/attachments'
 import { db } from '../db/database'
+import { pushAttachments } from './attachments'
 import { acknowledged, buildPayload, NotSendable } from './payload'
 
 /**
@@ -135,6 +137,17 @@ export async function syncAll(): Promise<void> {
             await syncAssessment(assessment.id)
         }
 
+        // Images go after every assessment, not after each one. They are the
+        // slow half, and an assessment still sitting on the device is worth
+        // more than a signature belonging to one that has already landed.
+        //
+        // Read fresh rather than derived from the queue above: an assessment
+        // synced days ago can still be carrying a signature that has never
+        // gone through.
+        for (const assessmentId of await assessmentsWithPendingAttachments()) {
+            await pushAttachments(assessmentId)
+        }
+
         syncStatus.value = { ...syncStatus.value, lastError: null }
         resetBackoff()
     } catch (error) {
@@ -149,7 +162,12 @@ export async function syncAll(): Promise<void> {
             ...syncStatus.value,
             running: false,
             lastRunAt: new Date().toISOString(),
-            pending: await db.assessments.where('syncState').equals('pending').count(),
+            // Images count towards pending. Reporting "Synced" while a
+            // signature is still only on the tablet is the exact reassurance
+            // this badge exists to avoid giving.
+            pending:
+                (await db.assessments.where('syncState').equals('pending').count()) +
+                (await countPendingAttachments()),
             blocked: await db.assessments.where('syncState').equals('blocked').count(),
         }
     }
