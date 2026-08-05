@@ -119,7 +119,7 @@ Native, run directly. Under Docker, prefix with `docker compose exec php`.
 |---|---|
 | `composer setup` | First-run setup. Idempotent — safe to re-run |
 | `composer setup -- --reset` | Drop every table and rebuild (refuses on production) |
-| `composer upgrade` | Backup, sync code, migrate, verify |
+| `composer app:upgrade` | Backup, sync code, migrate, verify |
 | `composer db:backup` | Backup via db-tools |
 | `composer refresh` | Pull latest, then install/migrate only if needed |
 | `composer refresh -- --status` | Local vs remote state, changes nothing |

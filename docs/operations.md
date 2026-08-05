@@ -37,7 +37,7 @@ Working around either inside the backup tool would be papering over the wrong bi
 ## Upgrading
 
 ```bash
-composer upgrade
+composer app:upgrade
 ```
 
 Five steps:
@@ -57,7 +57,7 @@ Two design points worth understanding:
 Rehearse first:
 
 ```bash
-composer upgrade -- --dry-run
+composer app:upgrade -- --dry-run
 ```
 
 ## Housekeeping
