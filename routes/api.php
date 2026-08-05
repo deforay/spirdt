@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Action\Admin\AssignmentsAction;
+use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\ChangePasswordAction;
@@ -83,8 +85,32 @@ return static function (App $app): void {
         $group->post('/users', [UsersAction::class, 'create']);
         $group->patch('/users/{id}', [UsersAction::class, 'update']);
         $group->post('/users/{id}/password', [UsersAction::class, 'resetPassword']);
+
+        // The registry: places, facilities, the benches inside them.
+        $group->post('/geo-units', [RegistryAction::class, 'createGeoUnit']);
+        $group->patch('/geo-units/{id}', [RegistryAction::class, 'updateGeoUnit']);
+        $group->post('/facilities', [RegistryAction::class, 'createFacility']);
+        $group->patch('/facilities/{id}', [RegistryAction::class, 'updateFacility']);
+        $group->post('/testing-sites', [RegistryAction::class, 'createTestingSite']);
+        $group->patch('/testing-sites/{id}', [RegistryAction::class, 'updateTestingSite']);
+
+        // Who covers what. The organisation comes from the token.
+        $group->post('/assignments', [AssignmentsAction::class, 'create']);
+        $group->delete('/assignments/{id}', [AssignmentsAction::class, 'delete']);
     })
         ->add(new RequireRoleMiddleware('admin', 'superadmin'))
+        ->add(new AuthMiddleware());
+
+    // Reading the registry and the plan. A viewer is included: the dashboard
+    // filters by the same hierarchy, and a filter nobody can populate is not a
+    // filter. Writing stays in the administrators-only group above.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->get('/geo-units', [RegistryAction::class, 'geoUnits']);
+        $group->get('/facilities', [RegistryAction::class, 'facilities']);
+        $group->get('/testing-sites', [RegistryAction::class, 'testingSites']);
+        $group->get('/assignments', [AssignmentsAction::class, 'index']);
+    })
+        ->add(new RequireRoleMiddleware('admin', 'superadmin', 'viewer'))
         ->add(new AuthMiddleware());
 
     // Reference data the device caches to work offline.

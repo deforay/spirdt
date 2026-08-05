@@ -8,7 +8,9 @@ use App\Bootstrap\Providers\CoreServicesProvider;
 use App\Bootstrap\ServiceProvider;
 use App\Handler\ErrorHandler;
 use DI\Container;
+use Illuminate\Container\Container as IlluminateContainer;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Events\Dispatcher;
 use Psr\Log\LoggerInterface;
 use Slim\App;
 use Slim\Factory\AppFactory;
@@ -108,6 +110,9 @@ final class Bootstrap
         }
     }
 
+    /** Shared for the life of the process — see bootDatabase() for why. */
+    private static ?Dispatcher $events = null;
+
     private static function bootDatabase(): void
     {
         $capsule = new Capsule();
@@ -125,6 +130,26 @@ final class Bootstrap
             // createApp() about windowed queries.
             'timezone'  => '+00:00',
         ]);
+        // Without a dispatcher, NO Eloquent model event fires. Not creating,
+        // not saving, not deleting — they are registered, never called, and
+        // nothing anywhere reports it. Standalone Illuminate does not wire one
+        // for you the way the full framework does.
+        //
+        // Both tenancy traits hang a `creating` hook off this to stamp the
+        // tenant on every insert, and until this line existed that hook did
+        // nothing at all. It went unnoticed because every call site happened
+        // to set the column explicitly; the first one that did not wrote a row
+        // with no tenant.
+        //
+        // ONE DISPATCHER FOR THE PROCESS, and that is not a micro-optimisation.
+        // A model registers its listeners on whichever dispatcher is current
+        // when the class first boots, and Eloquent boots a class once. Handing
+        // out a fresh dispatcher on a later createApp() would leave those
+        // listeners on the discarded one — the events would stop firing again,
+        // silently, and only where createApp() runs more than once per
+        // process: the test suite, and anything long-running.
+        $capsule->setEventDispatcher(self::$events ??= new Dispatcher(new IlluminateContainer()));
+
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
     }
