@@ -112,6 +112,88 @@ See [Backup & Upgrade](operations.md) for the encryption caveat.
 
 Normalises every table to the server-default utf8mb4 collation. Idempotent.
 
+## Accounts and reference data
+
+Until the admin interface exists, these are the only way to create the records
+an assessor needs in order to sign in and start a visit.
+
+### `bin/provision-org`
+
+Onboards an organisation: creates it, seeds the five system roles, and creates
+its first administrator. Prints a generated password once.
+
+```bash
+bin/provision-org --code=zm-moh --name="Ministry of Health Zambia" \
+    --admin-email=grace@moh.gov.zm --admin-name="Grace Phiri" \
+    --country=ZM --timezone=Africa/Lusaka
+```
+
+Run without flags it asks for each value.
+
+| Flag | Effect |
+|---|---|
+| `--code` | Short unique code, used at sign-in where one address exists in two organisations |
+| `--name` | Display name |
+| `--admin-email` / `--admin-name` | The first administrator |
+| `--country` | ISO 3166-1 alpha-2 |
+| `--timezone` | IANA zone. Validated against the system list; defaults to UTC |
+| `--date-format` | Defaults to `d/m/Y` |
+| `--password` | Skips generation. Avoid it — this account opens an entire organisation |
+
+**Refuses a code that already exists.** Provisioning that quietly reuses one is
+how a new administrator ends up inside somebody else's tenant. To add a user to
+an existing organisation, use `bin/dev/create-user`.
+
+Timezone and date format are asked for rather than defaulted because the User's
+Guide makes date format a per-country choice: `05/08/2026` is August or May
+depending on who reads it, and the difference stays invisible until someone
+disputes a certification level.
+
+### `bin/dev/create-user`
+
+Creates or updates one user. Creates the organisation and roles if missing, so
+it is the quick path for local work — and the password-reset path, since
+running it against an existing address resets that person's password and role
+rather than creating a duplicate.
+
+```bash
+bin/dev/create-user --org=demo --email=jane@example.org --name="Jane Doe" --role=assessor
+```
+
+Roles: `superadmin`, `admin`, `assessor`, `viewer`, `site_user`. Prompts for the
+password unless `--password` is given. Minimum twelve characters.
+
+!!! note "Roles carry no permissions yet"
+    The role key travels in the token and `AuthMiddleware` attaches it to the
+    request, but nothing reads it. An admin token currently opens exactly the
+    same routes as an assessor token.
+
+### `bin/dev/publish-template`
+
+Loads an instrument from `resources/templates/` into the `templates` table and
+publishes it. Platform-wide by default; `--org=<code>` publishes a copy for one
+organisation, which template lookup then prefers.
+
+```bash
+bin/dev/publish-template
+```
+
+**Required before any device can sync.** The server scores against the copy in
+this table, not the one bundled with the app, and a payload naming a template
+that is not here is refused. Re-running replaces the definition for the same
+code and version.
+
+### `bin/dev/seed-sites`
+
+Puts a few facilities and testing sites into an organisation, so the app has
+something to assess before the registry screens exist.
+
+```bash
+bin/dev/seed-sites --org=demo
+```
+
+Matched by facility and name, so running it twice does not duplicate anything.
+
 ## Quality
 
 | Command | What it does |

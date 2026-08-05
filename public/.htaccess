@@ -1,0 +1,60 @@
+# Apache configuration for the API.
+#
+# Only needed on Apache. The Docker stack uses nginx, which does all of this
+# in docker/nginx/default.conf and ignores this file entirely.
+#
+# A vhost is the better place for these rules — Apache re-reads .htaccess on
+# every request and a vhost is parsed once. This file exists anyway so that a
+# deployment onto shared hosting, or one where AllowOverride was left at None
+# and then turned on later, works without anyone having to work out why every
+# URL returns 404. See docs/deployment.md for the vhost form.
+
+# Directory listings would expose the tree if the rewrite ever stopped
+# matching. There is nothing in here worth listing.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # RewriteBase is set because this directory is normally reached through an
+    # Alias rather than as the DocumentRoot. Without it, Apache resolves the
+    # substitution against the URL path instead of the alias and rewrites
+    # /api/health to /index.php, which does not exist.
+    RewriteBase /api
+
+    # The Authorization header decides whether anything works at all: every
+    # route but sign-in is a Bearer token. mod_php exposes it through
+    # apache_request_headers(), but CGI and FastCGI drop it unless it is
+    # copied into the environment, and the symptom is that signing in works
+    # while every subsequent call returns 401.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Anything that is not a real file goes to the front controller.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    # Fail loudly rather than serving a 404 for every route and leaving
+    # someone to guess that a module is missing.
+    <IfModule mod_headers.c>
+        Header set X-Spirdt-Error "mod_rewrite is not enabled"
+    </IfModule>
+</IfModule>
+
+# CGIPassAuth is the supported way to pass Authorization through on 2.4.13
+# and later, and it covers the SAPIs the rewrite above cannot reach.
+<IfModule mod_authz_core.c>
+    <Files "index.php">
+        CGIPassAuth On
+    </Files>
+</IfModule>
+
+# Belt and braces. These should never be under the document root, but a
+# misconfigured DocumentRoot pointing at the repository root is a real
+# mistake and this makes it a denial rather than a download.
+<FilesMatch "^\.env|composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>

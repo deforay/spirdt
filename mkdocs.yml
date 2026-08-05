@@ -41,6 +41,7 @@ nav:
       - Installation: getting-started.md
       - CLI Reference: cli.md
   - Operations:
+      - Deployment: deployment.md
       - Backup & Upgrade: operations.md
   - Reference:
       - Architecture: architecture.md
