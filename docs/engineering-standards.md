@@ -12,10 +12,16 @@ bin/dev/review <commit-sha>     # one commit
 bin/dev/review --uncommitted    # the working tree, before committing
 ```
 
-The reviewing CLI is named by `$REVIEW_AGENT`, read from the untracked `.env`
-and falling back to your shell profile. It is deliberately not written down
-here: the tool can be swapped without editing anything, and no vendor name
-enters the repository.
+The reviewing CLI is named by `$REVIEW_AGENT`, and `$REVIEW_AGENT_ARGS` carries
+whatever it needs between its own name and the prompt — a review subcommand for
+one tool, a non-interactive flag for another. Both are read from the untracked
+`.env`, falling back to your shell profile.
+
+Neither is written down here. The tool can be swapped without editing anything,
+and no vendor name enters the repository. The *shape* of the invocation is kept
+configurable for the same reason as the name: baking one in would mean the
+script only works with the tool it was written against, which is the thing
+being avoided.
 
 **The review brief** — single source of truth, extracted verbatim by the script, so it cannot drift:
 > "You are reviewing a change to SPI-RDT: an offline-first site-assessment platform for rapid diagnostic testing, with a shared-schema multi-tenant API. Do not summarize the code. Find: (1) any query reaching tenant-scoped data without the organisation scope, or the registry without the programme scope, and any use of withoutScope/acrossOrganizations/acrossProgrammes that is not justified in a comment; (2) any scoring path that could make PHP and TypeScript disagree — floating point, rounding before banding, N/A treated as zero rather than excluded; (3) anything that can lose an assessor's work: a write not persisted immediately, reliance on beforeunload, a sync that clears a dirty flag without checking the revision it sent, a retry that could duplicate a visit; (4) upload handling that trusts the client — a type taken from a header rather than sniffed and decoded, a filename that reaches a path, a checksum supplied rather than computed; (5) a route whose role gate is missing or wider than the data it exposes, and any authenticated route reachable while must_change_password is set; (6) migrations that are not re-runnable, or that drop or rewrite data an audit trail depends on; (7) tests that assert the happy path but would still pass if the invariant were deleted. Rank findings by severity. If you find nothing in a category, say 'clear' — don't pad."

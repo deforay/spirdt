@@ -250,11 +250,18 @@ bin/dev/review <commit-sha>     # one commit
 bin/dev/review --uncommitted    # the working tree, before committing
 ```
 
-The reviewing CLI is named by `$REVIEW_AGENT`, read from the untracked `.env`
-and falling back to your shell profile — so the tool can be swapped without
-editing anything, and no vendor name is committed. Only that one key is read
-from `.env`: a reviewer reading a diff has no business inheriting the database
-credentials or the JWT secret.
+Two settings, both from the untracked `.env` and both falling back to your shell
+profile:
+
+| Variable | What it is |
+|---|---|
+| `REVIEW_AGENT` | The command to run |
+| `REVIEW_AGENT_ARGS` | What that command needs before the prompt — a review subcommand for one tool, a non-interactive flag for another. Empty is fine |
+
+Keeping the invocation shape configurable matters as much as the name: baking
+one shape in would mean the script only works with the tool it was written
+against. Only these two keys are read from `.env` — something reading a diff has
+no business inheriting the database credentials or the JWT secret.
 
 The brief itself lives in
 [Engineering Standards](engineering-standards.md) and is extracted from there

@@ -52,6 +52,7 @@ nav:
       - Scoring: scoring.md
       - Design: design.md
       - Engineering Standards: engineering-standards.md
+  - What's Left: todo.md
   - Design Brief: design-brief.md
 
 markdown_extensions:
