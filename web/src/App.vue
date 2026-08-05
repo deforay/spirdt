@@ -1,33 +1,39 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 
 import QuestionRow from '@/components/QuestionRow.vue'
-import { questionKey, score } from '@/scoring/engine'
-import type { AnswerInput, Context, ResponseCode, Template } from '@/scoring/types'
+import StorageNotice from '@/components/StorageNotice.vue'
+import { useAssessment } from '@/composables/useAssessment'
+import type { StoredResponse } from '@/db/database'
+import type { ResponseCode, Template } from '@/scoring/types'
 
 /**
- * The section screen, wired to the real template and the real scoring rules.
+ * The section screen, backed by the local database.
  *
- * Answers live in memory here. The next step is Dexie, so an assessment
- * survives a closed tab and a dead battery — which on a site visit is the
- * difference between a wasted morning and a filed assessment.
+ * Answers are written as they are given. The footer says when the last one
+ * landed, because an auditor working offline has no other way to tell.
  */
 
 // Cast rather than let TypeScript infer a literal type for a 96 KB document.
 const template = rawTemplate as unknown as Template
 
 const locale = template.default_locale
-
-// Stands in for the assessment record until Part A and the local store land.
-const context: Context = { refers_specimens: 'no' }
 const pathogens = ['hiv']
 
+const assessment = useAssessment(template)
 const activeSection = ref(template.sections[2]?.code ?? '1')
+const ready = ref(false)
 
-const responses = reactive(new Map<string, ResponseCode | null>())
-const comments = reactive(new Map<string, string>())
+onMounted(async () => {
+    await assessment.start({
+        siteName: 'Kanyama Clinic',
+        pathogens,
+        context: { refers_specimens: 'no' },
+    })
+    ready.value = true
+})
 
 const section = computed(
     () => template.sections.find((s) => s.code === activeSection.value) ?? template.sections[0]!,
@@ -36,54 +42,34 @@ const section = computed(
 /** Section 4 repeats per pathogen; every other section is answered once. */
 const instance = computed(() => (section.value.scope === 'pathogen' ? pathogens[0]! : null))
 
-function keyFor(code: string): string {
-    return questionKey(code, instance.value)
-}
-
-function responseFor(code: string): ResponseCode | null {
-    return responses.get(keyFor(code)) ?? null
-}
-
-function setResponse(code: string, value: ResponseCode | null): void {
-    responses.set(keyFor(code), value)
-}
-
-function commentFor(code: string): string {
-    return comments.get(keyFor(code)) ?? ''
-}
-
-function setComment(code: string, value: string): void {
-    comments.set(keyFor(code), value)
-}
-
-const answers = computed<AnswerInput[]>(() =>
-    [...responses.entries()]
-        .filter(([, value]) => value !== null)
-        .map(([key, value]) => {
-            const [code, pathogen] = key.split('|')
-            return {
-                question_code: code!,
-                pathogen: pathogen === '' ? null : pathogen!,
-                response: value!,
-            }
-        }),
+const sectionTally = computed(() =>
+    assessment.result.value.sections.find((s) => s.code === section.value.code),
 )
 
-const result = computed(() => score(template, answers.value, context, pathogens))
-
-const sectionTally = computed(() => result.value.sections.find((s) => s.code === section.value.code))
-
 const answeredHere = computed(
-    () => section.value.questions.filter((q) => responseFor(q.code) !== null).length,
+    () =>
+        section.value.questions.filter((q) => assessment.responseFor(q.code, instance.value) !== null)
+            .length,
 )
 
 const levelTone = computed(() => {
-    const level = result.value.level
+    const level = assessment.result.value.level
     if (level === null) return 'bg-track text-label-2'
     if (level >= 4) return 'bg-yes-soft text-yes'
     if (level === 3) return 'bg-accent-soft text-accent'
     if (level === 2) return 'bg-partial-soft text-partial'
     return 'bg-no-soft text-no'
+})
+
+const savedLabel = computed(() => {
+    if (assessment.saveState.value === 'error') return 'Not saved'
+    if (assessment.saveState.value === 'saving') return 'Saving'
+    if (assessment.lastSavedAt.value === null) return 'Nothing to save yet'
+
+    return `Saved ${assessment.lastSavedAt.value.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}`
 })
 
 function title(value: Record<string, string>): string {
@@ -93,15 +79,23 @@ function title(value: Record<string, string>): string {
 
 <template>
     <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
+        <StorageNotice
+            :storage="assessment.storage.value"
+            :save-state="assessment.saveState.value"
+            :save-error="assessment.saveError.value"
+        />
+
         <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3">
-            <span class="text-[13px] text-accent">Kanyama Clinic</span>
+            <span class="text-[13px] text-accent">
+                {{ assessment.assessment.value?.siteName ?? 'Loading' }}
+            </span>
             <h1 class="text-[30px] font-bold tracking-tight">{{ title(section.title) }}</h1>
             <span class="tnum text-[13px] text-label-2">
                 {{ answeredHere }} of {{ section.questions.length }} answered
             </span>
         </header>
 
-        <nav class="flex gap-1.5 overflow-x-auto scroll-thin px-4 pb-3" aria-label="Sections">
+        <nav class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-3" aria-label="Sections">
             <button
                 v-for="item in template.sections"
                 :key="item.code"
@@ -119,21 +113,25 @@ function title(value: Record<string, string>): string {
             </button>
         </nav>
 
-        <main class="flex-1 overflow-y-auto scroll-thin px-4 pb-6">
-            <div class="overflow-hidden rounded-card bg-surface">
+        <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
+            <div v-if="ready" class="overflow-hidden rounded-card bg-surface">
                 <div v-for="(question, index) in section.questions" :key="question.code">
                     <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
                     <QuestionRow
                         :question="question"
                         :locale="locale"
-                        :response="responseFor(question.code)"
-                        :comment="commentFor(question.code)"
-                        @update:response="setResponse(question.code, $event)"
-                        @update:comment="setComment(question.code, $event)"
+                        :response="assessment.responseFor(question.code, instance) as ResponseCode | null"
+                        :comment="assessment.commentFor(question.code, instance)"
+                        @update:response="
+                            assessment.setResponse(question.code, instance, $event as StoredResponse | null)
+                        "
+                        @update:comment="assessment.setComment(question.code, instance, $event)"
                     />
                 </div>
 
-                <div class="flex justify-between border-t border-hairline px-3.5 py-3 text-[13px] text-label-2">
+                <div
+                    class="flex justify-between border-t border-hairline px-3.5 py-3 text-[13px] text-label-2"
+                >
                     <span>Section score</span>
                     <strong class="tnum font-semibold text-label">
                         {{ sectionTally?.score ?? 0 }} / {{ sectionTally?.possible ?? 0 }}
@@ -142,17 +140,32 @@ function title(value: Record<string, string>): string {
             </div>
         </main>
 
-        <footer class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3">
+        <footer
+            class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3"
+        >
             <div>
                 <div class="tnum text-[22px] font-bold tracking-tight">
-                    {{ result.percentage === null ? '—' : `${result.percentage.toFixed(2)}%` }}
+                    {{
+                        assessment.result.value.percentage === null
+                            ? '—'
+                            : `${assessment.result.value.percentage.toFixed(2)}%`
+                    }}
                 </div>
-                <div class="tnum text-xs text-label-2">
-                    {{ answers.length }} of {{ answers.length + result.missing.length }} questions
+                <div
+                    :class="[
+                        'tnum text-xs',
+                        assessment.saveState.value === 'error' ? 'font-semibold text-no' : 'text-label-2',
+                    ]"
+                >
+                    {{ savedLabel }}
                 </div>
             </div>
             <span :class="['rounded-full px-3 py-1.5 text-[13px] font-semibold', levelTone]">
-                {{ result.level === null ? 'Not scorable' : `Level ${result.level}` }}
+                {{
+                    assessment.result.value.level === null
+                        ? 'Not scorable'
+                        : `Level ${assessment.result.value.level}`
+                }}
             </span>
         </footer>
     </div>

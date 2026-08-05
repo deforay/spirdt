@@ -377,6 +377,24 @@ if (!function_exists('con_db_remedy')) {
             $driverCode = preg_match('/\[(\d+)\]/', $e->getMessage(), $m) === 1 ? (int) $m[1] : null;
         }
 
+        // Access denied, while `mysql` on the same machine connects fine. The
+        // client reads ~/.my.cnf and PHP does not, so the command line is
+        // authenticating with credentials the app never sees. Confirmed the
+        // hard way: `mysql -u root` succeeded and PDO was refused for the same
+        // user in the same shell.
+        if ($driverCode === 1045) {
+            $home = (string) getenv('HOME');
+            $cnf  = $home . '/.my.cnf';
+
+            if ($home !== '' && is_file($cnf)) {
+                return "Access was refused, and {$cnf} exists.\n"
+                     . "The mysql command line reads that file for its username and password. PHP does not,\n"
+                     . 'so a working `mysql` login proves nothing here. Set DB_USER and DB_PASS in .env explicitly.';
+            }
+
+            return 'Check DB_USER and DB_PASS in .env. The user must also be granted access from this host.';
+        }
+
         if (!in_array($driverCode, [2002, 2005, 2006], true)) {
             return '';
         }
