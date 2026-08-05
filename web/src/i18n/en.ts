@@ -45,6 +45,10 @@ export const messages = {
     'sites.title': 'Testing sites',
     'sites.subtitle': 'Choose the site you are assessing.',
     'sites.search': 'Search',
+    'sites.showAll': 'Show all sites ({count} more)',
+    'sites.showMine': 'Show only my sites',
+    'sites.assignedToColleague': 'Assigned to a colleague',
+    'sites.unassigned': 'Not assigned',
     'sites.loading': 'Loading sites.',
     'sites.empty': 'No sites yet. An administrator adds them, or seed some locally with',
 

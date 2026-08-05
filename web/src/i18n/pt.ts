@@ -40,6 +40,10 @@ export const messages: Messages = {
     'sites.title': 'Locais de teste',
     'sites.subtitle': 'Escolha o local que está a avaliar.',
     'sites.search': 'Pesquisar',
+    'sites.showAll': 'Mostrar todos os locais (mais {count})',
+    'sites.showMine': 'Mostrar apenas os meus locais',
+    'sites.assignedToColleague': 'Atribuído a um colega',
+    'sites.unassigned': 'Não atribuído',
     'sites.loading': 'A carregar locais.',
     'sites.empty': 'Ainda não há locais. Um administrador adiciona-os, ou crie alguns localmente com',
 

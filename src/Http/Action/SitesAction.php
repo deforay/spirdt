@@ -6,21 +6,34 @@ namespace App\Http\Action;
 
 use App\Models\Facility;
 use App\Models\TestingSite;
+use App\Service\AssignmentService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * The testing sites this organisation assesses.
+ * The testing sites available to this caller, and which are theirs to visit.
  *
- * Downloaded whole rather than searched. A registry of sites for one
- * organisation is small, and the device needs it offline — a search endpoint
- * would work in the office and be useless in the building where it matters.
+ * Downloaded whole rather than searched. The device needs it offline, and a
+ * search endpoint would work in the office and be useless in the building
+ * where it matters.
  *
- * Scoped like everything else: the organisation comes from the token, so there
- * is no organisation parameter to tamper with.
+ * EVERY site in the programme is returned, each annotated with how it is
+ * assigned, rather than the server returning only the assigned ones. Two
+ * reasons, both about the field. An assessor who arrives somewhere unplanned
+ * must still be able to work — refusing to show a site because a planner did
+ * not list it turns an administrative gap into a wasted visit. And the
+ * filtering has to happen with no signal, which means the device needs the
+ * facts rather than a server-side mode it cannot re-ask for.
+ *
+ * Scoped like everything else: the programme and organisation come from the
+ * token, so there is no parameter to tamper with.
  */
 final class SitesAction
 {
+    public function __construct(private readonly AssignmentService $assignments = new AssignmentService())
+    {
+    }
+
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $facilities = [];
@@ -36,14 +49,28 @@ final class SitesAction
         $query = TestingSite::query()->where('is_active', 1);
         $query->getQuery()->orderBy('name');
 
+        $campaignId = $this->campaignId($request);
+
+        $assigned = $this->assignments->forUser(
+            (int) $request->getAttribute('organization_id'),
+            (int) $request->getAttribute('user_id'),
+            $campaignId,
+        );
+
         foreach ($query->get() as $site) {
             $facilityId = (string) $site->facility_id;
+            $id = (string) $site->id;
 
             $sites[] = [
-                'id'            => (string) $site->id,
+                'id'            => $id,
                 'name'          => (string) $site->name,
                 'facility_id'   => $facilityId,
                 'facility_name' => $facilities[$facilityId] ?? null,
+                // Assigned to this organisation at all, and assigned to this
+                // person in particular. A site assigned to a named colleague
+                // is neither.
+                'assigned'      => isset($assigned[$id]),
+                'assigned_to_me' => $assigned[$id]['mine'] ?? false,
             ];
         }
 
@@ -56,5 +83,19 @@ final class SitesAction
         ], JSON_THROW_ON_ERROR));
 
         return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * The round to resolve assignments against.
+     *
+     * A query parameter rather than a stored "current campaign", because two
+     * rounds can legitimately overlap while one is being closed and the next
+     * planned, and a single global notion of "current" would silently pick one.
+     */
+    private function campaignId(ServerRequestInterface $request): ?int
+    {
+        $value = $request->getQueryParams()['campaign'] ?? null;
+
+        return is_numeric($value) ? (int) $value : null;
     }
 }

@@ -42,6 +42,10 @@ export const messages: Messages = {
     'sites.title': 'Sites de test',
     'sites.subtitle': 'Choisissez le site que vous évaluez.',
     'sites.search': 'Rechercher',
+    'sites.showAll': 'Afficher tous les sites ({count} de plus)',
+    'sites.showMine': 'Afficher seulement mes sites',
+    'sites.assignedToColleague': 'Attribué à un collègue',
+    'sites.unassigned': 'Non attribué',
     'sites.loading': 'Chargement des sites.',
     'sites.empty':
         "Aucun site pour l'instant. Un administrateur les ajoute, ou créez-en localement avec",

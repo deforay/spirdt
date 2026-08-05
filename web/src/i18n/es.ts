@@ -40,6 +40,10 @@ export const messages: Messages = {
     'sites.title': 'Sitios de prueba',
     'sites.subtitle': 'Elija el sitio que está evaluando.',
     'sites.search': 'Buscar',
+    'sites.showAll': 'Mostrar todos los sitios ({count} más)',
+    'sites.showMine': 'Mostrar solo mis sitios',
+    'sites.assignedToColleague': 'Asignado a un colega',
+    'sites.unassigned': 'Sin asignar',
     'sites.loading': 'Cargando sitios.',
     'sites.empty': 'Aún no hay sitios. Un administrador los añade, o cree algunos localmente con',
 

@@ -20,6 +20,16 @@ export interface Site {
     name: string
     facility_id: string
     facility_name: string | null
+    /** Assigned to this assessor's organisation, to whoever within it. */
+    assigned: boolean
+    /**
+     * Assigned to this assessor, or to their organisation with nobody named.
+     *
+     * A site assigned to a named colleague is `assigned` but not
+     * `assigned_to_me`: visible, so somebody can cover for them, and off the
+     * default list, so the default list means something.
+     */
+    assigned_to_me: boolean
 }
 
 interface SitesResponse {
@@ -32,7 +42,19 @@ export function cachedSites(): Site[] {
     try {
         const raw = localStorage.getItem(CACHE_KEY)
 
-        return raw === null ? [] : (JSON.parse(raw) as Site[])
+        if (raw === null) {
+            return []
+        }
+
+        // A list cached before assignments existed has neither flag. Reading a
+        // missing flag as false would empty the assessor's list on the first
+        // run after an update, with the sites plainly still there — so an
+        // unannotated entry is treated as assigned rather than as unassigned.
+        return (JSON.parse(raw) as Site[]).map((site) => ({
+            ...site,
+            assigned: site.assigned ?? true,
+            assigned_to_me: site.assigned_to_me ?? true,
+        }))
     } catch {
         return []
     }

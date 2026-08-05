@@ -12,6 +12,7 @@
 | `0.1.5-submissions` | Raw payloads kept as an audit record |
 | `0.1.6-attachment-signer` | Who a signature claims to be |
 | `0.1.7-programmes` | A level above organisations, sharing the registry |
+| `0.1.8-site-assignments` | Who covers which site, and when |
 
 Each migration file opens with a comment explaining *why*, not just what. Read them in order — later files carry foreign keys into earlier ones.
 
@@ -73,6 +74,64 @@ being grouped by `country_code`. Grouping would have been "more correct" and is
 the wrong default: it silently hands one organisation's national site list to
 another because they share a border. `bin/provision-org --programme=<code>`
 makes joining an existing one a deliberate act.
+
+### Assignments
+
+`site_assignments` answers "who is supposed to visit this site" on three
+independent axes, because the answer differs by programme and by round and a
+model that fixes any one of them has to be rebuilt:
+
+| Column | Meaning |
+|---|---|
+| `organization_id` | Who is responsible. **Always set** |
+| `user_id` | Which assessor, if one is named. Nullable |
+| `campaign_id` | Which round, if round-specific. Nullable = the standing plan |
+| `due_on` | A deadline that is not a whole round |
+
+```
+B, —,      —        organisation B covers this site, permanently
+B, —,      round 3  organisation B covers it this round
+B, Joseph, —        Joseph covers it, permanently
+B, Joseph, round 3  Joseph covers it this round only
+```
+
+`organization_id` is set even when a person is named. The organisation owns the
+audit and the person may leave; naming an assessor **narrows** an assignment
+rather than replacing it, so a departure leaves the site covered rather than
+orphaned. The user foreign key is `ON DELETE SET NULL` for the same reason.
+
+**Two rules live in `AssignmentService`, not in the schema, because no
+constraint can express them:**
+
+1. **A round beats the standing plan, per site.** If a site has any assignment
+   for the round being asked about, its standing assignments are ignored.
+   *Per site* is the point — a rule that switched wholesale would mean one
+   override silently unassigns everything else in the round.
+2. **No assessor named means the whole organisation.** So a site assigned
+   specifically to Joseph is not on Mary's list, and one assigned to the
+   organisation is on both.
+
+Assignments of *other* rounds never leak into the current one: last year's plan
+is not this year's default.
+
+**Two organisations may be assigned the same site**, deliberately — it is the
+independent-audit case the programme layer exists for, and it is what lets a
+coverage view answer "who is auditing what, and who is auditing nothing".
+
+`user_key` and `campaign_key` are generated columns holding `IFNULL(col, 0)`,
+present only so the unique key works: MySQL treats nulls in a unique index as
+distinct, so a plain `UNIQUE` over the four columns would accept the same
+standing assignment twice — and standing assignments are the commonest case of
+all. They are **`VIRTUAL`, not `STORED`**, and that is not a preference: MySQL
+refuses a foreign key with `ON DELETE SET NULL` or `CASCADE` on a column that
+an indexed *stored* generated column depends on, and says only "Cannot add
+foreign key constraint".
+
+`GET /sites` returns **every** site in the programme, each annotated with
+`assigned` and `assigned_to_me`, rather than only the assigned ones. An
+assessor who arrives somewhere unplanned must still be able to work, and the
+filtering has to happen with no signal — so the device gets the facts rather
+than a server-side mode it cannot re-ask for.
 
 ### Registry
 
