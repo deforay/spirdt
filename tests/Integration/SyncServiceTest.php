@@ -95,6 +95,43 @@ final class SyncServiceTest extends TestCase
         self::assertFalse($result['score']['is_complete'], 'a partial visit is not complete');
     }
 
+    public function testADraftBacksUpWithoutBecomingASubmission(): void
+    {
+        // Mid-visit backup. The work is off the tablet, but the visit has not
+        // been submitted and must not read as though it has.
+        $payload = $this->payload();
+        $payload['status'] = 'draft';
+
+        $result = (new SyncService())->accept($payload);
+
+        $stored = Assessment::findByUuid($result['assessment_id']);
+        self::assertNotNull($stored);
+        self::assertSame('draft', $stored->status);
+        self::assertNull($stored->submitted_at);
+    }
+
+    public function testASubmittedVisitIsNeverReopenedByALateRetry(): void
+    {
+        $sync = new SyncService();
+
+        $sync->accept($this->payload());
+
+        $submitted = Assessment::findByUuid('019fd200-0000-7000-8000-000000000001');
+        self::assertNotNull($submitted);
+        self::assertSame('submitted', $submitted->status);
+        $submittedAt = (string) $submitted->submitted_at;
+
+        // A draft payload from before the submission, arriving after it.
+        $stale = $this->payload();
+        $stale['status'] = 'draft';
+        $sync->accept($stale);
+
+        $after = Assessment::findByUuid('019fd200-0000-7000-8000-000000000001');
+        self::assertNotNull($after);
+        self::assertSame('submitted', $after->status);
+        self::assertSame($submittedAt, (string) $after->submitted_at, 'the submission time is not restamped');
+    }
+
     public function testRunningTheSamePayloadTwiceChangesNothing(): void
     {
         $sync = new SyncService();

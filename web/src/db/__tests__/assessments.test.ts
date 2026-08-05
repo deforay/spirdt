@@ -26,7 +26,10 @@ async function newAssessment() {
         siteName: 'Kanyama Clinic',
         templateCode: 'spi-rdt',
         templateVersion: '1.0.0',
-        pathogens: ['hiv', 'syphilis'],
+        pathogens: [
+            { key: 'hiv', name: 'HIV' },
+            { key: 'syphilis', name: 'Syphilis' },
+        ],
     })
 }
 
@@ -144,7 +147,7 @@ describe('local assessments', () => {
 
         await markSynced(
             assessment.id,
-            before.map((row) => row.key),
+            before.map((row) => ({ key: row.key, revision: row.revision })),
         )
 
         expect(await pendingAnswers(assessment.id)).toHaveLength(0)
@@ -158,11 +161,33 @@ describe('local assessments', () => {
     it('makes an answer dirty again when it is changed after syncing', async () => {
         const assessment = await newAssessment()
 
-        await saveAnswer(assessment.id, '3.1', null, { response: 'Y' })
-        await markSynced(assessment.id, [answerKey(assessment.id, '3.1', null)])
+        const saved = await saveAnswer(assessment.id, '3.1', null, { response: 'Y' })
+        await markSynced(assessment.id, [{ key: saved.key, revision: saved.revision }])
         await saveAnswer(assessment.id, '3.1', null, { response: 'P' })
 
         expect(await pendingAnswers(assessment.id)).toHaveLength(1)
+    })
+
+    it('keeps an answer dirty when it changed while the sync was in flight', async () => {
+        // The failure this prevents is silent and permanent. The payload goes
+        // out holding 'Y', the assessor corrects it to 'P' while the request is
+        // still travelling, and the acknowledgement then arrives describing an
+        // answer that is no longer the one on disk. Marking it clean on that
+        // basis means 'P' is never sent, never retried, and reads correctly on
+        // the device forever while the server holds 'Y'.
+        const assessment = await newAssessment()
+
+        const sent = await saveAnswer(assessment.id, '3.1', null, { response: 'Y' })
+
+        await saveAnswer(assessment.id, '3.1', null, { response: 'P' })
+
+        await markSynced(assessment.id, [{ key: sent.key, revision: sent.revision }])
+
+        const pending = await pendingAnswers(assessment.id)
+
+        expect(pending, 'the correction is still queued').toHaveLength(1)
+        expect(pending[0]?.response).toBe('P')
+        expect((await db.assessments.get(assessment.id))?.syncState).toBe('pending')
     })
 
     it('stores Part A separately from the answers', async () => {

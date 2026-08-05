@@ -3,37 +3,60 @@ import { computed, onMounted, ref } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 
+import type { Site } from '@/api/sites'
+import { session } from '@/auth/session'
 import QuestionRow from '@/components/QuestionRow.vue'
+import SignIn from '@/components/SignIn.vue'
+import SitePicker from '@/components/SitePicker.vue'
 import StorageNotice from '@/components/StorageNotice.vue'
+import SyncBadge from '@/components/SyncBadge.vue'
 import { useAssessment } from '@/composables/useAssessment'
 import type { StoredResponse } from '@/db/database'
 import type { ResponseCode, Template } from '@/scoring/types'
+import { startSync, syncAll } from '@/sync/engine'
 
 /**
- * The section screen, backed by the local database.
+ * The shell: sign in, choose a site, work through the sections.
  *
  * Answers are written as they are given. The footer says when the last one
- * landed, because an assessor working offline has no other way to tell.
+ * landed, because an assessor working offline has no other way to tell, and the
+ * badge says whether it has reached the server, which is a different question.
  */
 
 // Cast rather than let TypeScript infer a literal type for a 96 KB document.
 const template = rawTemplate as unknown as Template
 
 const locale = template.default_locale
-const pathogens = ['hiv']
+const pathogens = ['HIV']
 
 const assessment = useAssessment(template)
 const activeSection = ref(template.sections[2]?.code ?? '1')
 const ready = ref(false)
 
-onMounted(async () => {
+const signedIn = computed(() => session.value !== null)
+
+onMounted(() => {
+    if (signedIn.value) {
+        startSync()
+    }
+})
+
+function onSignedIn() {
+    startSync()
+}
+
+async function onSiteChosen(site: Site) {
     await assessment.start({
-        siteName: 'Kanyama Clinic',
+        organizationId: session.value?.user.organizationId ?? 0,
+        siteId: site.id,
+        siteName: site.name,
+        facilityId: site.facility_id,
         pathogens,
         context: { refers_specimens: 'no' },
     })
+
     ready.value = true
-})
+}
 
 const section = computed(
     () => template.sections.find((s) => s.code === activeSection.value) ?? template.sections[0]!,
@@ -78,7 +101,11 @@ function title(value: Record<string, string>): string {
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
+    <SignIn v-if="!signedIn" @signed-in="onSignedIn" />
+
+    <SitePicker v-else-if="!ready" @chosen="onSiteChosen" />
+
+    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
         <StorageNotice
             :storage="assessment.storage.value"
             :save-state="assessment.saveState.value"
@@ -86,9 +113,12 @@ function title(value: Record<string, string>): string {
         />
 
         <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3">
-            <span class="text-[13px] text-accent">
-                {{ assessment.assessment.value?.siteName ?? 'Loading' }}
-            </span>
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-[13px] text-accent">
+                    {{ assessment.assessment.value?.siteName ?? 'Loading' }}
+                </span>
+                <SyncBadge @retry="syncAll()" />
+            </div>
             <h1 class="text-[30px] font-bold tracking-tight">{{ title(section.title) }}</h1>
             <span class="tnum text-[13px] text-label-2">
                 {{ answeredHere }} of {{ section.questions.length }} answered
@@ -114,7 +144,7 @@ function title(value: Record<string, string>): string {
         </nav>
 
         <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
-            <div v-if="ready" class="overflow-hidden rounded-card bg-surface">
+            <div class="overflow-hidden rounded-card bg-surface">
                 <div v-for="(question, index) in section.questions" :key="question.code">
                     <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
                     <QuestionRow

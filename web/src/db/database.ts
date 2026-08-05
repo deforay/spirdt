@@ -18,23 +18,49 @@ import Dexie, { type Table } from 'dexie'
 /** Mirrors answers.response in the database. */
 export type StoredResponse = 'Y' | 'P' | 'N' | 'NA'
 
+/**
+ * One pathogen assessed during a visit. The key is what answers reference; the
+ * name is what the server stores and what the score is reported against.
+ */
+export interface StoredPathogen {
+    key: string
+    name: string
+}
+
+/**
+ * Where an assessment stands with the server.
+ *
+ * `blocked` is the one that matters. It means the server refused the payload
+ * for a reason that retrying cannot fix — the wrong organisation, a template it
+ * does not have — and something has to be shown to a person rather than
+ * retried quietly until the tablet is wiped.
+ */
+export type SyncState = 'pending' | 'synced' | 'blocked'
+
 export interface StoredAssessment {
     /** UUIDv7, generated on the device. The server accepts this id as given. */
     id: string
     organizationId: number
     siteId: string | null
     siteName: string
+    /** The facility the site belongs to. The server requires both. */
+    facilityId: string | null
     templateCode: string
     templateVersion: string
+    /** The date of the visit, YYYY-MM-DD. Not the date it was synced. */
+    assessedOn: string
     /** Part A answers, keyed by field code. */
     context: Record<string, unknown>
-    /** Pathogen keys in sequence order. Section 4 repeats once per entry. */
-    pathogens: string[]
+    /** In sequence order. Section 4 repeats once per entry. */
+    pathogens: StoredPathogen[]
     status: 'draft' | 'complete' | 'submitted'
     startedAt: string
     updatedAt: string
     /** Set when the server has acknowledged this assessment. */
     syncedAt: string | null
+    syncState: SyncState
+    /** Why the server refused, in words for the assessor. */
+    syncError: string | null
 }
 
 export interface StoredAnswer {
@@ -47,6 +73,16 @@ export interface StoredAnswer {
     comment: string
     answeredAt: string | null
     updatedAt: string
+    /**
+     * Incremented on every write to this answer.
+     *
+     * A counter rather than updatedAt, because two writes can land in the same
+     * millisecond and an ISO timestamp cannot tell them apart. The sync uses
+     * this to check that the answer it is about to mark clean is still the one
+     * it sent, so a comparison that silently reports "unchanged" for a real
+     * change would discard the change.
+     */
+    revision: number
     /** False once the server has acknowledged this exact revision. */
     dirty: boolean
 }
@@ -81,6 +117,47 @@ export class SpirdtDatabase extends Dexie {
             answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
             journal: '++id, assessmentId, at',
         })
+
+        // Version 2 adds what the server requires to accept a visit — the
+        // facility, the date it happened — and the sync bookkeeping.
+        //
+        // The upgrade fills those in rather than leaving them undefined,
+        // because a row half-described here is a row that fails to sync later
+        // with nothing on screen to explain why. A device carrying an
+        // unfinished visit through this upgrade keeps it.
+        this.version(2)
+            .stores({
+                assessments: 'id, status, syncState, syncedAt, updatedAt',
+                answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
+                journal: '++id, assessmentId, at',
+            })
+            .upgrade(async (transaction) => {
+                await transaction
+                    .table('assessments')
+                    .toCollection()
+                    .modify((row: Record<string, unknown>) => {
+                        row.facilityId ??= null
+                        row.assessedOn ??= String(row.startedAt ?? '').slice(0, 10)
+                        row.syncError ??= null
+                        row.syncState ??= row.syncedAt == null ? 'pending' : 'synced'
+
+                        // Pathogens were bare keys before the server needed a
+                        // name to score against. The key is the best name
+                        // available, and the review screen can correct it.
+                        if (Array.isArray(row.pathogens)) {
+                            row.pathogens = row.pathogens.map((entry: unknown) =>
+                                typeof entry === 'string' ? { key: entry, name: entry } : entry,
+                            )
+                        }
+                    })
+
+                await transaction
+                    .table('answers')
+                    .toCollection()
+                    .modify((row: Record<string, unknown>) => {
+                        row.revision ??= 1
+                    })
+            })
     }
 }
 

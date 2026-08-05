@@ -24,7 +24,9 @@ final class TokenService
 {
     private readonly string $secret;
 
-    public function __construct(?string $secret = null, private readonly int $ttlSeconds = 3600)
+    private readonly int $ttlSeconds;
+
+    public function __construct(?string $secret = null, ?int $ttlSeconds = null)
     {
         $secret ??= (string) env('JWT_SECRET', '');
 
@@ -33,6 +35,18 @@ final class TokenService
         }
 
         $this->secret = $secret;
+
+        // Floored rather than trusted: a JWT_ACCESS_TTL of 0 — an unset or
+        // mistyped variable reads as 0 — would mint tokens that expire in the
+        // same second they are issued, and the symptom is a device that can
+        // never sync rather than an obvious configuration error.
+        $this->ttlSeconds = max(60, $ttlSeconds ?? (int) env('JWT_ACCESS_TTL', 900));
+    }
+
+    /** What the device should put on its clock to know when to refresh. */
+    public function ttlSeconds(): int
+    {
+        return $this->ttlSeconds;
     }
 
     public function issue(int $userId, int $organizationId, string $role, bool $isPlatformAdmin = false): string

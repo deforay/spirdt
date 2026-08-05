@@ -100,23 +100,30 @@ final class SyncService
     ): Assessment {
         $context = is_array($payload['context'] ?? null) ? $payload['context'] : [];
 
+        $assessment = Assessment::findByUuid($assessmentId);
+        $status = $this->status($payload, $assessment);
+
         $attributes = [
             'organization_id'  => $organizationId,
             'template_id'      => $templateId,
             'testing_site_id'  => $this->requireUuid($payload, 'testing_site_id'),
             'facility_id'      => $this->requireUuid($payload, 'facility_id'),
             'assessed_on'      => $this->requireString($payload, 'assessed_on'),
-            'status'           => 'submitted',
+            'status'           => $status,
             'context'          => $context,
             'refers_specimens' => $this->refersSpecimens($context),
             'started_at'       => $payload['started_at'] ?? null,
             'ended_at'         => $payload['ended_at'] ?? null,
             'device_id'        => $payload['device_id'] ?? null,
             'app_version'      => $payload['app_version'] ?? null,
-            'submitted_at'     => gmdate('Y-m-d H:i:s'),
         ];
 
-        $assessment = Assessment::findByUuid($assessmentId);
+        // Stamped once, when the visit is actually submitted. Re-stamping on
+        // every retry would make the audit trail say the visit was submitted
+        // whenever the device last had a signal.
+        if ($status === 'submitted' && ($assessment === null || $assessment->submitted_at === null)) {
+            $attributes['submitted_at'] = gmdate('Y-m-d H:i:s');
+        }
 
         if ($assessment === null) {
             $assessment = new Assessment();
@@ -305,6 +312,31 @@ final class SyncService
             'missing'        => $result->missing,
             'violations'     => $result->violations,
         ];
+    }
+
+    /**
+     * What the visit's status becomes.
+     *
+     * A device syncs mid-visit to get work off the tablet, so a payload may
+     * legitimately say `draft`. Two rules keep that from rewriting history:
+     * anything other than draft or submitted is ignored rather than trusted,
+     * and a visit that has moved past draft never goes back. A retry can
+     * arrive after the submission it precedes, and without the second rule a
+     * lost response from an hour ago would reopen a finalised assessment.
+     *
+     * @param array<string,mixed> $payload
+     */
+    private function status(array $payload, ?Assessment $existing): string
+    {
+        if ($existing !== null && $existing->status !== 'draft') {
+            return (string) $existing->status;
+        }
+
+        $requested = $payload['status'] ?? null;
+
+        return is_string($requested) && in_array($requested, ['draft', 'submitted'], true)
+            ? $requested
+            : 'submitted';
     }
 
     /** @param array<string,mixed> $context */

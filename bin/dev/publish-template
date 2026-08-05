@@ -1,0 +1,147 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Load an instrument into the templates table and publish it.
+ *
+ * The device carries the template bundled with the build, but the SERVER scores
+ * against the copy in this table — that is the authoritative one — so a payload
+ * naming a template that is not here is refused. Nothing else puts it there.
+ *
+ * Published platform-wide by default (organization_id NULL), which every
+ * organisation can use. Pass --org to publish a copy for one organisation
+ * instead; template lookup prefers an organisation's own copy over the
+ * platform's.
+ *
+ * Idempotent: re-running replaces the definition for the same code and version.
+ *
+ * Usage:
+ *   bin/dev/publish-template                       every resources/templates/*.json
+ *   bin/dev/publish-template <path>                one file
+ *   bin/dev/publish-template --org=demo            for one organisation only
+ *   bin/dev/publish-template --help
+ *
+ * Exit codes: 0 published, 1 refused.
+ */
+
+require __DIR__ . '/../lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/../lib/console.php';
+
+$root = dirname(__DIR__, 2);
+chdir($root);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    con_fail('vendor/ missing — run composer install.');
+}
+
+require $root . '/vendor/autoload.php';
+
+$options = [];
+$targets = [];
+
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--([a-z-]+)=(.*)$/', $argument, $matches) === 1) {
+        $options[$matches[1]] = $matches[2];
+    } elseif (!str_starts_with($argument, '-')) {
+        $targets[] = $argument;
+    }
+}
+
+if ($targets === []) {
+    $targets = array_values(array_filter(
+        glob($root . '/resources/templates/*.json') ?: [],
+        static fn (string $path): bool => basename($path) !== 'template.schema.json',
+    ));
+}
+
+if ($targets === []) {
+    con_fail('No templates found in resources/templates/.');
+}
+
+$env = con_read_env(con_env_path($root));
+$pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+
+$organizationId = null;
+$orgCode = trim($options['org'] ?? '');
+
+if ($orgCode !== '') {
+    $statement = $pdo->prepare('SELECT id FROM organizations WHERE code = ?');
+    $statement->execute([$orgCode]);
+    $found = $statement->fetchColumn();
+
+    if ($found === false) {
+        con_fail('No organisation ' . $orgCode . '.');
+    }
+
+    $organizationId = (int) $found;
+}
+
+$published = 0;
+
+foreach ($targets as $path) {
+    $raw = @file_get_contents($path);
+
+    if ($raw === false) {
+        con_print('error', 'Unreadable: ' . $path);
+
+        continue;
+    }
+
+    try {
+        $definition = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        con_print('error', basename($path) . ' — not valid JSON: ' . $e->getMessage());
+
+        continue;
+    }
+
+    $code = $definition['code'] ?? null;
+    $version = $definition['version'] ?? null;
+
+    if (!is_string($code) || !is_string($version)) {
+        con_print('error', basename($path) . ' — no code or version.');
+
+        continue;
+    }
+
+    $title = $definition['title'][$definition['default_locale'] ?? 'en']
+        ?? $definition['title']
+        ?? $code;
+
+    // org_key is generated from organization_id, so it is matched on rather
+    // than written: IFNULL(organization_id, 0) is what the unique key uses.
+    $statement = $pdo->prepare(
+        'SELECT id FROM templates WHERE org_key = ? AND code = ? AND version = ?',
+    );
+    $statement->execute([$organizationId ?? 0, $code, $version]);
+    $existing = $statement->fetchColumn();
+
+    if ($existing === false) {
+        $pdo->prepare(
+            'INSERT INTO templates (organization_id, code, version, title, definition, status, published_at)
+             VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+        )->execute([$organizationId, $code, $version, is_string($title) ? $title : $code, $raw, 'published']);
+
+        con_print('success', $code . ' ' . $version . ' published');
+    } else {
+        $pdo->prepare(
+            'UPDATE templates SET definition = ?, title = ?, status = ?, published_at = UTC_TIMESTAMP()
+             WHERE id = ?',
+        )->execute([$raw, is_string($title) ? $title : $code, 'published', (int) $existing]);
+
+        con_print('success', $code . ' ' . $version . ' replaced');
+    }
+
+    ++$published;
+}
+
+if ($published === 0) {
+    con_fail('Nothing was published.');
+}
+
+con_print('info', $organizationId === null
+    ? 'Available to every organisation.'
+    : 'Available to ' . $orgCode . ' only.');

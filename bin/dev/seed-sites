@@ -1,0 +1,131 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Put a few facilities and testing sites into an organisation.
+ *
+ * For local work only. There is no admin interface yet, and an assessor cannot
+ * start a visit without a site to assess, so this is what makes the app usable
+ * end to end before the registry screens exist.
+ *
+ * Idempotent: sites are matched by facility and name, so running it twice does
+ * not produce a second Kanyama Clinic.
+ *
+ * Usage:
+ *   bin/dev/seed-sites --org=demo
+ *   bin/dev/seed-sites --help
+ *
+ * Exit codes: 0 seeded, 1 refused.
+ */
+
+require __DIR__ . '/../lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/../lib/console.php';
+
+$root = dirname(__DIR__, 2);
+chdir($root);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    con_fail('vendor/ missing — run composer install.');
+}
+
+require $root . '/vendor/autoload.php';
+
+use App\Support\BinaryUuid;
+
+/** Facility => its testing sites. */
+const REGISTRY = [
+    'Kanyama Level 1 Hospital' => ['Kanyama Clinic Laboratory', 'Kanyama ART Corner'],
+    'Chilenje Health Centre'   => ['Chilenje Testing Room'],
+    'Matero Reference Centre'  => ['Matero Main Laboratory'],
+];
+
+$options = [];
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--([a-z-]+)=(.*)$/', $argument, $matches) === 1) {
+        $options[$matches[1]] = $matches[2];
+    }
+}
+
+$orgCode = trim($options['org'] ?? '');
+
+if ($orgCode === '') {
+    con_fail('--org is required. See --help.');
+}
+
+$env = con_read_env(con_env_path($root));
+$pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+
+$statement = $pdo->prepare('SELECT id FROM organizations WHERE code = ?');
+$statement->execute([$orgCode]);
+$organizationId = $statement->fetchColumn();
+
+if ($organizationId === false) {
+    con_fail('No organisation ' . $orgCode . '. Create one with bin/dev/create-user first.');
+}
+
+$organizationId = (int) $organizationId;
+
+/** UUIDv7, matching what the devices mint. */
+function seed_uuid(): string
+{
+    $bytes = random_bytes(16);
+    $millis = (int) (microtime(true) * 1000);
+
+    for ($i = 5; $i >= 0; --$i) {
+        $bytes[$i] = chr($millis & 0xff);
+        $millis >>= 8;
+    }
+
+    $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x70);
+    $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+
+    return BinaryUuid::toString($bytes);
+}
+
+$created = 0;
+
+foreach (REGISTRY as $facilityName => $siteNames) {
+    $statement = $pdo->prepare('SELECT id FROM facilities WHERE organization_id = ? AND name = ?');
+    $statement->execute([$organizationId, $facilityName]);
+    $facilityId = $statement->fetchColumn();
+
+    if ($facilityId === false) {
+        $facilityId = BinaryUuid::toBytes(seed_uuid());
+
+        $pdo->prepare(
+            'INSERT INTO facilities (id, organization_id, name, source) VALUES (?, ?, ?, ?)',
+        )->execute([$facilityId, $organizationId, $facilityName, 'registry']);
+
+        con_print('success', 'Facility ' . $facilityName);
+    }
+
+    foreach ($siteNames as $siteName) {
+        $statement = $pdo->prepare(
+            'SELECT id FROM testing_sites WHERE organization_id = ? AND facility_id = ? AND name = ?',
+        );
+        $statement->execute([$organizationId, $facilityId, $siteName]);
+
+        if ($statement->fetchColumn() !== false) {
+            continue;
+        }
+
+        $pdo->prepare(
+            'INSERT INTO testing_sites (id, organization_id, facility_id, name, source)
+             VALUES (?, ?, ?, ?, ?)',
+        )->execute([
+            BinaryUuid::toBytes(seed_uuid()),
+            $organizationId,
+            $facilityId,
+            $siteName,
+            'registry',
+        ]);
+
+        con_print('success', '  ' . $siteName);
+        ++$created;
+    }
+}
+
+con_print('info', $created === 0 ? 'Already seeded.' : $created . ' testing sites added.');

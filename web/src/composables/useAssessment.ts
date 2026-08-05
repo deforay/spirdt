@@ -38,19 +38,32 @@ export function useAssessment(template: Template) {
     const lastSavedAt = ref<Date | null>(null)
     const inFlight = ref(0)
 
-    async function start(input: { siteName: string; pathogens: string[]; context: Context }) {
+    async function start(input: {
+        organizationId: number
+        siteId: string
+        siteName: string
+        facilityId: string
+        pathogens: string[]
+        context: Context
+    }) {
         // Checked before anything is written, not after. A device that is not
         // keeping data has to be found out before fifty-nine questions, not
         // after them.
         storage.value = await checkStorage()
 
         const created = await createAssessment({
-            organizationId: 1,
+            organizationId: input.organizationId,
+            siteId: input.siteId,
+            facilityId: input.facilityId,
             siteName: input.siteName,
             templateCode: template.code,
             templateVersion: template.version,
             context: input.context,
-            pathogens: input.pathogens,
+            // Key and name are the same string here. Answers reference a
+            // pathogen by name and the scoring engine scores by name, so
+            // introducing a separate key would mean two identifiers for one
+            // thing and a mapping to keep correct on both sides of the sync.
+            pathogens: input.pathogens.map((name) => ({ key: name, name })),
         })
 
         assessment.value = created
@@ -165,7 +178,7 @@ export function useAssessment(template: Template) {
             template,
             answers.value,
             assessment.value?.context ?? {},
-            assessment.value?.pathogens ?? [],
+            assessment.value?.pathogens.map((pathogen) => pathogen.name) ?? [],
         ),
     )
 

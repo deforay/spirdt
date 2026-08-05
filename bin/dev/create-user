@@ -1,0 +1,164 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Create an organisation, its system roles, and a user who can sign in.
+ *
+ * There is no self-registration in this product and no admin interface yet, so
+ * without this the login endpoint has nothing to authenticate against and the
+ * app cannot be run end to end at all.
+ *
+ * Everything is idempotent: an existing organisation is reused, existing roles
+ * are left alone, and an existing user has their password and role updated
+ * rather than being duplicated. Running it twice is a supported way to reset a
+ * forgotten local password.
+ *
+ * Usage:
+ *   bin/dev/create-user --org=demo --email=jane@example.org --name="Jane Doe"
+ *   bin/dev/create-user --org=demo --email=jane@example.org --role=admin
+ *   bin/dev/create-user --help
+ *
+ * Options:
+ *   --org        Organisation code. Created if it does not exist. Required.
+ *   --email      Sign-in address. Required.
+ *   --name       Full name. Defaults to the part of the email before the @.
+ *   --role       One of superadmin, admin, assessor, viewer, site_user.
+ *                Defaults to assessor.
+ *   --password   Skips the prompt. Avoid it — the password lands in your
+ *                shell history, and this is the account that reaches an
+ *                organisation's assessments.
+ *
+ * Exit codes: 0 created or updated, 1 refused.
+ */
+
+require __DIR__ . '/../lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/../lib/console.php';
+
+$root = dirname(__DIR__, 2);
+chdir($root);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    con_fail('vendor/ missing — run composer install.');
+}
+
+require $root . '/vendor/autoload.php';
+
+/** The five in the baseline schema. is_system marks them undeletable. */
+const SYSTEM_ROLES = [
+    'superadmin' => 'Superadmin',
+    'admin'      => 'Administrator',
+    'assessor'   => 'Assessor',
+    'viewer'     => 'Viewer',
+    'site_user'  => 'Site user',
+];
+
+$options = [];
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--([a-z-]+)=(.*)$/', $argument, $matches) === 1) {
+        $options[$matches[1]] = $matches[2];
+    }
+}
+
+$orgCode = trim($options['org'] ?? '');
+$email = mb_strtolower(trim($options['email'] ?? ''));
+$roleKey = trim($options['role'] ?? 'assessor');
+
+if ($orgCode === '' || $email === '') {
+    con_fail('--org and --email are both required. See --help.');
+}
+
+if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+    con_fail('That does not look like an email address: ' . $email);
+}
+
+if (!isset(SYSTEM_ROLES[$roleKey])) {
+    con_fail('Unknown role ' . $roleKey . '. One of: ' . implode(', ', array_keys(SYSTEM_ROLES)));
+}
+
+$name = trim($options['name'] ?? '');
+if ($name === '') {
+    $name = ucwords(str_replace(['.', '_', '-'], ' ', (string) strstr($email, '@', true)));
+}
+
+$password = $options['password'] ?? null;
+
+if ($password === null) {
+    if (!con_is_interactive()) {
+        con_fail('No --password given and nothing to prompt on. Pass --password in a script.');
+    }
+
+    $password = con_ask_secret('Password');
+    $again = con_ask_secret('Password again');
+
+    if ($password !== $again) {
+        con_fail('Those did not match.');
+    }
+}
+
+// Twelve rather than eight: these accounts hold an organisation's assessment
+// history, and the check runs once per sign-in, not once per request.
+if (strlen($password) < 12) {
+    con_fail('Use at least 12 characters.');
+}
+
+$env = con_read_env(con_env_path($root));
+$pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+
+$pdo->beginTransaction();
+
+try {
+    $statement = $pdo->prepare('SELECT id FROM organizations WHERE code = ?');
+    $statement->execute([$orgCode]);
+    $organizationId = $statement->fetchColumn();
+
+    if ($organizationId === false) {
+        $pdo->prepare('INSERT INTO organizations (code, name) VALUES (?, ?)')
+            ->execute([$orgCode, ucfirst($orgCode)]);
+        $organizationId = (int) $pdo->lastInsertId();
+        con_print('success', 'Created organisation ' . $orgCode);
+    } else {
+        $organizationId = (int) $organizationId;
+    }
+
+    foreach (SYSTEM_ROLES as $key => $label) {
+        $pdo->prepare(
+            'INSERT INTO roles (organization_id, `key`, name, is_system) VALUES (?, ?, ?, 1)
+             ON DUPLICATE KEY UPDATE id = id',
+        )->execute([$organizationId, $key, $label]);
+    }
+
+    $statement = $pdo->prepare('SELECT id FROM roles WHERE organization_id = ? AND `key` = ?');
+    $statement->execute([$organizationId, $roleKey]);
+    $roleId = (int) $statement->fetchColumn();
+
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+
+    $statement = $pdo->prepare('SELECT id FROM users WHERE organization_id = ? AND email = ?');
+    $statement->execute([$organizationId, $email]);
+    $userId = $statement->fetchColumn();
+
+    if ($userId === false) {
+        $pdo->prepare(
+            'INSERT INTO users (organization_id, role_id, email, password_hash, full_name, is_active)
+             VALUES (?, ?, ?, ?, ?, 1)',
+        )->execute([$organizationId, $roleId, $email, $hash, $name]);
+
+        con_print('success', 'Created ' . $email . ' as ' . $roleKey . ' in ' . $orgCode);
+    } else {
+        $pdo->prepare(
+            'UPDATE users SET role_id = ?, password_hash = ?, full_name = ?, is_active = 1 WHERE id = ?',
+        )->execute([$roleId, $hash, $name, (int) $userId]);
+
+        con_print('success', 'Updated ' . $email . ' — password reset, role ' . $roleKey);
+    }
+
+    $pdo->commit();
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    con_fail('Nothing was written: ' . $e->getMessage());
+}
+
+con_print('info', 'Sign in with POST /api/auth/login');

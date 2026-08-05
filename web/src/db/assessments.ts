@@ -1,4 +1,11 @@
-import { answerKey, db, type StoredAnswer, type StoredAssessment, type StoredResponse } from './database'
+import {
+    answerKey,
+    db,
+    type StoredAnswer,
+    type StoredAssessment,
+    type StoredPathogen,
+    type StoredResponse,
+} from './database'
 import { uuidv7 } from './uuid'
 
 /**
@@ -40,10 +47,13 @@ export interface NewAssessment {
     organizationId: number
     siteId?: string | null
     siteName: string
+    facilityId?: string | null
     templateCode: string
     templateVersion: string
+    /** Defaults to today. A visit entered the next morning must say so. */
+    assessedOn?: string
     context?: Record<string, unknown>
-    pathogens?: string[]
+    pathogens?: StoredPathogen[]
 }
 
 export async function createAssessment(input: NewAssessment): Promise<StoredAssessment> {
@@ -54,14 +64,18 @@ export async function createAssessment(input: NewAssessment): Promise<StoredAsse
         organizationId: input.organizationId,
         siteId: input.siteId ?? null,
         siteName: input.siteName,
+        facilityId: input.facilityId ?? null,
         templateCode: input.templateCode,
         templateVersion: input.templateVersion,
+        assessedOn: input.assessedOn ?? now.slice(0, 10),
         context: input.context ?? {},
         pathogens: input.pathogens ?? [],
         status: 'draft',
         startedAt: now,
         updatedAt: now,
         syncedAt: null,
+        syncState: 'pending',
+        syncError: null,
     }
 
     await db.transaction('rw', db.assessments, db.journal, async () => {
@@ -125,6 +139,7 @@ export async function saveAnswer(
                 comment: patch.comment !== undefined ? patch.comment : (existing?.comment ?? ''),
                 answeredAt: now,
                 updatedAt: now,
+                revision: (existing?.revision ?? 0) + 1,
                 dirty: true,
             }
 
@@ -136,7 +151,16 @@ export async function saveAnswer(
                 subject: key,
                 payload: { response: row.response, comment: row.comment },
             })
-            await db.assessments.update(assessmentId, { updatedAt: now })
+
+            // Any edit re-arms the sync, including on an assessment the server
+            // previously refused: the refusal was about the content, and the
+            // content has just changed. Without this a blocked assessment stays
+            // blocked no matter what the assessor corrects.
+            await db.assessments.update(assessmentId, {
+                updatedAt: now,
+                syncState: 'pending',
+                syncError: null,
+            })
 
             return row
         })
@@ -151,7 +175,12 @@ export async function saveContext(
         const now = new Date().toISOString()
 
         await db.transaction('rw', db.assessments, db.journal, async () => {
-            await db.assessments.update(assessmentId, { context, updatedAt: now })
+            await db.assessments.update(assessmentId, {
+                context,
+                updatedAt: now,
+                syncState: 'pending',
+                syncError: null,
+            })
             await db.journal.add({
                 assessmentId,
                 at: now,
@@ -163,23 +192,70 @@ export async function saveContext(
     })
 }
 
+/** What was sent, as it was at the moment it was sent. */
+export interface AcknowledgedAnswer {
+    key: string
+    /** The revision that went to the server, not the one on disk now. */
+    revision: number
+}
+
 /**
  * Mark rows the server has acknowledged.
+ *
+ * The revision check is the whole point. A sync takes seconds on a bad
+ * connection, and the assessor keeps working through it — so by the time the
+ * acknowledgement lands, an answer in that payload may already have been
+ * changed on screen. Clearing its dirty flag on the strength of the OLD
+ * revision would mean that edit is never sent and never retried, and nothing
+ * anywhere would look wrong: the answer reads correctly on the device and is
+ * simply absent from the server's copy for good.
+ *
+ * So a row whose revision has moved is left dirty and goes in the next sync.
  *
  * Nothing is deleted. The device keeps the assessment so the assessor can still
  * read what they filed, and so a server that later says it never received it
  * can be contradicted.
  */
-export async function markSynced(assessmentId: string, answerKeys: string[]): Promise<void> {
+export async function markSynced(
+    assessmentId: string,
+    acknowledged: AcknowledgedAnswer[],
+): Promise<void> {
     const now = new Date().toISOString()
 
     await db.transaction('rw', db.answers, db.assessments, async () => {
-        for (const key of answerKeys) {
-            await db.answers.update(key, { dirty: false })
+        for (const entry of acknowledged) {
+            const row = await db.answers.get(entry.key)
+
+            if (row === undefined || row.revision !== entry.revision) {
+                continue
+            }
+
+            await db.answers.update(entry.key, { dirty: false })
         }
 
-        await db.assessments.update(assessmentId, { syncedAt: now })
+        const stillDirty = await db.answers
+            .where('assessmentId')
+            .equals(assessmentId)
+            .filter((row) => row.dirty)
+            .count()
+
+        await db.assessments.update(assessmentId, {
+            syncedAt: now,
+            syncState: stillDirty === 0 ? 'synced' : 'pending',
+            syncError: null,
+        })
     })
+}
+
+/**
+ * Record that the server refused, and will refuse again.
+ *
+ * Kept on the row rather than in memory so the reason survives a reload — the
+ * device may not be looked at again until someone asks why a visit never
+ * arrived.
+ */
+export async function markBlocked(assessmentId: string, reason: string): Promise<void> {
+    await db.assessments.update(assessmentId, { syncState: 'blocked', syncError: reason })
 }
 
 export function pendingAnswers(assessmentId: string): Promise<StoredAnswer[]> {
@@ -203,6 +279,11 @@ export async function recoverFromJournal(assessmentId: string): Promise<number> 
 
     let restored = 0
 
+    // Rebuilt by counting replays rather than carried in the journal: the
+    // revision only has to increase with each write to the same answer, and
+    // the journal is already in write order.
+    const revisions = new Map<string, number>()
+
     await db.transaction('rw', db.answers, async () => {
         for (const entry of entries) {
             if (entry.kind !== 'answer') {
@@ -211,6 +292,9 @@ export async function recoverFromJournal(assessmentId: string): Promise<number> 
 
             const payload = entry.payload as { response: StoredResponse | null; comment: string }
             const [, questionCode, pathogen] = entry.subject.split('|')
+            const revision = (revisions.get(entry.subject) ?? 0) + 1
+
+            revisions.set(entry.subject, revision)
 
             await db.answers.put({
                 key: entry.subject,
@@ -221,6 +305,7 @@ export async function recoverFromJournal(assessmentId: string): Promise<number> 
                 comment: payload.comment,
                 answeredAt: entry.at,
                 updatedAt: entry.at,
+                revision,
                 dirty: true,
             })
 
