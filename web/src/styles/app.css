@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ─── Tokens ───
+ *
+ * The palette from docs/design.md. Every value clears WCAG AA on both the
+ * surface and the ground, in both themes. Measure a replacement before you
+ * make one.
+ *
+ * Colours are declared here and nowhere else. A colour written inside a
+ * component, or inside a media query, is how the two themes drift apart — and
+ * when they do, dark-on-boot stops matching dark-on-toggle, which is the kind
+ * of bug nobody reports because it only shows up on someone else's machine.
+ */
+
+:root {
+    --c-ground:       #F2F2F7;
+    --c-surface:      #FFFFFF;
+    --c-hairline:     rgba(60, 60, 67, 0.20);
+    --c-label:        #111114;
+    --c-label-2:      #55555D;
+    --c-label-3:      #6E6E76;
+    --c-accent:       #0A6ECB;
+    --c-accent-soft:  rgba(10, 110, 203, 0.10);
+    --c-yes:          #1E7B34;
+    --c-partial:      #9A5B00;
+    --c-no:           #B3261E;
+    --c-na:           #6B6B73;
+    --c-yes-soft:     rgba(30, 123, 52, 0.12);
+    --c-partial-soft: rgba(154, 91, 0, 0.12);
+    --c-no-soft:      rgba(179, 38, 30, 0.12);
+    --c-na-soft:      rgba(124, 124, 132, 0.14);
+    --c-track:        rgba(118, 118, 128, 0.12);
+    --c-scrollbar:    rgba(122, 122, 130, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --c-ground:       #000000;
+        --c-surface:      #1C1C1E;
+        --c-hairline:     rgba(84, 84, 88, 0.55);
+        --c-label:        #F5F5F7;
+        --c-label-2:      #9A9AA0;
+        --c-label-3:      #86868E;
+        --c-accent:       #4C9DF5;
+        --c-accent-soft:  rgba(76, 157, 245, 0.16);
+        --c-yes:          #4FD16B;
+        --c-partial:      #E0A030;
+        --c-no:           #FF6B60;
+        --c-na:           #98989F;
+        --c-yes-soft:     rgba(79, 209, 107, 0.16);
+        --c-partial-soft: rgba(224, 160, 48, 0.16);
+        --c-no-soft:      rgba(255, 107, 96, 0.16);
+        --c-na-soft:      rgba(152, 152, 159, 0.18);
+        --c-track:        rgba(118, 118, 128, 0.24);
+    }
+}
+
+/* The manual override must win over the media query in both directions, so
+   both values are restated rather than only the dark one. */
+:root[data-theme="dark"] {
+    --c-ground:       #000000;
+    --c-surface:      #1C1C1E;
+    --c-hairline:     rgba(84, 84, 88, 0.55);
+    --c-label:        #F5F5F7;
+    --c-label-2:      #9A9AA0;
+    --c-label-3:      #86868E;
+    --c-accent:       #4C9DF5;
+    --c-accent-soft:  rgba(76, 157, 245, 0.16);
+    --c-yes:          #4FD16B;
+    --c-partial:      #E0A030;
+    --c-no:           #FF6B60;
+    --c-na:           #98989F;
+    --c-yes-soft:     rgba(79, 209, 107, 0.16);
+    --c-partial-soft: rgba(224, 160, 48, 0.16);
+    --c-no-soft:      rgba(255, 107, 96, 0.16);
+    --c-na-soft:      rgba(152, 152, 159, 0.18);
+    --c-track:        rgba(118, 118, 128, 0.24);
+}
+
+:root[data-theme="light"] {
+    --c-ground:       #F2F2F7;
+    --c-surface:      #FFFFFF;
+    --c-hairline:     rgba(60, 60, 67, 0.20);
+    --c-label:        #111114;
+    --c-label-2:      #55555D;
+    --c-label-3:      #6E6E76;
+    --c-accent:       #0A6ECB;
+    --c-accent-soft:  rgba(10, 110, 203, 0.10);
+    --c-yes:          #1E7B34;
+    --c-partial:      #9A5B00;
+    --c-no:           #B3261E;
+    --c-na:           #6B6B73;
+    --c-yes-soft:     rgba(30, 123, 52, 0.12);
+    --c-partial-soft: rgba(154, 91, 0, 0.12);
+    --c-no-soft:      rgba(179, 38, 30, 0.12);
+    --c-na-soft:      rgba(124, 124, 132, 0.14);
+    --c-track:        rgba(118, 118, 128, 0.12);
+}
+
+@theme inline {
+    --color-ground:       var(--c-ground);
+    --color-surface:      var(--c-surface);
+    --color-hairline:     var(--c-hairline);
+    --color-label:        var(--c-label);
+    --color-label-2:      var(--c-label-2);
+    --color-label-3:      var(--c-label-3);
+    --color-accent:       var(--c-accent);
+    --color-accent-soft:  var(--c-accent-soft);
+    --color-yes:          var(--c-yes);
+    --color-partial:      var(--c-partial);
+    --color-no:           var(--c-no);
+    --color-na:           var(--c-na);
+    --color-yes-soft:     var(--c-yes-soft);
+    --color-partial-soft: var(--c-partial-soft);
+    --color-no-soft:      var(--c-no-soft);
+    --color-na-soft:      var(--c-na-soft);
+    --color-track:        var(--c-track);
+
+    /* The system stack is the Apple face and downloads nothing, which is the
+       point on a bench connection. */
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --radius-card: 11px;
+}
+
+@layer base {
+    html {
+        background: var(--c-ground);
+        color: var(--c-label);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        /* Thin, but never hidden: a scrollbar that disappears removes the only
+           cue that there is more below. Set in CSS, never with a plugin —
+           scrollbar plugins break momentum scrolling on iOS and hide the scroll
+           area from assistive technology. */
+        scrollbar-width: thin;
+        scrollbar-color: var(--c-scrollbar) transparent;
+    }
+
+    /* Digits that stack must line up: scores, percentages, question codes. */
+    .tnum { font-variant-numeric: tabular-nums; }
+
+    :focus-visible {
+        outline: 2px solid var(--c-accent);
+        outline-offset: 2px;
+    }
+}
+
+@layer utilities {
+    .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--c-scrollbar) transparent; }
+    .scroll-thin::-webkit-scrollbar { width: 7px; height: 7px; }
+    .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: var(--c-scrollbar); border-radius: 100px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
