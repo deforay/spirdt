@@ -108,12 +108,16 @@ if (strlen($env['JWT_SECRET'] ?? '') < 32) {
 // resolve. Offer to point it at a local server rather than letting the user
 // discover it as an opaque connection error two steps later.
 if (($env['DB_HOST'] ?? '') === 'mysql' && !is_file('/.dockerenv')) {
-    [, $composeUp] = con_run('docker compose ps --quiet php');
-
-    if ($composeUp !== 0) {
+    if (!con_compose_running('php')) {
         con_print('warn', 'DB_HOST=mysql, but no Compose stack is running.');
 
-        if (con_confirm('Point DB_HOST at 127.0.0.1 for a local MySQL?', true)) {
+        // Editing someone's .env is a change to their configuration, so it
+        // needs an answer rather than a default. Unattended, say what to
+        // change and leave it alone: the run then fails at step 4 with the
+        // reason spelled out, which beats a silent rewrite nobody asked for.
+        if (!con_is_interactive()) {
+            con_print('info', 'Not interactive — leaving .env alone. Set DB_HOST=127.0.0.1 for a local MySQL, or start Compose: docker compose up -d');
+        } elseif (con_confirm('Point DB_HOST at 127.0.0.1 for a local MySQL?', true)) {
             con_set_env($envPath, 'DB_HOST', '127.0.0.1');
             con_print('success', 'DB_HOST set to 127.0.0.1');
         }
@@ -162,8 +166,16 @@ try {
     $server = con_pdo($env, null);
 } catch (PDOException $e) {
     con_print('error', 'Cannot reach the database server: ' . $e->getMessage());
-    con_print('info', 'Check DB_HOST/DB_PORT/DB_USER/DB_PASS in .env.');
-    con_print('info', 'Using Docker? Start it first: docker compose up -d');
+
+    $remedy = con_db_remedy($env['DB_HOST'] ?? '', $e);
+
+    if ($remedy !== '') {
+        con_print('info', $remedy);
+    } else {
+        con_print('info', 'Check DB_HOST/DB_PORT/DB_USER/DB_PASS in .env.');
+        con_print('info', 'Using Docker? Start it first: docker compose up -d');
+    }
+
     con_fail('Database unreachable.');
 }
 

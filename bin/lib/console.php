@@ -309,9 +309,99 @@ if (!function_exists('con_docker_prefix')) {
             return '';
         }
 
-        [, $code] = con_run('docker compose ps --quiet php');
+        // Only route into the container when it is actually running. Routing
+        // into a stopped one fails with "service php is not running", which
+        // reads as a broken script rather than a stopped stack.
+        return con_compose_running('php') ? 'docker compose exec -T php ' : '';
+    }
+}
 
-        return $code === 0 ? 'docker compose exec -T php ' : '';
+if (!function_exists('con_compose_running')) {
+    /**
+     * Is a Compose service actually running?
+     *
+     * The obvious test — run `docker compose ps` and check the exit code — is
+     * wrong, and wrong in the direction that hurts. With the stack down the
+     * command exits 0 and prints nothing, so an exit-code check concludes the
+     * stack is up. Verified against Compose v2: stopped service, exit 0, empty
+     * output. That made bin/setup skip the warning about DB_HOST=mysql on
+     * exactly the machines that needed it, and made con_docker_prefix() route
+     * commands into a container that was not there.
+     *
+     * So this reads the output, and `--status=running` because plain `ps -a`
+     * lists stopped containers too.
+     *
+     * The output is checked for a container ID rather than merely being
+     * non-empty: con_run merges stderr, so "Cannot connect to the Docker
+     * daemon" is itself output and would otherwise read as a running service.
+     */
+    function con_compose_running(string $service): bool
+    {
+        [$out, $code] = con_run('docker compose ps --quiet --status=running ' . escapeshellarg($service));
+
+        if ($code !== 0) {
+            return false;
+        }
+
+        $first = trim(strtok($out, "\n") ?: '');
+
+        return preg_match('/^[0-9a-f]{12,}$/i', $first) === 1;
+    }
+}
+
+if (!function_exists('con_db_remedy')) {
+    /**
+     * What to do about a connection that failed, given where we are running.
+     *
+     * A PDO error says the name did not resolve; it cannot say that "mysql" is
+     * a Compose service name and you are not in Compose. That mismatch — .env
+     * left at the Docker default while running natively, or the reverse — is by
+     * some distance the most common reason a fresh checkout appears broken, and
+     * it has cost setup time more than once.
+     *
+     * Lives here rather than in one script because setup, preflight and
+     * anything else that opens a connection all owe the same answer.
+     *
+     * Returns an empty string when the host looks right for where we are, since
+     * then the fault is the server or the credentials and a guess would mislead.
+     */
+    function con_db_remedy(string $host, PDOException $e): string
+    {
+        // Only where we never reached a server: 2002 cannot connect, 2005
+        // unknown host, 2006 server gone away. An "access denied" means the
+        // host was fine and the credentials were not, and telling someone to
+        // change DB_HOST at that point sends them away from the actual fault.
+        $driverCode = $e->errorInfo[1] ?? null;
+
+        if ($driverCode === null) {
+            $driverCode = preg_match('/\[(\d+)\]/', $e->getMessage(), $m) === 1 ? (int) $m[1] : null;
+        }
+
+        if (!in_array($driverCode, [2002, 2005, 2006], true)) {
+            return '';
+        }
+
+        // The reliable marker: the file exists in a container and nowhere else.
+        $inContainer = is_file('/.dockerenv');
+
+        if ($host === 'mysql' && !$inContainer) {
+            return 'DB_HOST=mysql is the Compose service name and resolves only inside the Compose network. '
+                 . 'Running natively: set DB_HOST=127.0.0.1 in .env. '
+                 . 'Running under Docker: start it with docker compose up -d, then run inside the container — '
+                 . 'docker compose exec php composer preflight';
+        }
+
+        if ($inContainer && in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
+            return 'Inside a container, ' . $host . ' is the container itself, not your machine. '
+                 . 'Set DB_HOST=mysql for the Compose database, or host.docker.internal for a MySQL running on the host.';
+        }
+
+        if ($host === 'localhost') {
+            return 'localhost makes PHP try a unix socket and ignore DB_PORT entirely, which fails when the '
+                 . 'socket path differs from what php.ini expects. Use DB_HOST=127.0.0.1 to force TCP.';
+        }
+
+        return '';
     }
 }
 

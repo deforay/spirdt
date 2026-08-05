@@ -37,6 +37,7 @@ declare(strict_types=1);
  */
 
 require __DIR__ . '/lib/help.php';
+require __DIR__ . '/lib/console.php';
 bin_help_if_requested(__FILE__);
 
 $root = dirname(__DIR__);
@@ -94,36 +95,6 @@ function step(string $label): void
     out("\n" . paint($label, 'bold'));
 }
 
-// ─── Runtime detection ───
-
-/**
- * Where should composer and bin/migrate run?
- *
- * Inside a container we are already in the right place. On the host, a
- * DB_HOST of "mysql" can only mean the Compose service, so the commands
- * belong inside the php container. Anything else is the native path.
- */
-function commandPrefix(string $root): string
-{
-    if (is_file('/.dockerenv')) {
-        return '';
-    }
-
-    $envFile = $root . '/.env';
-    if (!is_file($envFile)) {
-        return '';
-    }
-
-    $env = (string) file_get_contents($envFile);
-    if (preg_match('/^\s*DB_HOST\s*=\s*mysql\s*$/mi', $env) !== 1) {
-        return '';
-    }
-
-    [, $code] = run('docker compose ps --quiet php');
-
-    return $code === 0 ? 'docker compose exec -T php ' : '';
-}
-
 // ─── Preconditions ───
 
 [, $gitCode] = run('git --version');
@@ -138,7 +109,7 @@ if ($gitCode !== 0) {
 $currentBranch   = trim($currentBranch);
 $dirty           = trim($dirty);
 
-$prefix = commandPrefix($root);
+$prefix = con_docker_prefix($root);
 $where  = $prefix === '' ? 'native' : 'docker';
 
 // ─── Status mode ───
