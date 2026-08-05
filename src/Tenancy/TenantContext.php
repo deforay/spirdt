@@ -1,0 +1,104 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tenancy;
+
+use RuntimeException;
+
+/**
+ * Which organisation the current request belongs to.
+ *
+ * Every tenant-scoped table carries organization_id, and the global scope on
+ * the models reads it from here.
+ *
+ * FAILS CLOSED. With no context set, a scoped query throws rather than
+ * returning every organisation's rows. The alternative — treating "no context"
+ * as "no filter" — means one forgotten middleware turns a reporting endpoint
+ * into a cross-tenant data leak, and nothing about the response would look
+ * wrong. A loud exception in development is the cheap version of that bug.
+ *
+ * Held statically because Eloquent's global scopes are resolved deep inside
+ * the query builder, with no route to constructor injection. That makes it the
+ * one piece of global state in the application, so it is confined to this
+ * class, cleared between requests, and escaped only through withoutScope().
+ */
+final class TenantContext
+{
+    private static ?self $current = null;
+
+    /** Depth rather than a flag, so nested withoutScope() calls do not re-arm early. */
+    private static int $unscopedDepth = 0;
+
+    private function __construct(
+        public readonly int $organizationId,
+        public readonly ?int $userId = null,
+        public readonly bool $isPlatformAdmin = false,
+    ) {
+    }
+
+    public static function set(int $organizationId, ?int $userId = null, bool $isPlatformAdmin = false): self
+    {
+        self::$current = new self($organizationId, $userId, $isPlatformAdmin);
+
+        return self::$current;
+    }
+
+    public static function current(): ?self
+    {
+        return self::$current;
+    }
+
+    /**
+     * The organisation to filter by.
+     *
+     * @throws RuntimeException when nothing has established a tenant.
+     */
+    public static function requireOrganizationId(): int
+    {
+        if (self::$current === null) {
+            throw new RuntimeException(
+                'No tenant context. A scoped query ran outside a request that established an organisation — '
+                . 'set one with TenantContext::set(), or wrap the call in TenantContext::withoutScope() '
+                . 'if it is deliberately cross-tenant.',
+            );
+        }
+
+        return self::$current->organizationId;
+    }
+
+    public static function isScoped(): bool
+    {
+        return self::$unscopedDepth === 0;
+    }
+
+    /**
+     * Run something across every organisation.
+     *
+     * For platform administration, migrations and CLI work. Deliberately a
+     * callback rather than a flag: the scope is restored on the way out even
+     * when the callback throws, so an exception cannot leave the process
+     * unscoped for everything that follows it.
+     *
+     * @template T
+     * @param  callable():T $callback
+     * @return T
+     */
+    public static function withoutScope(callable $callback): mixed
+    {
+        ++self::$unscopedDepth;
+
+        try {
+            return $callback();
+        } finally {
+            --self::$unscopedDepth;
+        }
+    }
+
+    /** Between requests, and between tests. */
+    public static function forget(): void
+    {
+        self::$current = null;
+        self::$unscopedDepth = 0;
+    }
+}
