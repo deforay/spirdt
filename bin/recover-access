@@ -1,0 +1,460 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Get back into an organisation nobody can administer any more.
+ *
+ * Users are created and managed through the app. This is the break-glass tool
+ * for the cases where that is no longer possible, all of which are real and
+ * none of which have another way out:
+ *
+ *   The only administrator forgot their password, and nobody else can reset it.
+ *   The only administrator was changed to a role that cannot administer.
+ *   The only administrator was deactivated.
+ *   Failed sign-ins have throttled an account and the wait is not acceptable.
+ *
+ * Deliberately not a general user-management command. It does the four things
+ * above and nothing else — no deleting, no editing names, no creating
+ * organisations. A recovery tool that can do everything gets used for
+ * everything, and then it stops being audited as an exception.
+ *
+ * EVERY ACTION IS WRITTEN TO audit_log with actor_type 'system', because on an
+ * audit instrument the question "who reset the administrator's password, and
+ * when" has to have an answer that is not "someone with a shell".
+ *
+ * Resetting a password also revokes every refresh token that user holds. If
+ * the reason for the reset was that somebody else had the old password, then
+ * leaving their session alive undoes the reset entirely.
+ *
+ * Usage:
+ *   bin/recover-access --list
+ *   bin/recover-access --list --org=zm-moh
+ *   bin/recover-access --org=zm-moh --email=grace@moh.gov.zm --reset-password
+ *   bin/recover-access --org=zm-moh --email=grace@moh.gov.zm --make-admin
+ *   bin/recover-access --org=zm-moh --email=grace@moh.gov.zm --unlock
+ *   bin/recover-access --org=zm-moh --email=new@moh.gov.zm --name="A Name" --create-admin
+ *   bin/recover-access --help
+ *
+ * Options:
+ *   --list             Show organisations, their administrators, and whether
+ *                      each one can actually sign in. Reads nothing else.
+ *   --org              Organisation code. Required for everything but --list.
+ *   --email            The account to act on. Required for every action.
+ *   --reset-password   Generate a new password and print it once. Revokes the
+ *                      user's sessions and reactivates the account.
+ *   --make-admin       Give an existing user the admin role. Also reactivates.
+ *   --create-admin     Create a new administrator. Needs --name.
+ *   --unlock           Clear the failed sign-in attempts throttling this
+ *                      account. Changes no credential. Reports any address
+ *                      that would still throttle it on its own.
+ *   --ip               With --unlock, also clear failures from this address.
+ *                      Sign-in throttles on email OR address, so a shared
+ *                      connection can lock somebody out through no fault of
+ *                      their own — and clearing an address is also how a
+ *                      password-guessing run gets its allowance back. Know
+ *                      which one you are looking at first.
+ *   --name             Full name, for --create-admin.
+ *   --yes              Skip the typed confirmation. For automation only.
+ *
+ * Exit codes: 0 done, 1 refused.
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/lib/console.php';
+
+$root = dirname(__DIR__);
+chdir($root);
+
+$options = [];
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--([a-z-]+)(?:=(.*))?$/', $argument, $matches) === 1) {
+        $options[$matches[1]] = $matches[2] ?? '1';
+    }
+}
+
+$env = con_read_env(con_env_path($root));
+$pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+
+if (isset($options['list'])) {
+    listAccess($pdo, strtolower(trim($options['org'] ?? '')));
+
+    exit(0);
+}
+
+$actions = array_values(array_filter(
+    ['reset-password', 'make-admin', 'create-admin', 'unlock'],
+    static fn (string $name): bool => isset($options[$name]),
+));
+
+if ($actions === []) {
+    con_fail('Nothing to do. Pass --list, or one of --reset-password, --make-admin, --create-admin, --unlock. See --help.');
+}
+
+if (count($actions) > 1) {
+    // One at a time, so what was done is one line in the audit log rather than
+    // a combination somebody has to reconstruct.
+    con_fail('One action at a time: ' . implode(', ', $actions));
+}
+
+$action = $actions[0];
+$code = strtolower(trim($options['org'] ?? ''));
+$email = mb_strtolower(trim($options['email'] ?? ''));
+
+if ($code === '') {
+    con_fail('--org is required. Run --list to see the codes.');
+}
+
+if ($email === '') {
+    con_fail('--email is required.');
+}
+
+$statement = $pdo->prepare('SELECT id, name FROM organizations WHERE code = ?');
+$statement->execute([$code]);
+$organization = $statement->fetch(PDO::FETCH_ASSOC);
+
+if ($organization === false) {
+    con_fail('No organisation with the code ' . $code . '. Run --list.');
+}
+
+$organizationId = (int) $organization['id'];
+
+$statement = $pdo->prepare(
+    'SELECT u.id, u.email, u.full_name, u.is_active, r.`key` AS role_key
+       FROM users u JOIN roles r ON r.id = u.role_id
+      WHERE u.organization_id = ? AND u.email = ?',
+);
+$statement->execute([$organizationId, $email]);
+$user = $statement->fetch(PDO::FETCH_ASSOC);
+
+if ($action === 'create-admin') {
+    if ($user !== false) {
+        con_fail($email . ' already exists in ' . $code . '. Use --make-admin or --reset-password.');
+    }
+} elseif ($user === false) {
+    con_fail('No user ' . $email . ' in ' . $code . '. Use --create-admin to add one.');
+}
+
+// A typed confirmation rather than y/n. Everything here changes who can reach
+// an organisation's assessments, and none of it is undoable by running the
+// command again.
+$summary = match ($action) {
+    'reset-password' => 'Reset the password for ' . $email . ' in ' . $code . ' and end their sessions',
+    'make-admin'     => 'Make ' . $email . ' an administrator of ' . $code,
+    'create-admin'   => 'Create a new administrator ' . $email . ' in ' . $code,
+    'unlock'         => 'Clear failed sign-in attempts for ' . $email . ' in ' . $code,
+};
+
+con_print('header', $summary . '?');
+
+if (!isset($options['yes']) && con_is_interactive() && !con_confirm_typed($summary, 'recover')) {
+    con_fail('Nothing was changed.');
+}
+
+$password = null;
+
+try {
+    $pdo->beginTransaction();
+
+    switch ($action) {
+        case 'reset-password':
+            $password = generatePassword();
+
+            $pdo->prepare(
+                'UPDATE users SET password_hash = ?, must_change_password = 1, is_active = 1 WHERE id = ?',
+            )->execute([password_hash($password, PASSWORD_DEFAULT), (int) $user['id']]);
+
+            // Anyone holding the old password keeps their session otherwise,
+            // which would make the reset cosmetic.
+            $pdo->prepare(
+                'UPDATE refresh_tokens SET revoked_at = UTC_TIMESTAMP()
+                  WHERE user_id = ? AND revoked_at IS NULL',
+            )->execute([(int) $user['id']]);
+
+            clearAttempts($pdo, $email);
+            audit($pdo, $organizationId, 'recover.password_reset', (int) $user['id'], [
+                'email' => $email,
+            ]);
+
+            break;
+
+        case 'make-admin':
+            $roleId = adminRoleId($pdo, $organizationId);
+
+            $pdo->prepare('UPDATE users SET role_id = ?, is_active = 1 WHERE id = ?')
+                ->execute([$roleId, (int) $user['id']]);
+
+            audit($pdo, $organizationId, 'recover.role_changed', (int) $user['id'], [
+                'email' => $email,
+                'from'  => $user['role_key'],
+                'to'    => 'admin',
+            ]);
+
+            break;
+
+        case 'create-admin':
+            $name = trim($options['name'] ?? '');
+
+            if ($name === '' && con_is_interactive()) {
+                $name = trim(con_ask('Full name'));
+            }
+
+            if ($name === '') {
+                con_fail('--name is required to create an administrator.');
+            }
+
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                con_fail('That does not look like an email address: ' . $email);
+            }
+
+            $password = generatePassword();
+            $roleId = adminRoleId($pdo, $organizationId);
+
+            $pdo->prepare(
+                'INSERT INTO users
+                    (organization_id, role_id, email, password_hash, full_name, is_active, must_change_password)
+                 VALUES (?, ?, ?, ?, ?, 1, 1)',
+            )->execute([
+                $organizationId,
+                $roleId,
+                $email,
+                password_hash($password, PASSWORD_DEFAULT),
+                $name,
+            ]);
+
+            audit($pdo, $organizationId, 'recover.admin_created', (int) $pdo->lastInsertId(), [
+                'email' => $email,
+                'name'  => $name,
+            ]);
+
+            break;
+
+        case 'unlock':
+            $address = trim($options['ip'] ?? '');
+            $cleared = clearAttempts($pdo, $email, $address === '' ? null : $address);
+
+            con_print('info', sprintf(
+                '  Cleared %d failed attempt(s) for %s%s.',
+                $cleared['email'],
+                $email,
+                $address === '' ? '' : sprintf(' and %d for %s', $cleared['ip'], $address),
+            ));
+
+            // Said after clearing, not before: the addresses still over the
+            // limit are the ones that will keep this account locked out no
+            // matter how many times the email is cleared.
+            foreach (throttlingAddresses($pdo) as $ip => $failures) {
+                con_print('warn', sprintf(
+                    '  %s still has %d recent failures and will keep throttling. '
+                    . 'Clear it with --unlock --ip=%s once you know why.',
+                    $ip,
+                    $failures,
+                    $ip,
+                ));
+            }
+
+            audit($pdo, $organizationId, 'recover.unlocked', (int) $user['id'], [
+                'email'         => $email,
+                'attempts'      => $cleared['email'],
+                'ip'            => $address === '' ? null : $address,
+                'ip_attempts'   => $cleared['ip'],
+            ]);
+
+            break;
+    }
+
+    $pdo->commit();
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    con_fail('Nothing was changed: ' . $e->getMessage());
+}
+
+con_print('success', 'Done.');
+
+if ($password !== null) {
+    con_print('plain', '');
+    con_print('header', 'Password (shown once)');
+    con_print('plain', '  ' . $password);
+    con_print('plain', '');
+    con_print(
+        'warn',
+        'Hand this over in person or over a channel you trust, not by email. '
+        . 'It is flagged as needing to be changed, which nothing enforces yet.',
+    );
+}
+
+exit(0);
+
+/**
+ * Who can actually get in.
+ *
+ * The point is the last column. An organisation with three administrators who
+ * are all deactivated is locked out, and the row that says so is the one
+ * somebody needs to see before guessing which account to reset.
+ */
+function listAccess(PDO $pdo, string $code): void
+{
+    // Every organisation, including the ones with nobody. Listing only the
+    // organisations that HAVE an administrator would hide the exact situation
+    // this command exists for — an operator would be unable to tell a locked
+    // out organisation from one that does not exist.
+    $sql = 'SELECT id, code, name FROM organizations';
+    $parameters = [];
+
+    if ($code !== '') {
+        $sql .= ' WHERE code = ?';
+        $parameters[] = $code;
+    }
+
+    $rows = $pdo->prepare($sql . ' ORDER BY code');
+    $rows->execute($parameters);
+    $organizations = $rows->fetchAll(PDO::FETCH_ASSOC);
+
+    if ($organizations === []) {
+        con_print('warn', $code === ''
+            ? 'No organisations. Use bin/provision-org.'
+            : 'No organisation with the code ' . $code . '.');
+
+        return;
+    }
+
+    $admins = $pdo->prepare(
+        'SELECT u.email, u.is_active, r.`key` AS role_key
+           FROM users u JOIN roles r ON r.id = u.role_id
+          WHERE u.organization_id = ? AND r.`key` IN (\'admin\', \'superadmin\')
+          ORDER BY u.email',
+    );
+
+    foreach ($organizations as $organization) {
+        con_print('header', $organization['code'] . '  ' . $organization['name']);
+
+        $admins->execute([(int) $organization['id']]);
+        $found = $admins->fetchAll(PDO::FETCH_ASSOC);
+
+        if ($found === []) {
+            con_print('warn', '  No administrator. Nobody can administer this organisation.');
+            con_print('plain', '    bin/recover-access --org=' . $organization['code'] . ' --email=... --create-admin');
+
+            continue;
+        }
+
+        $reachable = 0;
+
+        foreach ($found as $row) {
+            $active = (int) $row['is_active'] === 1;
+            $reachable += $active ? 1 : 0;
+
+            con_print(
+                $active ? 'info' : 'warn',
+                sprintf(
+                    '  %-34s %-11s %s',
+                    $row['email'],
+                    $row['role_key'],
+                    $active ? 'active' : 'DEACTIVATED — cannot sign in',
+                ),
+            );
+        }
+
+        if ($reachable === 0) {
+            con_print('warn', '  Every administrator is deactivated. This organisation is locked out.');
+        }
+    }
+}
+
+function adminRoleId(PDO $pdo, int $organizationId): int
+{
+    $statement = $pdo->prepare('SELECT id FROM roles WHERE organization_id = ? AND `key` = ?');
+    $statement->execute([$organizationId, 'admin']);
+    $id = $statement->fetchColumn();
+
+    if ($id === false) {
+        // Seeded with the organisation, so its absence means something else is
+        // wrong and guessing a role id would make it worse.
+        con_fail('That organisation has no admin role. It was not provisioned by bin/provision-org.');
+    }
+
+    return (int) $id;
+}
+
+/**
+ * Clear the failures that are throttling someone.
+ *
+ * Matched by email alone, and deliberately NOT by organisation. A failed
+ * sign-in is recorded before the organisation is known — there is nothing to
+ * resolve it against when the password was wrong — so those rows carry a null
+ * organisation_id and an organisation-scoped delete silently matches none of
+ * them. This mirrors how AuthService counts them, which is the only definition
+ * of "throttled" that matters.
+ *
+ * @return array{email: int, ip: int} rows cleared, and failures still
+ *                                    attributable to an address
+ */
+function clearAttempts(PDO $pdo, string $email, ?string $ip = null): array
+{
+    $statement = $pdo->prepare('DELETE FROM login_attempts WHERE email = ? AND succeeded = 0');
+    $statement->execute([$email]);
+    $cleared = $statement->rowCount();
+
+    $byAddress = 0;
+
+    if ($ip !== null && $ip !== '') {
+        $statement = $pdo->prepare('DELETE FROM login_attempts WHERE ip_address = ? AND succeeded = 0');
+        $statement->execute([$ip]);
+        $byAddress = $statement->rowCount();
+    }
+
+    return ['email' => $cleared, 'ip' => $byAddress];
+}
+
+/**
+ * Addresses that would still throttle this account on their own.
+ *
+ * The throttle triggers on email OR address, so clearing the email is not
+ * always enough — an assessor behind a shared connection can be locked out by
+ * a colleague's typing. Reported rather than cleared, because clearing an
+ * address is also how a password-guessing run gets its allowance back.
+ *
+ * @return array<string,int>
+ */
+function throttlingAddresses(PDO $pdo): array
+{
+    $rows = $pdo->query(
+        'SELECT ip_address, COUNT(*) AS failures
+           FROM login_attempts
+          WHERE succeeded = 0 AND attempted_at >= (UTC_TIMESTAMP() - INTERVAL 15 MINUTE)
+          GROUP BY ip_address
+         HAVING failures >= 10',
+    );
+
+    $found = [];
+
+    foreach ($rows as $row) {
+        $found[(string) $row['ip_address']] = (int) $row['failures'];
+    }
+
+    return $found;
+}
+
+/** @param array<string,mixed> $metadata */
+function audit(PDO $pdo, int $organizationId, string $action, int $userId, array $metadata): void
+{
+    $pdo->prepare(
+        'INSERT INTO audit_log (organization_id, actor_type, actor_id, action, entity_type, metadata)
+         VALUES (?, \'system\', NULL, ?, \'user\', ?)',
+    )->execute([
+        $organizationId,
+        $action,
+        json_encode($metadata + ['tool' => 'bin/recover-access', 'user_id' => $userId], JSON_THROW_ON_ERROR),
+    ]);
+}
+
+/** Base64url of 18 bytes: 24 characters, nothing ambiguous to read out loud. */
+function generatePassword(): string
+{
+    return rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');
+}

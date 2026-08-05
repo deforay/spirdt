@@ -112,10 +112,12 @@ See [Backup & Upgrade](operations.md) for the encryption caveat.
 
 Normalises every table to the server-default utf8mb4 collation. Idempotent.
 
-## Accounts and reference data
+## Accounts
 
-Until the admin interface exists, these are the only way to create the records
-an assessor needs in order to sign in and start a visit.
+Assessors and administrators are created and managed **in the app**. Only two
+things are done from a terminal, and both are things the app cannot do for
+itself: standing an organisation up for the first time, and getting back into
+one nobody can administer any more.
 
 ### `bin/provision-org`
 
@@ -141,19 +143,79 @@ Run without flags it asks for each value.
 | `--password` | Skips generation. Avoid it — this account opens an entire organisation |
 
 **Refuses a code that already exists.** Provisioning that quietly reuses one is
-how a new administrator ends up inside somebody else's tenant. To add a user to
-an existing organisation, use `bin/dev/create-user`.
+how a new administrator ends up inside somebody else's tenant. Everything after
+the first administrator happens in the app.
 
 Timezone and date format are asked for rather than defaulted because the User's
 Guide makes date format a per-country choice: `05/08/2026` is August or May
 depending on who reads it, and the difference stays invisible until someone
 disputes a certification level.
 
+### `bin/recover-access`
+
+Break-glass. For the cases where the app can no longer be used to fix itself:
+
+- the only administrator forgot their password and nobody else can reset it;
+- the only administrator was changed to a role that cannot administer;
+- the only administrator was deactivated;
+- failed sign-ins have throttled an account and the wait is not acceptable.
+
+Start with the listing. It shows **every** organisation, including the ones with
+no administrator at all — listing only the organisations that have one would
+hide the exact situation this command exists for.
+
+```console
+$ bin/recover-access --list
+demo  Demo
+  warn    No administrator. Nobody can administer this organisation.
+    bin/recover-access --org=demo --email=... --create-admin
+
+zm-moh  Ministry of Health Zambia
+        grace@moh.gov.zm    admin    active
+```
+
+Then one action at a time, so what was done is one line in the audit log rather
+than a combination somebody has to reconstruct:
+
+| Flag | Effect |
+|---|---|
+| `--reset-password` | New generated password, printed once. **Revokes every session that user holds** and reactivates the account |
+| `--make-admin` | Gives an existing user the admin role, and reactivates them |
+| `--create-admin` | Adds a new administrator. Needs `--name` |
+| `--unlock` | Clears the failed sign-in attempts throttling an account. Changes no credential |
+| `--ip` | With `--unlock`, also clears failures from an address |
+| `--yes` | Skips the typed confirmation. Automation only |
+
+Each action asks you to type `recover` before it runs, because all of them
+change who can reach an organisation's assessments and none is undone by
+running the command again.
+
+**Every action is written to `audit_log`** with actor type `system`. On an audit
+instrument, "who reset the administrator's password, and when" has to have an
+answer better than "someone with a shell".
+
+A password reset revokes refresh tokens on purpose. If the reason for the reset
+was that somebody else had the old password, leaving their session alive makes
+the reset cosmetic.
+
+!!! warning "`--unlock` may need `--ip`"
+    Sign-in throttles on email **or** address. Someone behind a shared
+    connection can be locked out by a colleague's typing, and clearing their
+    email then does nothing at all. `--unlock` reports any address still over
+    the limit and tells you the flag to clear it — but find out *why* the
+    address is failing first, because clearing one is also how a
+    password-guessing run gets its allowance back.
+
+This is deliberately not a general user-management command. It does those four
+things and nothing else: a recovery tool that can do everything gets used for
+everything, and then it stops being audited as an exception.
+
 ### `bin/dev/create-user`
 
-Creates or updates one user. Creates the organisation and roles if missing, so
-it is the quick path for local work — and the password-reset path, since
-running it against an existing address resets that person's password and role
+**Local development only.** Creates or updates one user, and creates the
+organisation and roles if they are missing — which is exactly why it does not
+belong on a server: on a typo it invents an organisation rather than refusing.
+Running it against an existing address resets that person's password and role
 rather than creating a duplicate.
 
 ```bash
@@ -167,6 +229,8 @@ password unless `--password` is given. Minimum twelve characters.
     The role key travels in the token and `AuthMiddleware` attaches it to the
     request, but nothing reads it. An admin token currently opens exactly the
     same routes as an assessor token.
+
+## Reference data
 
 ### `bin/dev/publish-template`
 
