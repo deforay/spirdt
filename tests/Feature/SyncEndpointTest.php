@@ -6,12 +6,12 @@ namespace Tests\Feature;
 
 use App\Bootstrap;
 use App\Models\Assessment;
-use App\Service\TokenService;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use PHPUnit\Framework\TestCase;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Tests\Support\MakesTenants;
 
 /**
  * The sync endpoint, through the whole Slim stack.
@@ -23,6 +23,8 @@ use Slim\Psr7\Factory\ServerRequestFactory;
  */
 final class SyncEndpointTest extends TestCase
 {
+    use MakesTenants;
+
     private int $orgA;
     private int $orgB;
     private string $siteId;
@@ -37,15 +39,15 @@ final class SyncEndpointTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['submissions_raw', 'assessment_scores', 'answers', 'assessment_pathogens',
-                    'assessments', 'templates', 'testing_sites', 'facilities', 'organizations'] as $table
+                    'assessments', 'templates', 'testing_sites', 'facilities', 'organizations', 'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
             }
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
         });
 
-        $this->orgA = (int) Capsule::table('organizations')->insertGetId(['code' => 'org-a', 'name' => 'A']);
-        $this->orgB = (int) Capsule::table('organizations')->insertGetId(['code' => 'org-b', 'name' => 'B']);
+        $this->orgA = $this->makeTenant('org-a', 'A');
+        $this->orgB = $this->makeTenant('org-b', 'B');
 
         Capsule::table('templates')->insert([
             'organization_id' => null,
@@ -63,6 +65,7 @@ final class SyncEndpointTest extends TestCase
 
         Capsule::table('facilities')->insert([
             'id'              => BinaryUuid::toBytes($this->facilityId),
+            'programme_id'    => $this->programmeFor($this->orgA),
             'organization_id' => $this->orgA,
             'name'            => 'Facility A',
             'source'          => 'registry',
@@ -70,6 +73,7 @@ final class SyncEndpointTest extends TestCase
 
         Capsule::table('testing_sites')->insert([
             'id'              => BinaryUuid::toBytes($this->siteId),
+            'programme_id'    => $this->programmeFor($this->orgA),
             'organization_id' => $this->orgA,
             'facility_id'     => BinaryUuid::toBytes($this->facilityId),
             'name'            => 'Site A',
@@ -95,7 +99,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testATamperedTokenIsRefused(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
+        $token = $this->tokenFor($this->orgA, 'assessor');
         $response = $this->send($this->payload(), $token . 'x');
 
         self::assertSame(401, $response->getStatusCode());
@@ -103,7 +107,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testAValidTokenStoresTheAssessment(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
+        $token = $this->tokenFor($this->orgA, 'assessor');
         $response = $this->send($this->payload(), $token);
 
         self::assertSame(200, $response->getStatusCode());
@@ -126,15 +130,15 @@ final class SyncEndpointTest extends TestCase
         $payload['facility_id'] = $facilityB;
         $payload['testing_site_id'] = $siteB;
 
-        $token = (new TokenService())->issue(1, $this->orgB, 'assessor');
+        $token = $this->tokenFor($this->orgB, 'assessor');
         $response = $this->send($payload, $token);
 
         self::assertSame(200, $response->getStatusCode());
 
-        TenantContext::set($this->orgA);
+        $this->useTenant($this->orgA);
         self::assertSame(0, Assessment::query()->count(), 'nothing landed in A');
 
-        TenantContext::set($this->orgB);
+        $this->useTenant($this->orgB);
         self::assertSame(1, Assessment::query()->count(), 'it landed in B, from the token');
     }
 
@@ -144,13 +148,13 @@ final class SyncEndpointTest extends TestCase
         // an ownership check the visit is stored against a site this
         // organisation does not own — invisible in every report that resolves
         // the site, and plantable by anyone who learns a site id.
-        $token = (new TokenService())->issue(1, $this->orgB, 'assessor');
+        $token = $this->tokenFor($this->orgB, 'assessor');
 
         $response = $this->send($this->payload(), $token);
 
         self::assertSame(422, $response->getStatusCode());
         self::assertStringContainsString(
-            'not in this organisation',
+            'not in this programme',
             (string) json_decode((string) $response->getBody(), true)['error']['message'],
         );
 
@@ -168,7 +172,7 @@ final class SyncEndpointTest extends TestCase
         $payload = $this->payload();
         $payload['facility_id'] = $otherFacility;
 
-        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
+        $token = $this->tokenFor($this->orgA, 'assessor');
 
         self::assertSame(422, $this->send($payload, $token)->getStatusCode());
     }
@@ -183,6 +187,7 @@ final class SyncEndpointTest extends TestCase
 
         Capsule::table('facilities')->insert([
             'id'              => BinaryUuid::toBytes($facilityId),
+            'programme_id'    => $this->programmeFor($organizationId),
             'organization_id' => $organizationId,
             'name'            => 'Facility ' . $facilitySlot,
             'source'          => 'registry',
@@ -190,6 +195,7 @@ final class SyncEndpointTest extends TestCase
 
         Capsule::table('testing_sites')->insert([
             'id'              => BinaryUuid::toBytes($siteId),
+            'programme_id'    => $this->programmeFor($organizationId),
             'organization_id' => $organizationId,
             'facility_id'     => BinaryUuid::toBytes($facilityId),
             'name'            => 'Site ' . $siteSlot,
@@ -201,7 +207,7 @@ final class SyncEndpointTest extends TestCase
 
     public function testARefusedPayloadIsStillFiled(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
+        $token = $this->tokenFor($this->orgA, 'assessor');
 
         $payload = $this->payload();
         $payload['template_version'] = '9.9.9';
@@ -220,12 +226,12 @@ final class SyncEndpointTest extends TestCase
 
     public function testTheSamePayloadTwiceProducesOneAssessment(): void
     {
-        $token = (new TokenService())->issue(1, $this->orgA, 'assessor');
+        $token = $this->tokenFor($this->orgA, 'assessor');
 
         self::assertSame(200, $this->send($this->payload(), $token)->getStatusCode());
         self::assertSame(200, $this->send($this->payload(), $token)->getStatusCode());
 
-        TenantContext::set($this->orgA);
+        $this->useTenant($this->orgA);
         self::assertSame(1, Assessment::query()->count());
     }
 

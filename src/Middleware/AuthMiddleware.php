@@ -58,7 +58,7 @@ final class AuthMiddleware implements MiddlewareInterface
             return $this->forbidden(AuthException::passwordChangeRequired()->getMessage());
         }
 
-        TenantContext::set($claims['org'], $claims['sub'], $claims['admin']);
+        TenantContext::set($claims['org'], $claims['sub'], $claims['admin'], $claims['prg']);
 
         return $handler->handle(
             $request

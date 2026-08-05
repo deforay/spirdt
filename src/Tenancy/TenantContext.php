@@ -34,12 +34,25 @@ final class TenantContext
         public readonly int $organizationId,
         public readonly ?int $userId = null,
         public readonly bool $isPlatformAdmin = false,
+        public readonly ?int $programmeId = null,
     ) {
     }
 
-    public static function set(int $organizationId, ?int $userId = null, bool $isPlatformAdmin = false): self
-    {
-        self::$current = new self($organizationId, $userId, $isPlatformAdmin);
+    /**
+     * @param int|null $programmeId the programme the organisation belongs to,
+     *                              which scopes the shared site registry. Null
+     *                              is allowed so that callers with no reason to
+     *                              touch the registry — most tests, most CLI
+     *                              work — need not supply one; a registry query
+     *                              made without it throws rather than guessing.
+     */
+    public static function set(
+        int $organizationId,
+        ?int $userId = null,
+        bool $isPlatformAdmin = false,
+        ?int $programmeId = null,
+    ): self {
+        self::$current = new self($organizationId, $userId, $isPlatformAdmin, $programmeId);
 
         return self::$current;
     }
@@ -65,6 +78,29 @@ final class TenantContext
         }
 
         return self::$current->organizationId;
+    }
+
+    /**
+     * The programme to filter the shared registry by.
+     *
+     * Fails closed for the same reason the organisation does, and it matters
+     * more here: the registry is the one thing several organisations share, so
+     * an unfiltered query returns another programme's national site list.
+     *
+     * @throws RuntimeException when no programme has been established.
+     */
+    public static function requireProgrammeId(): int
+    {
+        if (self::$current?->programmeId === null) {
+            throw new RuntimeException(
+                'No programme in the tenant context. The registry — geographic units, facilities, '
+                . 'testing sites — is scoped by programme rather than organisation. Pass the '
+                . 'programme to TenantContext::set(), or wrap a deliberately cross-programme call '
+                . 'in TenantContext::withoutScope().',
+            );
+        }
+
+        return self::$current->programmeId;
     }
 
     public static function isScoped(): bool

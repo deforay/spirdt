@@ -34,6 +34,13 @@ declare(strict_types=1);
  *   --name           Display name. Required.
  *   --admin-email    First administrator's sign-in address. Required.
  *   --admin-name     First administrator's full name. Required.
+ *   --programme      Join an existing programme by its code, so this
+ *                    organisation shares that programme's site registry —
+ *                    the case where two organisations audit labs in the same
+ *                    country and their results have to be comparable. Omit it
+ *                    to get a programme of this organisation's own, which is
+ *                    the safe default: assessments stay private either way,
+ *                    but a site list should only be shared deliberately.
  *   --country        ISO 3166-1 alpha-2, e.g. ZM.
  *   --timezone       IANA zone, e.g. Africa/Lusaka. Defaults to UTC.
  *   --date-format    PHP date format. Defaults to d/m/Y.
@@ -118,6 +125,17 @@ if (!in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
     con_fail('Unknown timezone ' . $timezone . '. Use an IANA name such as Africa/Lusaka.');
 }
 
+/**
+ * The programme this organisation joins, if it is joining an existing one.
+ *
+ * A programme owns the site registry — geographic units, facilities, testing
+ * sites — so two organisations sharing one are auditing from the same national
+ * list, which is what makes their results comparable. Blank means a programme
+ * of its own, which is the safe default: their assessments stay private either
+ * way, but their site list does not.
+ */
+$programmeCode = strtolower(trim($options['programme'] ?? ''));
+
 $dateFormat = trim($options['date-format'] ?? '') ?: 'd/m/Y';
 $locale = trim($options['locale'] ?? '') ?: 'en';
 
@@ -151,10 +169,40 @@ if ($statement->fetchColumn() !== false) {
 $pdo->beginTransaction();
 
 try {
+    // A programme of its own unless one was named. Two organisations that
+    // should share a site registry is a deliberate decision — defaulting to
+    // "same country, same programme" would hand one organisation's national
+    // site list to another because they happen to share a border.
+    if ($programmeCode === '') {
+        $pdo->prepare('INSERT INTO programmes (code, name, country_code) VALUES (?, ?, ?)')
+            ->execute([$code, $name, $country === '' ? null : $country]);
+
+        $programmeId = (int) $pdo->lastInsertId();
+    } else {
+        $statement = $pdo->prepare('SELECT id FROM programmes WHERE code = ?');
+        $statement->execute([$programmeCode]);
+        $programmeId = (int) $statement->fetchColumn();
+
+        if ($programmeId === 0) {
+            con_fail(
+                'No programme with the code ' . $programmeCode . '. Omit --programme to create one, '
+                . 'or check bin/recover-access --list for the organisations already in it.',
+            );
+        }
+    }
+
     $pdo->prepare(
-        'INSERT INTO organizations (code, name, country_code, timezone, date_format, default_locale)
-         VALUES (?, ?, ?, ?, ?, ?)',
-    )->execute([$code, $name, $country === '' ? null : $country, $timezone, $dateFormat, $locale]);
+        'INSERT INTO organizations (programme_id, code, name, country_code, timezone, date_format, default_locale)
+         VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )->execute([
+        $programmeId,
+        $code,
+        $name,
+        $country === '' ? null : $country,
+        $timezone,
+        $dateFormat,
+        $locale,
+    ]);
 
     $organizationId = (int) $pdo->lastInsertId();
 

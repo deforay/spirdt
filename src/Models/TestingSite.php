@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Casts\BinaryUuidCast;
-use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\BelongsToProgramme;
 use App\Models\Concerns\HasBinaryUuidKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,10 +15,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Distinct from the facility that contains it, because one hospital can run
  * several testing sites and each is assessed separately.
+ *
+ * Registry rather than audit data, so it is scoped by PROGRAMME: two
+ * organisations auditing in the same country have to be talking about the same
+ * bench, not two similarly-named rows. See BelongsToProgramme — including for
+ * what organization_id means on this table now, which is not what it used to.
  */
 final class TestingSite extends Model
 {
-    use BelongsToOrganization;
+    use BelongsToProgramme;
     use HasBinaryUuidKey;
 
     protected $table = 'testing_sites';

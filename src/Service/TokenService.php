@@ -63,6 +63,7 @@ final class TokenService
         string $role,
         bool $isPlatformAdmin = false,
         bool $mustChangePassword = false,
+        ?int $programmeId = null,
     ): string {
         $now = time();
 
@@ -77,6 +78,10 @@ final class TokenService
                 'role'  => $role,
                 'admin' => $isPlatformAdmin,
                 'pwd'   => $mustChangePassword,
+                // The programme scopes the shared registry. Carried in the
+                // token for the same reason as the rest: resolving it would
+                // mean joining organizations on every single request.
+                'prg'   => $programmeId,
             ],
             $this->secret,
             'HS256',
@@ -88,7 +93,7 @@ final class TokenService
      * signed with a different secret. Deliberately one return for all of them:
      * telling a caller which of those went wrong tells an attacker too.
      *
-     * @return array{sub:int,org:int,role:string,admin:bool,pwd:bool}|null
+     * @return array{sub:int,org:int,role:string,admin:bool,pwd:bool,prg:int|null}|null
      */
     public function verify(string $token): ?array
     {
@@ -112,6 +117,11 @@ final class TokenService
             // rather than locking a signed-in assessor out mid-visit, and the
             // flag is re-read from the database at the next sign-in anyway.
             'pwd'   => (bool) ($claims['pwd'] ?? false),
+            // Null on a token minted before programmes existed. The registry
+            // scope then throws rather than guessing, which is the right way
+            // for that to fail — the alternative is showing one programme's
+            // national site list to another.
+            'prg'   => isset($claims['prg']) ? (int) $claims['prg'] : null,
         ];
     }
 }

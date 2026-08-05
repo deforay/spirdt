@@ -137,6 +137,7 @@ Run without flags it asks for each value.
 | `--code` | Short unique code, used at sign-in where one address exists in two organisations |
 | `--name` | Display name |
 | `--admin-email` / `--admin-name` | The first administrator |
+| `--programme` | Join an existing programme by code, sharing its site registry. Omit for a programme of its own |
 | `--country` | ISO 3166-1 alpha-2 |
 | `--timezone` | IANA zone. Validated against the system list; defaults to UTC |
 | `--date-format` | Defaults to `d/m/Y` |
@@ -145,6 +146,13 @@ Run without flags it asks for each value.
 **Refuses a code that already exists.** Provisioning that quietly reuses one is
 how a new administrator ends up inside somebody else's tenant. Everything after
 the first administrator happens in the app.
+
+`--programme` is for the case where two organisations audit labs in the same
+country and their results have to be comparable — they then share one site
+registry, so both are provably assessing the same bench rather than two
+similarly-named rows. Their assessments stay private either way. Omitting it
+gives the organisation a programme of its own, which is the safe default: a
+site list should only be shared because somebody decided to share it.
 
 Timezone and date format are asked for rather than defaulted because the User's
 Guide makes date format a per-country choice: `05/08/2026` is August or May

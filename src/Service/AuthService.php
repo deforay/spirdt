@@ -286,12 +286,15 @@ final class AuthService
         $role = Role::acrossOrganizations()->where('roles.id', (int) $user->role_id)->first();
         $roleKey = $role === null ? '' : (string) $role->key;
 
+        $organization = Organization::query()->where('id', $organizationId)->first();
+
         $accessToken = $this->tokens->issue(
             (int) $user->id,
             $organizationId,
             $roleKey,
             false,
             (bool) $user->must_change_password,
+            $organization === null ? null : (int) $organization->programme_id,
         );
 
         $refreshToken = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -307,8 +310,6 @@ final class AuthService
         User::acrossOrganizations()
             ->where('users.id', (int) $user->id)
             ->update(['last_login_at' => gmdate('Y-m-d H:i:s')]);
-
-        $organization = Organization::query()->where('id', $organizationId)->first();
 
         return [
             'access_token'  => $accessToken,

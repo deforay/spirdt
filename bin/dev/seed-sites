@@ -87,36 +87,51 @@ function seed_uuid(): string
 
 $created = 0;
 
+// The registry belongs to the programme rather than the organisation, so
+// seeding into one organisation seeds it for every organisation sharing that
+// programme. That is the point of the layer, and it is why the lookups below
+// match on programme_id: matching on organization_id would re-seed a duplicate
+// set for the second organisation in the same programme.
+$statement = $pdo->prepare('SELECT programme_id FROM organizations WHERE id = ?');
+$statement->execute([$organizationId]);
+$programmeId = (int) $statement->fetchColumn();
+
+if ($programmeId === 0) {
+    con_fail('That organisation has no programme. Run bin/migrate.');
+}
+
 foreach (REGISTRY as $facilityName => $siteNames) {
-    $statement = $pdo->prepare('SELECT id FROM facilities WHERE organization_id = ? AND name = ?');
-    $statement->execute([$organizationId, $facilityName]);
+    $statement = $pdo->prepare('SELECT id FROM facilities WHERE programme_id = ? AND name = ?');
+    $statement->execute([$programmeId, $facilityName]);
     $facilityId = $statement->fetchColumn();
 
     if ($facilityId === false) {
         $facilityId = BinaryUuid::toBytes(seed_uuid());
 
         $pdo->prepare(
-            'INSERT INTO facilities (id, organization_id, name, source) VALUES (?, ?, ?, ?)',
-        )->execute([$facilityId, $organizationId, $facilityName, 'registry']);
+            'INSERT INTO facilities (id, programme_id, organization_id, name, source)
+             VALUES (?, ?, ?, ?, ?)',
+        )->execute([$facilityId, $programmeId, $organizationId, $facilityName, 'registry']);
 
         con_print('success', 'Facility ' . $facilityName);
     }
 
     foreach ($siteNames as $siteName) {
         $statement = $pdo->prepare(
-            'SELECT id FROM testing_sites WHERE organization_id = ? AND facility_id = ? AND name = ?',
+            'SELECT id FROM testing_sites WHERE programme_id = ? AND facility_id = ? AND name = ?',
         );
-        $statement->execute([$organizationId, $facilityId, $siteName]);
+        $statement->execute([$programmeId, $facilityId, $siteName]);
 
         if ($statement->fetchColumn() !== false) {
             continue;
         }
 
         $pdo->prepare(
-            'INSERT INTO testing_sites (id, organization_id, facility_id, name, source)
-             VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO testing_sites (id, programme_id, organization_id, facility_id, name, source)
+             VALUES (?, ?, ?, ?, ?, ?)',
         )->execute([
             BinaryUuid::toBytes(seed_uuid()),
+            $programmeId,
             $organizationId,
             $facilityId,
             $siteName,

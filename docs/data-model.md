@@ -1,6 +1,6 @@
 # Data Model
 
-25 tables across five migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
+26 tables across eight migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
 
 | Migration | Covers |
 |---|---|
@@ -9,6 +9,9 @@
 | `0.1.2-templates` | Question catalog and versioned templates |
 | `0.1.3-assessments` | Campaigns, assessments, answers, findings, scores |
 | `0.1.4-ops` | Audit log and API logs |
+| `0.1.5-submissions` | Raw payloads kept as an audit record |
+| `0.1.6-attachment-signer` | Who a signature claims to be |
+| `0.1.7-programmes` | A level above organisations, sharing the registry |
 
 Each migration file opens with a comment explaining *why*, not just what. Read them in order — later files carry foreign keys into earlier ones.
 
@@ -27,6 +30,49 @@ Facilities and testing sites are in the first group because an assessor can arri
 Answers deliberately get **no** client-generated ID: the idempotency unit is the assessment, submitted as a whole document, so answers upsert on their natural key.
 
 ## Core tables
+
+### Programmes, and what is shared
+
+There are **two** scopes, not one, and which a table uses decides who can see it.
+
+```
+programme  (a country's national programme, usually the ministry)
+├── organisation A     ── assessments, answers, findings, scores, attachments
+└── organisation B     ── assessments, answers, findings, scores, attachments
+└── registry           ── geo_units, facilities, testing_sites   (SHARED)
+```
+
+Within one country two organisations may both be running audits, sometimes on
+the same labs, independently. That was impossible while the registry was
+organisation-scoped: each held its own `facilities` row, its own
+`testing_sites` row, its own "Lusaka Province", with different UUIDs and
+nothing to join on. Comparing them meant matching facility names.
+
+So the **registry moved up to the programme** and everything derived from a
+visit stayed put:
+
+| Scope | Tables | Trait |
+|---|---|---|
+| Programme | `geo_units`, `facilities`, `testing_sites` | `BelongsToProgramme` |
+| Organisation | `assessments`, `answers`, `findings`, `assessment_scores`, `attachments`, `campaigns`, `users`, `roles` | `BelongsToOrganization` |
+
+**The registry is shared; the audit data is not.** That boundary is the whole
+security property of the layer, and `ProgrammeScopeTest` asserts both halves —
+removing the programme scope fails a leak test, and moving the registry back to
+organisation scope fails a sharing test.
+
+`organization_id` survives on the three registry tables and **no longer means
+what it did**. It is now provenance: which organisation *originated* the row.
+Set when an assessor created a facility in the field before it existed
+centrally — which is what `source = 'field'` already records, and what a
+reconciler needs in order to ask the right people about a duplicate. Null when
+an administrator entered it. Nothing reads it as a scope.
+
+Existing organisations were each given a programme of their own rather than
+being grouped by `country_code`. Grouping would have been "more correct" and is
+the wrong default: it silently hands one organisation's national site list to
+another because they share a border. `bin/provision-org --programme=<code>`
+makes joining an existing one a deliberate act.
 
 ### Registry
 

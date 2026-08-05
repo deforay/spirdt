@@ -15,6 +15,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\MakesTenants;
 
 /**
  * The sync, against a real database.
@@ -25,6 +26,8 @@ use RuntimeException;
  */
 final class SyncServiceTest extends TestCase
 {
+    use MakesTenants;
+
     private int $orgA;
     private int $orgB;
     private string $siteId;
@@ -40,15 +43,15 @@ final class SyncServiceTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['assessment_scores', 'findings', 'answers', 'assessment_pathogens', 'assessments',
-                    'templates', 'testing_sites', 'facilities', 'organizations'] as $table
+                    'templates', 'testing_sites', 'facilities', 'organizations', 'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
             }
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
         });
 
-        $this->orgA = $this->makeOrganization('org-a');
-        $this->orgB = $this->makeOrganization('org-b');
+        $this->orgA = $this->makeTenant('org-a');
+        $this->orgB = $this->makeTenant('org-b');
 
         $definition = json_decode(
             (string) file_get_contents(dirname(__DIR__, 2) . '/resources/templates/spi-rdt-1.0.0.json'),
@@ -69,7 +72,7 @@ final class SyncServiceTest extends TestCase
         $this->facilityId = $this->makeFacility($this->orgA, 'a1');
         $this->siteId = $this->makeSite($this->orgA, $this->facilityId, 'a2');
 
-        TenantContext::set($this->orgA, null);
+        $this->useTenant($this->orgA);
     }
 
     protected function tearDown(): void
@@ -249,7 +252,7 @@ final class SyncServiceTest extends TestCase
     {
         $result = (new SyncService())->accept($this->payload());
 
-        TenantContext::set($this->orgB, null);
+        $this->useTenant($this->orgB);
 
         self::assertNull(Assessment::findByUuid($result['assessment_id']));
         self::assertSame(0, Assessment::query()->count());
@@ -264,7 +267,7 @@ final class SyncServiceTest extends TestCase
         $facilityB = $this->makeFacility($this->orgB, 'b1');
         $siteB = $this->makeSite($this->orgB, $facilityB, 'b2');
 
-        TenantContext::set($this->orgB, null);
+        $this->useTenant($this->orgB);
 
         $payload = $this->payload();
         $payload['id'] = $result['assessment_id'];
@@ -322,14 +325,6 @@ final class SyncServiceTest extends TestCase
         ];
     }
 
-    private function makeOrganization(string $code): int
-    {
-        return (int) Capsule::table('organizations')->insertGetId([
-            'code' => $code,
-            'name' => strtoupper($code),
-        ]);
-    }
-
     /**
      * $slot is two hex characters chosen by the caller, NOT derived from the
      * organisation id. Organisation ids come from an auto-increment that keeps
@@ -343,6 +338,7 @@ final class SyncServiceTest extends TestCase
 
         Capsule::table('facilities')->insert([
             'id'              => BinaryUuid::toBytes($id),
+            'programme_id'    => $this->programmeFor($organizationId),
             'organization_id' => $organizationId,
             'name'            => 'Facility ' . $organizationId,
             'source'          => 'registry',
@@ -357,6 +353,7 @@ final class SyncServiceTest extends TestCase
 
         Capsule::table('testing_sites')->insert([
             'id'              => BinaryUuid::toBytes($id),
+            'programme_id'    => $this->programmeFor($organizationId),
             'organization_id' => $organizationId,
             'facility_id'     => BinaryUuid::toBytes($facilityId),
             'name'            => 'Site ' . $organizationId,

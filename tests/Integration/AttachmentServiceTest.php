@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Slim\Psr7\Factory\StreamFactory;
 use Slim\Psr7\UploadedFile;
+use Tests\Support\MakesTenants;
 
 /**
  * Signature upload, against a real database and a real directory.
@@ -27,6 +28,8 @@ use Slim\Psr7\UploadedFile;
  */
 final class AttachmentServiceTest extends TestCase
 {
+    use MakesTenants;
+
     private int $orgA;
     private int $orgB;
     private string $assessmentA;
@@ -44,15 +47,15 @@ final class AttachmentServiceTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['attachments', 'assessment_scores', 'findings', 'answers', 'assessment_pathogens',
-                    'assessments', 'templates', 'testing_sites', 'facilities', 'organizations'] as $table
+                    'assessments', 'templates', 'testing_sites', 'facilities', 'organizations', 'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
             }
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
         });
 
-        $this->orgA = $this->makeOrganization('att-a');
-        $this->orgB = $this->makeOrganization('att-b');
+        $this->orgA = $this->makeTenant('att-a');
+        $this->orgB = $this->makeTenant('att-b');
 
         $templateId = (int) Capsule::table('templates')->insertGetId([
             'organization_id' => null,
@@ -69,7 +72,7 @@ final class AttachmentServiceTest extends TestCase
         $this->storage = sys_get_temp_dir() . '/spirdt-attachments-' . bin2hex(random_bytes(4));
         $this->service = new AttachmentService($this->storage);
 
-        TenantContext::set($this->orgA, null);
+        $this->useTenant($this->orgA);
     }
 
     protected function tearDown(): void
@@ -401,7 +404,7 @@ final class AttachmentServiceTest extends TestCase
         ]);
 
         TenantContext::forget();
-        TenantContext::set($this->orgB, null);
+        $this->useTenant($this->orgB);
 
         $this->assertNull($this->service->read($stored['id']));
     }
@@ -467,14 +470,6 @@ final class AttachmentServiceTest extends TestCase
         @rmdir($path);
     }
 
-    private function makeOrganization(string $code): int
-    {
-        return (int) Capsule::table('organizations')->insertGetId([
-            'code' => $code,
-            'name' => strtoupper($code),
-        ]);
-    }
-
     /** @see SyncServiceTest::makeFacility for why the slot is chosen, not derived. */
     private function makeAssessment(int $organizationId, int $templateId, string $slot): string
     {
@@ -484,6 +479,7 @@ final class AttachmentServiceTest extends TestCase
 
         Capsule::table('facilities')->insert([
             'id'              => BinaryUuid::toBytes($facilityId),
+            'programme_id'    => $this->programmeFor($organizationId),
             'organization_id' => $organizationId,
             'name'            => 'Facility ' . $organizationId,
             'source'          => 'registry',
@@ -491,6 +487,7 @@ final class AttachmentServiceTest extends TestCase
 
         Capsule::table('testing_sites')->insert([
             'id'              => BinaryUuid::toBytes($siteId),
+            'programme_id'    => $this->programmeFor($organizationId),
             'organization_id' => $organizationId,
             'facility_id'     => BinaryUuid::toBytes($facilityId),
             'name'            => 'Site ' . $organizationId,
