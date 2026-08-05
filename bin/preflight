@@ -46,6 +46,57 @@ function check(string $label, string $status, string $detail = ''): void
     $results[] = ['status' => $status, 'label' => $label, 'detail' => $detail];
 }
 
+/**
+ * What to do about a connection that failed, given where we are running.
+ *
+ * A PDO error says the name did not resolve; it cannot say that "mysql" is a
+ * Compose service name and you are not in Compose. That mismatch — .env left
+ * at the Docker default while running natively, or the reverse — is by some
+ * distance the most common reason a fresh checkout appears broken, and it has
+ * cost setup time more than once. The script already knows both halves of the
+ * answer, so it should say it rather than leave a PDO message to be decoded.
+ *
+ * Returns an empty string when the host looks right for where we are, since
+ * then the fault is the server or the credentials and a guess would mislead.
+ */
+function db_remedy(string $host, PDOException $e): string
+{
+    // Only where we never reached a server: 2002 cannot connect, 2005 unknown
+    // host, 2006 server gone away. An "access denied" means the host was fine
+    // and the credentials were not, and telling someone to change DB_HOST at
+    // that point sends them away from the actual fault.
+    $driverCode = $e->errorInfo[1] ?? null;
+
+    if ($driverCode === null) {
+        $driverCode = preg_match('/\[(\d+)\]/', $e->getMessage(), $m) === 1 ? (int) $m[1] : null;
+    }
+
+    if (!in_array($driverCode, [2002, 2005, 2006], true)) {
+        return '';
+    }
+
+    // The reliable marker: the file exists in a container and nowhere else.
+    $inContainer = is_file('/.dockerenv');
+
+    if ($host === 'mysql' && !$inContainer) {
+        return 'DB_HOST=mysql is the Compose service name and resolves only inside the Compose network. '
+             . 'Running natively: set DB_HOST=127.0.0.1 in .env. '
+             . 'Running under Docker: keep it and run inside the container — docker compose exec php composer preflight';
+    }
+
+    if ($inContainer && in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
+        return 'Inside a container, ' . $host . ' is the container itself, not your machine. '
+             . 'Set DB_HOST=mysql for the Compose database, or host.docker.internal for a MySQL running on the host.';
+    }
+
+    if ($host === 'localhost') {
+        return 'localhost makes PHP try a unix socket, which fails when the socket path differs from what php.ini expects. '
+             . 'Use DB_HOST=127.0.0.1 to force TCP.';
+    }
+
+    return '';
+}
+
 // ─── 1. PHP ───
 
 $phpOk = PHP_VERSION_ID >= 80400;
@@ -149,6 +200,12 @@ try {
     );
 } catch (PDOException $e) {
     check('DB reachable', PF_FAIL, $e->getMessage());
+
+    $remedy = db_remedy($host, $e);
+
+    if ($remedy !== '') {
+        check('DB fix', PF_WARN, $remedy);
+    }
 }
 
 render($results, $quiet);
