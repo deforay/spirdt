@@ -47,6 +47,7 @@ nav:
       - Architecture: architecture.md
       - Data Model: data-model.md
       - Templates: templates.md
+      - Languages: i18n.md
       - Scoring: scoring.md
       - Design: design.md
   - Design Brief: design-brief.md

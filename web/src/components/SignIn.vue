@@ -2,7 +2,9 @@
 import { computed, ref } from 'vue'
 
 import { ApiError } from '@/api/client'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import { signIn } from '@/auth/login'
+import { t } from '@/i18n'
 
 /**
  * Sign in.
@@ -46,7 +48,7 @@ async function submit() {
             needsOrganization.value = true
         }
 
-        error.value = caught instanceof Error ? caught.message : 'Could not sign in.'
+        error.value = caught instanceof Error ? caught.message : t('signIn.failed')
     } finally {
         busy.value = false
     }
@@ -55,15 +57,20 @@ async function submit() {
 
 <template>
     <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center bg-ground px-5">
-        <header class="mb-7">
-            <h1 class="text-[30px] font-bold tracking-tight">SPI-RDT</h1>
-            <p class="mt-1 text-[15px] text-label-2">Sign in to start an assessment.</p>
+        <header class="mb-7 flex items-start justify-between gap-3">
+            <div>
+                <h1 class="text-[30px] font-bold tracking-tight">SPI-RDT</h1>
+                <p class="mt-1 text-[15px] text-label-2">{{ t('signIn.subtitle') }}</p>
+            </div>
+            <div class="mt-1.5"><LocaleSwitcher /></div>
         </header>
 
         <form class="flex flex-col gap-3" @submit.prevent="submit">
             <div class="overflow-hidden rounded-card bg-surface">
                 <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[76px] shrink-0 text-[15px] text-label-2">Email</span>
+                    <span class="w-[76px] shrink-0 text-[15px] text-label-2">
+                        {{ t('signIn.email') }}
+                    </span>
                     <input
                         v-model="email"
                         type="email"
@@ -79,7 +86,9 @@ async function submit() {
                 <div class="ml-[100px] border-t border-hairline"></div>
 
                 <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[76px] shrink-0 text-[15px] text-label-2">Password</span>
+                    <span class="w-[76px] shrink-0 text-[15px] text-label-2">
+                        {{ t('signIn.password') }}
+                    </span>
                     <input
                         v-model="password"
                         type="password"
@@ -93,7 +102,9 @@ async function submit() {
                     <div class="ml-[100px] border-t border-hairline"></div>
 
                     <label class="flex items-center gap-3 px-3.5 py-3">
-                        <span class="w-[76px] shrink-0 text-[15px] text-label-2">Org code</span>
+                        <span class="w-[76px] shrink-0 text-[15px] text-label-2">
+                            {{ t('signIn.organization') }}
+                        </span>
                         <input
                             v-model="organization"
                             type="text"
@@ -113,7 +124,7 @@ async function submit() {
                 :disabled="!canSubmit"
                 class="mt-1 rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40"
             >
-                {{ busy ? 'Signing in' : 'Sign in' }}
+                {{ busy ? t('signIn.submitting') : t('signIn.submit') }}
             </button>
         </form>
     </div>

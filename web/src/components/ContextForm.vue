@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 
-import type { Context, ContextField, Localised } from '@/scoring/types'
+import { t, text } from '@/i18n'
+import type { Context, ContextField } from '@/scoring/types'
 
 /**
  * Part A — everything asked before the checklist starts.
@@ -19,7 +20,6 @@ import type { Context, ContextField, Localised } from '@/scoring/types'
 
 const props = defineProps<{
     fields: ContextField[]
-    locale: string
     modelValue: Context
     /** Codes of fields whose value changes which sections apply. */
     applicabilityFields?: string[]
@@ -33,14 +33,6 @@ watch(
     () => props.modelValue,
     (next) => Object.assign(draft, next),
 )
-
-function text(value: Localised | undefined): string {
-    if (value === undefined) {
-        return ''
-    }
-
-    return value[props.locale] ?? Object.values(value)[0] ?? ''
-}
 
 function commit() {
     emit('update:modelValue', { ...draft })
@@ -104,7 +96,7 @@ const inputClass =
                     v-if="(applicabilityFields ?? []).includes(field.code)"
                     class="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent"
                 >
-                    Changes the checklist
+                    {{ t('context.changesChecklist') }}
                 </span>
             </div>
 
@@ -135,7 +127,7 @@ const inputClass =
                         :value="(draft[`${field.code}_other`] as string) ?? ''"
                         type="text"
                         :class="inputClass"
-                        placeholder="Please specify"
+                        :placeholder="t('context.specify')"
                         @input="
                             draft[`${field.code}_other`] = ($event.target as HTMLInputElement).value;
                             commit()
@@ -180,7 +172,7 @@ const inputClass =
                         class="w-full border-t border-hairline px-3.5 py-2.5 text-left text-[15px] text-no"
                         @click="removeRow(field, index)"
                     >
-                        Remove
+                        {{ t('action.remove') }}
                     </button>
                 </div>
 
@@ -189,7 +181,7 @@ const inputClass =
                     class="rounded-card bg-surface px-3.5 py-3 text-left text-[17px] text-accent"
                     @click="addRow(field)"
                 >
-                    Add {{ text(field.label).toLowerCase() }}
+                    {{ t('context.add', { label: text(field.label).toLowerCase() }) }}
                 </button>
             </div>
 

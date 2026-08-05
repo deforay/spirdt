@@ -6,6 +6,7 @@ import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 import type { Site } from '@/api/sites'
 import { session } from '@/auth/session'
 import ContextForm from '@/components/ContextForm.vue'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
@@ -15,6 +16,7 @@ import StorageNotice from '@/components/StorageNotice.vue'
 import SyncBadge from '@/components/SyncBadge.vue'
 import { useAssessment } from '@/composables/useAssessment'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
+import { formatPercent, formatTime, locale, t, text } from '@/i18n'
 import type { Context, ResponseCode, Template } from '@/scoring/types'
 import { startSync, syncAll } from '@/sync/engine'
 
@@ -30,8 +32,6 @@ import { startSync, syncAll } from '@/sync/engine'
 
 // Cast rather than let TypeScript infer a literal type for a 96 KB document.
 const template = rawTemplate as unknown as Template
-
-const locale = template.default_locale
 
 type Stage = 'site' | 'setup' | 'checklist' | 'review'
 
@@ -162,21 +162,28 @@ const levelTone = computed(() => {
 })
 
 const savedLabel = computed(() => {
-    if (assessment.saveState.value === 'error') return 'Not saved'
-    if (assessment.saveState.value === 'saving') return 'Saving'
-    if (assessment.lastSavedAt.value === null) return 'Nothing to save yet'
+    if (assessment.saveState.value === 'error') return t('save.error')
+    if (assessment.saveState.value === 'saving') return t('save.saving')
+    if (assessment.lastSavedAt.value === null) return t('save.nothing')
 
-    return `Saved ${assessment.lastSavedAt.value.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-    })}`
+    return t('save.saved', { time: formatTime(assessment.lastSavedAt.value) })
 })
 
-function title(value: Record<string, string> | undefined): string {
-    if (value === undefined) return ''
+/**
+ * The app is being read in a language the instrument was not published in.
+ *
+ * Said once on each screen where questions are about to appear, because an
+ * assessor who switches to French and still sees English questions will
+ * otherwise go looking for a setting that does not exist.
+ */
+const instrumentUntranslated = computed(() => !template.locales.includes(locale.value))
 
-    return value[locale] ?? Object.values(value)[0] ?? ''
-}
+/** The section that repeats per pathogen, and its size. Used to size the setup screen. */
+const repeating = computed(() => {
+    const found = template.sections.find((entry) => entry.scope === 'pathogen')
+
+    return { number: found?.number ?? 0, questions: found?.questions.length ?? 0 }
+})
 
 function jumpTo(sectionCode: string) {
     activeSection.value = sectionCode
@@ -192,7 +199,7 @@ async function onSubmit() {
     submitting.value = false
 
     if (!outcome.ok) {
-        submitError.value = outcome.reason ?? 'The assessment could not be submitted.'
+        submitError.value = outcome.reason ?? t('submit.failed')
     }
 }
 </script>
@@ -213,26 +220,35 @@ async function onSubmit() {
             :save-error="assessment.saveError.value"
         />
 
-        <header class="px-4 pb-3 pt-4">
-            <span class="text-[13px] text-accent">
-                {{ assessment.assessment.value?.siteName }}
-            </span>
-            <h1 class="text-[30px] font-bold tracking-tight">Set up the visit</h1>
+        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+            <div>
+                <span class="text-[13px] text-accent">
+                    {{ assessment.assessment.value?.siteName }}
+                </span>
+                <h1 class="text-[30px] font-bold tracking-tight">{{ t('setup.title') }}</h1>
+                <p v-if="instrumentUntranslated" class="mt-1 text-[12px] leading-snug text-label-2">
+                    {{ t('locale.instrumentNote') }}
+                </p>
+            </div>
+            <div class="mt-1"><LocaleSwitcher /></div>
         </header>
 
         <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
             <h2 class="px-1 pb-2 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                Tests performed here
+                {{ t('setup.pathogensHeading') }}
             </h2>
-            <PathogenSetup v-model="draftPathogens" />
+            <PathogenSetup
+                v-model="draftPathogens"
+                :repeating-section="repeating.number"
+                :questions-per-pathogen="repeating.questions"
+            />
 
             <h2 class="px-1 pb-2 pt-6 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                About the site
+                {{ t('setup.contextHeading') }}
             </h2>
             <ContextForm
                 v-model="draftContext"
                 :fields="template.context_fields ?? []"
-                :locale="locale"
                 :applicability-fields="applicabilityFields"
             />
         </main>
@@ -244,14 +260,13 @@ async function onSubmit() {
                 :disabled="!setupReady"
                 @click="startChecklist"
             >
-                Start the checklist
+                {{ t('setup.start') }}
             </button>
             <p v-if="draftPathogens.length === 0" class="pt-2 text-center text-[13px] text-label-2">
-                Add at least one test performed at this site.
+                {{ t('setup.needPathogen') }}
             </p>
             <p v-else-if="missingContext.length > 0" class="pt-2 text-center text-[13px] text-label-2">
-                {{ missingContext.length }} required
-                {{ missingContext.length === 1 ? 'field' : 'fields' }} still to fill in.
+                {{ t('setup.missingFields', { count: missingContext.length }) }}
             </p>
         </footer>
     </div>
@@ -259,7 +274,6 @@ async function onSubmit() {
     <ReviewScreen
         v-else-if="stage === 'review'"
         :template="template"
-        :locale="locale"
         :result="assessment.result.value"
         :findings="assessment.findings"
         :answers-by-key="answersByKey"
@@ -280,19 +294,31 @@ async function onSubmit() {
         />
 
         <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3">
-            <div class="flex items-center justify-between gap-3">
-                <span class="text-[13px] text-accent">
-                    {{ assessment.assessment.value?.siteName ?? 'Loading' }}
+            <div class="flex items-center justify-between gap-2">
+                <span class="flex-1 truncate text-[13px] text-accent">
+                    {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
                 </span>
+                <LocaleSwitcher />
                 <SyncBadge @retry="syncAll()" />
             </div>
-            <h1 class="text-[30px] font-bold tracking-tight">{{ title(section.title) }}</h1>
+            <h1 class="text-[30px] font-bold tracking-tight">{{ text(section.title) }}</h1>
             <span class="tnum text-[13px] text-label-2">
-                {{ answeredHere }} of {{ section.questions.length }} answered
+                {{
+                    t('checklist.answered', {
+                        answered: answeredHere,
+                        total: section.questions.length,
+                    })
+                }}
             </span>
+            <p v-if="instrumentUntranslated" class="text-[12px] leading-snug text-label-2">
+                {{ t('locale.instrumentNote') }}
+            </p>
         </header>
 
-        <nav class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2" aria-label="Sections">
+        <nav
+            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2"
+            :aria-label="t('checklist.sections')"
+        >
             <button
                 v-for="item in visibleSections"
                 :key="item.code"
@@ -316,7 +342,7 @@ async function onSubmit() {
         <nav
             v-if="section.scope === 'pathogen'"
             class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-3"
-            aria-label="Pathogens"
+            :aria-label="t('checklist.pathogens')"
         >
             <button
                 v-for="pathogen in assessment.assessment.value?.pathogens ?? []"
@@ -341,7 +367,6 @@ async function onSubmit() {
                     <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
                     <QuestionRow
                         :question="question"
-                        :locale="locale"
                         :response="assessment.responseFor(question.code, instance) as ResponseCode | null"
                         :comment="assessment.commentFor(question.code, instance)"
                         @update:response="
@@ -354,7 +379,7 @@ async function onSubmit() {
                 <div
                     class="flex justify-between border-t border-hairline px-3.5 py-3 text-[13px] text-label-2"
                 >
-                    <span>Section score</span>
+                    <span>{{ t('checklist.sectionScore') }}</span>
                     <strong class="tnum font-semibold text-label">
                         {{ sectionTally?.score ?? 0 }} / {{ sectionTally?.possible ?? 0 }}
                     </strong>
@@ -370,7 +395,10 @@ async function onSubmit() {
                     {{
                         assessment.result.value.percentage === null
                             ? '—'
-                            : `${assessment.result.value.percentage.toFixed(2)}%`
+                            : formatPercent(
+                                  assessment.result.value.percentage,
+                                  assessment.result.value.roundDp,
+                              )
                     }}
                 </div>
                 <div
@@ -387,8 +415,8 @@ async function onSubmit() {
                 <span :class="['rounded-full px-3 py-1.5 text-[13px] font-semibold', levelTone]">
                     {{
                         assessment.result.value.level === null
-                            ? 'Not scorable'
-                            : `Level ${assessment.result.value.level}`
+                            ? t('score.notScorable')
+                            : t('score.level', { level: assessment.result.value.level })
                     }}
                 </span>
                 <button
@@ -396,7 +424,7 @@ async function onSubmit() {
                     class="rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-white"
                     @click="stage = 'review'"
                 >
-                    Review
+                    {{ t('checklist.review') }}
                 </button>
             </div>
         </footer>

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import { t, text as localised } from '@/i18n'
 import { commentRequired } from '@/scoring/engine'
 import type { Question, ResponseCode } from '@/scoring/types'
 
@@ -22,17 +23,14 @@ import type { Question, ResponseCode } from '@/scoring/types'
  *   the decision, beats saying it at submit when the site visit is over.
  */
 
-const props = defineProps<{
-    question: Question
-    locale: string
-}>()
+const props = defineProps<{ question: Question }>()
 
 const response = defineModel<ResponseCode | null>('response', { required: true })
 const comment = defineModel<string>('comment', { required: true })
 
 const emit = defineEmits<{ guidance: [Question] }>()
 
-const text = computed(() => props.question.text[props.locale] ?? Object.values(props.question.text)[0] ?? '')
+const text = computed(() => localised(props.question.text))
 
 const needsComment = computed(() =>
     commentRequired(response.value, props.question.comment_required_for),
@@ -41,10 +39,13 @@ const needsComment = computed(() =>
 const commentMissing = computed(() => needsComment.value && comment.value.trim() === '')
 
 const placeholder = computed(() =>
-    response.value === 'NA' ? 'Why does this not apply?' : 'Describe the gap',
+    response.value === 'NA' ? t('question.whyNotApplicable') : t('question.describeGap'),
 )
 
-const hasGuidance = computed(() => Boolean(props.question.guidance?.[props.locale]))
+// Any translation counts, not only one in the current language: the button
+// offers to show guidance, and guidance in the wrong language beats a button
+// that is not there.
+const hasGuidance = computed(() => Object.keys(props.question.guidance ?? {}).length > 0)
 </script>
 
 <template>
@@ -62,14 +63,14 @@ const hasGuidance = computed(() => Boolean(props.question.guidance?.[props.local
             class="ml-[35px] self-start text-left text-[12.5px] text-accent"
             @click="emit('guidance', question)"
         >
-            What to look for &rsaquo;
+            {{ t('question.guidance') }} &rsaquo;
         </button>
 
         <div class="ml-[35px]">
             <SegmentedControl
                 v-model="response"
                 :na-allowed="question.na_allowed"
-                :label="`Response to question ${question.code}`"
+                :label="t('question.responseLabel', { code: question.code })"
             />
         </div>
 
@@ -78,12 +79,12 @@ const hasGuidance = computed(() => Boolean(props.question.guidance?.[props.local
                 v-model="comment"
                 type="text"
                 :placeholder="placeholder"
-                :aria-label="`Note for question ${question.code}`"
+                :aria-label="t('question.noteLabel', { code: question.code })"
                 :aria-invalid="commentMissing"
                 class="w-full rounded-lg border border-hairline bg-ground px-2.5 py-2 text-[13px] text-label placeholder:text-label-3"
             />
             <p v-if="commentMissing" class="mt-1 text-[11.5px] text-no">
-                A note is required before you can submit.
+                {{ t('question.noteRequired') }}
             </p>
         </div>
     </div>

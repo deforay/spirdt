@@ -11,8 +11,9 @@ declare(strict_types=1);
  *   1. Structural — resources/templates/template.schema.json
  *   2. Semantic   — rules that span the document: unique question codes,
  *                   bands ascending with a band at 0, every localised string
- *                   carrying the default locale, exactly one excluded
- *                   response, an applicability_field on optional sections.
+ *                   carrying the default locale, every declared locale
+ *                   actually carried, exactly one excluded response, an
+ *                   applicability_field on optional sections.
  *
  * The semantic layer exists because the failures it catches are the expensive
  * ones. A band list missing its zero entry, or a percentage falling into no
@@ -173,6 +174,138 @@ con_print('header', $failed === 0 ? 'All templates valid.' : sprintf('%d templat
 exit($failed === 0 ? 0 : 1);
 
 /**
+ * Every localised string in the document, as path => map of locale to text.
+ *
+ * Walked by name rather than sniffed for, so a position that stops being
+ * localised, or a new one that starts, shows up as a change here instead of
+ * being silently skipped by a heuristic.
+ *
+ * @return array<string, object>
+ */
+function localised_strings(object $data): array
+{
+    $found = [];
+
+    $add = static function (?object $value, string $path) use (&$found): void {
+        if ($value !== null) {
+            $found[$path] = $value;
+        }
+    };
+
+    $add($data->title ?? null, 'title');
+
+    foreach ((array) $data->scoring->responses as $code => $response) {
+        $add($response->label ?? null, "scoring.responses.{$code}.label");
+    }
+
+    foreach ($data->scoring->bands as $index => $band) {
+        $add($band->label ?? null, "scoring.bands[{$index}].label");
+        $add($band->description ?? null, "scoring.bands[{$index}].description");
+    }
+
+    // Context fields nest one level, for the repeating groups.
+    $walkFields = static function (array $fields, string $prefix) use ($add, &$walkFields): void {
+        foreach ($fields as $index => $field) {
+            $at = "{$prefix}[{$index}]";
+
+            $add($field->label ?? null, "{$at}.label");
+            $add($field->hint ?? null, "{$at}.hint");
+
+            foreach ($field->options ?? [] as $optionIndex => $option) {
+                $add($option->label ?? null, "{$at}.options[{$optionIndex}].label");
+            }
+
+            if (($field->fields ?? []) !== []) {
+                $walkFields($field->fields, "{$at}.fields");
+            }
+        }
+    };
+
+    $walkFields($data->context_fields ?? [], 'context_fields');
+
+    foreach ($data->sections as $section) {
+        $add($section->title ?? null, "sections.{$section->code}.title");
+        $add($section->intro ?? null, "sections.{$section->code}.intro");
+
+        foreach ($section->questions as $question) {
+            $add($question->text ?? null, "questions.{$question->code}.text");
+            $add($question->guidance ?? null, "questions.{$question->code}.guidance");
+
+            foreach ((array) ($question->criteria ?? new stdClass()) as $code => $criterion) {
+                $add($criterion, "questions.{$question->code}.criteria.{$code}");
+            }
+        }
+    }
+
+    return $found;
+}
+
+/**
+ * Whether the languages the template claims are the languages it has.
+ *
+ * A template declaring French and carrying it on two thirds of the questions
+ * is worse than one not declaring it at all: the app offers the language, and
+ * the assessor discovers the holes one question at a time, mid-visit. So the
+ * declaration is treated as a promise and checked against the document.
+ *
+ * @return list<string>
+ */
+function locale_coverage(object $data): array
+{
+    $problems  = [];
+    $strings   = localised_strings($data);
+    $total     = count($strings);
+    $declared  = (array) $data->locales;
+
+    foreach ($declared as $code) {
+        $missing = [];
+
+        foreach ($strings as $path => $map) {
+            if (!isset($map->{$code}) || trim((string) $map->{$code}) === '') {
+                $missing[] = $path;
+            }
+        }
+
+        if ($missing !== []) {
+            $problems[] = sprintf(
+                "locales declares '%s' but %d of %d localised strings have no %s text (%s%s)",
+                $code,
+                count($missing),
+                $total,
+                $code,
+                implode(', ', array_slice($missing, 0, 4)),
+                count($missing) > 4 ? ', …' : '',
+            );
+        }
+    }
+
+    // The other direction: text nobody can reach. The app offers the declared
+    // list, so an undeclared translation is work already done and not shipped.
+    $undeclared = [];
+
+    foreach ($strings as $path => $map) {
+        foreach ((array) $map as $code => $_) {
+            if (!in_array($code, $declared, true)) {
+                $undeclared[$code][] = $path;
+            }
+        }
+    }
+
+    foreach ($undeclared as $code => $paths) {
+        $problems[] = sprintf(
+            "'%s' text appears in %d localised %s but is not listed in locales (%s%s)",
+            $code,
+            count($paths),
+            count($paths) === 1 ? 'string' : 'strings',
+            implode(', ', array_slice($paths, 0, 4)),
+            count($paths) > 4 ? ', …' : '',
+        );
+    }
+
+    return $problems;
+}
+
+/**
  * Cross-document rules JSON Schema cannot express.
  *
  * @return list<string>
@@ -185,6 +318,8 @@ function semantic_check(object $data): array
     if (!in_array($locale, $data->locales, true)) {
         $problems[] = "default_locale '{$locale}' is not listed in locales";
     }
+
+    $problems = array_merge($problems, locale_coverage($data));
 
     // Bands must ascend and start at 0, otherwise a low percentage falls into
     // no band and the assessment has no level.

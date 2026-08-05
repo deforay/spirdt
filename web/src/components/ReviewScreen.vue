@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 
 import type { StoredFinding } from '@/db/database'
-import type { Localised, ScoreResult, Template } from '@/scoring/types'
+import { formatNumber, formatPercent, t, text } from '@/i18n'
+import type { ScoreResult, Template } from '@/scoring/types'
 
 /**
  * Review, record the gaps, submit.
@@ -24,7 +25,6 @@ import type { Localised, ScoreResult, Template } from '@/scoring/types'
 
 const props = defineProps<{
     template: Template
-    locale: string
     result: ScoreResult
     findings: Map<string, StoredFinding>
     /** Response by `${questionCode}|${pathogen}`. Passed in rather than re-derived. */
@@ -48,20 +48,12 @@ const emit = defineEmits<{
 const open = ref<string | null>(null)
 
 const RESPONSIBILITY = [
-    { key: 'site', label: 'Site' },
-    { key: 'facility', label: 'Facility' },
-    { key: 'district', label: 'District' },
-    { key: 'regional', label: 'Regional' },
-    { key: 'national', label: 'National' },
+    { key: 'site', label: 'responsibility.site' },
+    { key: 'facility', label: 'responsibility.facility' },
+    { key: 'district', label: 'responsibility.district' },
+    { key: 'regional', label: 'responsibility.regional' },
+    { key: 'national', label: 'responsibility.national' },
 ] as const
-
-function text(value: Localised | undefined): string {
-    if (value === undefined) {
-        return ''
-    }
-
-    return value[props.locale] ?? Object.values(value)[0] ?? ''
-}
 
 /** Question text by code, so a gap reads as a sentence rather than a number. */
 const questionText = computed(() => {
@@ -161,9 +153,9 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
     <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
         <header class="px-4 pb-3 pt-4">
             <button type="button" class="mb-2 text-[15px] text-accent" @click="emit('back')">
-                Back to checklist
+                {{ t('review.back') }}
             </button>
-            <h1 class="text-[30px] font-bold tracking-tight">Review</h1>
+            <h1 class="text-[30px] font-bold tracking-tight">{{ t('review.title') }}</h1>
             <p class="mt-0.5 text-[13px] text-label-2">{{ siteName }}</p>
         </header>
 
@@ -172,10 +164,19 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
             <div class="mb-4 flex items-end justify-between rounded-card bg-surface px-4 py-4">
                 <div>
                     <div class="tnum text-[34px] font-bold leading-none tracking-tight">
-                        {{ result.percentage === null ? '—' : `${result.percentage.toFixed(2)}%` }}
+                        {{
+                            result.percentage === null
+                                ? '—'
+                                : formatPercent(result.percentage, result.roundDp)
+                        }}
                     </div>
                     <div class="tnum mt-1 text-[13px] text-label-2">
-                        {{ result.totalScore }} of {{ result.totalPossible }} points
+                        {{
+                            t('review.points', {
+                                score: result.totalScore,
+                                possible: result.totalPossible,
+                            })
+                        }}
                     </div>
                 </div>
                 <span
@@ -192,14 +193,18 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                                   : 'bg-no-soft text-no'
                     "
                 >
-                    {{ result.level === null ? 'Not scorable' : `Level ${result.level}` }}
+                    {{
+                        result.level === null
+                            ? t('score.notScorable')
+                            : t('score.level', { level: result.level })
+                    }}
                 </span>
             </div>
 
             <!-- Unanswered questions block submission, so they come first. -->
             <section v-if="missingBySection.length > 0" class="mb-4">
                 <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                    Unanswered
+                    {{ t('review.unanswered') }}
                 </h2>
                 <div class="overflow-hidden rounded-card bg-surface">
                     <button
@@ -211,12 +216,13 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                         @click="emit('jump', section.code, null)"
                     >
                         <span class="text-[17px]">{{ section.title }}</span>
-                        <span class="tnum text-[15px] font-semibold text-no">{{ section.count }}</span>
+                        <span class="tnum text-[15px] font-semibold text-no">
+                            {{ formatNumber(section.count) }}
+                        </span>
                     </button>
                 </div>
                 <p class="px-1 pt-1.5 text-[13px] text-label-2">
-                    The percentage above counts only answered questions, so it reads higher than the
-                    finished assessment will.
+                    {{ t('review.unansweredNote') }}
                 </p>
             </section>
 
@@ -225,8 +231,10 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                 <h2
                     class="flex items-baseline justify-between px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2"
                 >
-                    <span>Gaps</span>
-                    <span class="tnum normal-case">{{ described }} of {{ gaps.length }} described</span>
+                    <span>{{ t('review.gaps') }}</span>
+                    <span class="tnum normal-case">
+                        {{ t('review.described', { described, total: gaps.length }) }}
+                    </span>
                 </h2>
 
                 <div v-if="gaps.length > 0" class="overflow-hidden rounded-card bg-surface">
@@ -266,7 +274,7 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                                     {{ findingOf(gap).gap }}
                                 </span>
                                 <span v-else class="mt-1 block text-[13px] font-medium text-accent">
-                                    Describe the gap
+                                    {{ t('question.describeGap') }}
                                 </span>
                             </span>
                         </button>
@@ -275,7 +283,7 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                             <textarea
                                 :value="findingOf(gap).gap ?? ''"
                                 rows="2"
-                                placeholder="What is missing or not being done"
+                                :placeholder="t('review.gapPlaceholder')"
                                 class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
                                 @change="
                                     emit('finding', gap.questionCode, gap.pathogen, {
@@ -287,7 +295,7 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                             <textarea
                                 :value="findingOf(gap).recommendation ?? ''"
                                 rows="2"
-                                placeholder="Recommended action"
+                                :placeholder="t('review.recommendationPlaceholder')"
                                 class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
                                 @change="
                                     emit('finding', gap.questionCode, gap.pathogen, {
@@ -298,7 +306,7 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
 
                             <div>
                                 <span class="mb-1 block px-0.5 text-[13px] text-label-2">
-                                    Who acts on this
+                                    {{ t('review.whoActs') }}
                                 </span>
                                 <div class="scroll-thin flex gap-1.5 overflow-x-auto">
                                     <button
@@ -317,7 +325,7 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                                             })
                                         "
                                     >
-                                        {{ level.label }}
+                                        {{ t(level.label) }}
                                     </button>
                                 </div>
                             </div>
@@ -326,7 +334,7 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                                 <input
                                     :value="findingOf(gap).responsiblePerson ?? ''"
                                     type="text"
-                                    placeholder="Responsible person"
+                                    :placeholder="t('review.responsiblePerson')"
                                     class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
                                     @change="
                                         emit('finding', gap.questionCode, gap.pathogen, {
@@ -349,15 +357,13 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                     </div>
                 </div>
 
-                <p v-else class="px-1 text-[15px] text-label-2">
-                    No gaps recorded. Every answer so far is a Yes or Not applicable.
-                </p>
+                <p v-else class="px-1 text-[15px] text-label-2">{{ t('review.noGaps') }}</p>
             </section>
 
             <!-- Sections, for the debrief. -->
             <section class="mb-4">
                 <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                    By section
+                    {{ t('review.bySection') }}
                 </h2>
                 <div class="overflow-hidden rounded-card bg-surface">
                     <div
@@ -370,10 +376,10 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                             {{ text(template.sections.find((s) => s.code === tally.code)?.title) }}
                         </span>
                         <span v-if="!tally.applicable" class="text-[13px] text-label-3">
-                            Not applicable
+                            {{ t('review.notApplicable') }}
                         </span>
                         <span v-else class="tnum text-[15px] font-semibold">
-                            {{ tally.score }} / {{ tally.possible }}
+                            {{ formatNumber(tally.score) }} / {{ formatNumber(tally.possible) }}
                         </span>
                     </div>
                 </div>
@@ -391,11 +397,11 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                 :disabled="!result.isComplete || submitting"
                 @click="emit('submit')"
             >
-                {{ submitting ? 'Submitting' : 'Submit assessment' }}
+                {{ submitting ? t('review.submitting') : t('review.submit') }}
             </button>
 
             <p v-if="!result.isComplete" class="tnum pt-2 text-center text-[13px] text-label-2">
-                {{ result.missing.length }} questions still need an answer.
+                {{ t('review.stillNeeded', { count: result.missing.length }) }}
             </p>
         </footer>
     </div>

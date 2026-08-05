@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 
 import type { StoredPathogen } from '@/db/database'
+import { t } from '@/i18n'
 
 /**
  * Which pathogens the visit covers.
@@ -17,7 +18,12 @@ import type { StoredPathogen } from '@/db/database'
  * mis-tap here would otherwise discard 23 answers with nothing to undo it.
  */
 
-const props = defineProps<{ modelValue: StoredPathogen[] }>()
+const props = defineProps<{
+    modelValue: StoredPathogen[]
+    /** Which section repeats, and how big it is. Read off the template, not assumed. */
+    repeatingSection: number
+    questionsPerPathogen: number
+}>()
 const emit = defineEmits<{ 'update:modelValue': [value: StoredPathogen[]] }>()
 
 const draft = ref('')
@@ -66,14 +72,12 @@ function remove(key: string) {
             >
                 <span class="text-[17px]">{{ pathogen.name }}</span>
                 <button type="button" class="text-[15px] text-no" @click="remove(pathogen.key)">
-                    Remove
+                    {{ t('action.remove') }}
                 </button>
             </div>
         </div>
 
-        <p v-else class="px-1 text-[15px] text-label-2">
-            Add every rapid test performed at this site.
-        </p>
+        <p v-else class="px-1 text-[15px] text-label-2">{{ t('pathogens.empty') }}</p>
 
         <div class="overflow-hidden rounded-card bg-surface">
             <form class="flex items-center gap-3 px-3.5 py-3" @submit.prevent="add(draft)">
@@ -81,14 +85,14 @@ function remove(key: string) {
                     v-model="draft"
                     type="text"
                     class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                    placeholder="Add a pathogen"
+                    :placeholder="t('pathogens.placeholder')"
                 />
                 <button
                     type="submit"
                     class="shrink-0 text-[15px] font-semibold text-accent disabled:opacity-40"
                     :disabled="draft.trim() === ''"
                 >
-                    Add
+                    {{ t('action.add') }}
                 </button>
             </form>
         </div>
@@ -109,7 +113,12 @@ function remove(key: string) {
         </div>
 
         <p class="tnum px-1 text-[13px] text-label-2">
-            Section 4 repeats for each one. {{ modelValue.length * 23 }} questions.
+            {{
+                t('pathogens.repeatNote', {
+                    number: repeatingSection,
+                    count: modelValue.length * questionsPerPathogen,
+                })
+            }}
         </p>
     </div>
 </template>

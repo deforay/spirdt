@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { t } from '@/i18n'
 import { syncStatus } from '@/sync/engine'
 
 /**
@@ -20,22 +21,26 @@ const state = computed(() => {
     const status = syncStatus.value
 
     if (status.blocked > 0) {
-        return { label: 'Needs attention', tone: 'bg-no-soft text-no', clickable: true }
+        return { label: t('sync.blocked'), tone: 'bg-no-soft text-no', clickable: true }
     }
 
     if (status.running) {
-        return { label: 'Syncing', tone: 'bg-track text-label-2', clickable: false }
+        return { label: t('sync.running'), tone: 'bg-track text-label-2', clickable: false }
     }
 
     if (status.pending > 0) {
-        return { label: `${status.pending} waiting`, tone: 'bg-partial-soft text-partial', clickable: true }
+        return {
+            label: t('sync.pending', { count: status.pending }),
+            tone: 'bg-partial-soft text-partial',
+            clickable: true,
+        }
     }
 
     if (status.lastRunAt === null) {
-        return { label: 'Not synced', tone: 'bg-track text-label-2', clickable: true }
+        return { label: t('sync.never'), tone: 'bg-track text-label-2', clickable: true }
     }
 
-    return { label: 'Synced', tone: 'bg-yes-soft text-yes', clickable: false }
+    return { label: t('sync.synced'), tone: 'bg-yes-soft text-yes', clickable: false }
 })
 </script>
 

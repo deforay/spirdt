@@ -1,5 +1,7 @@
 import { db } from './database'
 
+import type { MessageKey } from '@/i18n'
+
 /**
  * Whether this device will actually keep what the assessor writes.
  *
@@ -30,8 +32,13 @@ export interface StorageReport {
     writable: boolean
     usageBytes: number | null
     quotaBytes: number | null
-    /** What to tell the assessor. Empty when there is nothing to say. */
-    message: string
+    /**
+     * What to tell the assessor, as a key rather than a sentence. The report is
+     * built once, before the visit starts; the language can be changed after
+     * that, and a warning frozen in the language of the moment it was raised is
+     * one nobody reads. Null when there is nothing to say.
+     */
+    messageKey: MessageKey | null
 }
 
 const CANARY = '__write_check__'
@@ -125,25 +132,23 @@ export async function checkStorage(): Promise<StorageReport> {
     const { usage, quota } = await storageEstimate()
 
     let risk: StorageRisk = 'safe'
-    let message = ''
+    let messageKey: MessageKey | null = null
 
     if (!writable) {
         risk = 'broken'
-        message =
-            'This device is not saving anything. Turn off private browsing, or use a different browser, before you start.'
+        messageKey = 'storage.notWritable'
     } else if (!persisted && !installed) {
         risk = 'at-risk'
-        message =
-            'This browser may clear saved assessments. Add the app to your home screen, and sync before you leave the site.'
+        messageKey = 'storage.mayClear'
     } else if (!persisted) {
         risk = 'at-risk'
-        message = 'Saved assessments are not protected from being cleared. Sync before you leave the site.'
+        messageKey = 'storage.notPersisted'
     }
 
     // Under a megabyte of headroom will not finish an assessment with photos.
     if (risk !== 'broken' && quota !== null && usage !== null && quota - usage < 1_000_000) {
         risk = 'at-risk'
-        message = 'This device is almost out of storage. Free up space before you start.'
+        messageKey = 'storage.almostFull'
     }
 
     return {
@@ -153,6 +158,6 @@ export async function checkStorage(): Promise<StorageReport> {
         writable,
         usageBytes: usage,
         quotaBytes: quota,
-        message,
+        messageKey,
     }
 }

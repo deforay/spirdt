@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import type { StorageReport } from '@/db/storage'
 import type { SaveState } from '@/composables/useAssessment'
+import { t } from '@/i18n'
 
 /**
  * Says whether this device is keeping the assessment.
@@ -32,10 +33,12 @@ const tone = computed(() => {
 
 const message = computed(() => {
     if (props.saveState === 'error') {
-        return props.saveError || 'The last answer was not saved to this device. Do not close this page.'
+        return props.saveError || t('storage.saveFailed')
     }
 
-    return props.storage?.message ?? ''
+    const key = props.storage?.messageKey
+
+    return key ? t(key) : ''
 })
 </script>
 

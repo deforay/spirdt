@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { cachedSites, fetchSites, type Site } from '@/api/sites'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
+import { t } from '@/i18n'
 
 /**
  * Choose the site being assessed.
@@ -39,9 +41,12 @@ const shown = computed(() => {
 
 <template>
     <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
-        <header class="px-4 pb-3 pt-4">
-            <h1 class="text-[30px] font-bold tracking-tight">Testing sites</h1>
-            <p class="mt-0.5 text-[13px] text-label-2">Choose the site you are assessing.</p>
+        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+            <div>
+                <h1 class="text-[30px] font-bold tracking-tight">{{ t('sites.title') }}</h1>
+                <p class="mt-0.5 text-[13px] text-label-2">{{ t('sites.subtitle') }}</p>
+            </div>
+            <div class="mt-1.5"><LocaleSwitcher /></div>
         </header>
 
         <div class="px-4 pb-3">
@@ -49,7 +54,7 @@ const shown = computed(() => {
                 v-model="filter"
                 type="search"
                 class="w-full rounded-card bg-surface px-3.5 py-2.5 text-[17px] outline-none placeholder:text-label-3"
-                placeholder="Search"
+                :placeholder="t('sites.search')"
             />
         </div>
 
@@ -70,11 +75,13 @@ const shown = computed(() => {
                 </button>
             </div>
 
-            <p v-else-if="loading" class="px-1 pt-2 text-[15px] text-label-2">Loading sites.</p>
+            <p v-else-if="loading" class="px-1 pt-2 text-[15px] text-label-2">
+                {{ t('sites.loading') }}
+            </p>
 
             <p v-else class="px-1 pt-2 text-[15px] text-label-2">
-                No sites yet. An administrator adds them, or seed some locally with
-                <code class="text-label">bin/dev/seed-sites</code>.
+                {{ t('sites.empty') }}
+                <code class="text-label">bin/dev/seed-sites</code>
             </p>
         </main>
     </div>

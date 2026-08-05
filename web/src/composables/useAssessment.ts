@@ -21,6 +21,7 @@ import {
     type StoredResponse,
 } from '@/db/database'
 import { checkStorage, type StorageReport } from '@/db/storage'
+import { t } from '@/i18n'
 import { questionKey, score } from '@/scoring/engine'
 import type { AnswerInput, Context, Template } from '@/scoring/types'
 import { syncAssessment } from '@/sync/engine'
@@ -131,7 +132,7 @@ export function useAssessment(template: Template) {
         } catch (error) {
             saveState.value = 'error'
             saveError.value =
-                error instanceof Error ? error.message : 'The answer was not saved to this device.'
+                error instanceof Error ? error.message : t('storage.answerNotSaved')
             return
         } finally {
             inFlight.value -= 1
@@ -221,7 +222,7 @@ export function useAssessment(template: Template) {
         const current = assessment.value
 
         if (!current) {
-            return { ok: false, reason: 'There is no assessment to submit.' }
+            return { ok: false, reason: t('submit.noAssessment') }
         }
 
         await flushWrites()
@@ -229,12 +230,12 @@ export function useAssessment(template: Template) {
         if (!result.value.isComplete) {
             return {
                 ok: false,
-                reason: `${result.value.missing.length} questions still need an answer.`,
+                reason: t('review.stillNeeded', { count: result.value.missing.length }),
             }
         }
 
         if (!result.value.isValid) {
-            return { ok: false, reason: 'Some answers are not allowed for their question.' }
+            return { ok: false, reason: t('submit.invalidAnswers') }
         }
 
         await setStatus(current.id, 'submitted')

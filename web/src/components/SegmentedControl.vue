@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 
+import { t } from '@/i18n'
 import type { ResponseCode } from '@/scoring/types'
 
 /**
@@ -29,11 +30,18 @@ const props = withDefaults(
     { naAllowed: false, disabled: false },
 )
 
-const LABELS: Record<ResponseCode, string> = {
-    Y: 'Yes',
-    P: 'Partial',
-    N: 'No',
-    NA: 'N/A',
+/**
+ * Worded here rather than taken from the template's response labels. Four
+ * options share the width of a phone, so what this needs is the shortest form
+ * a language has — "N/A", not "Not Applicable" — and each language gets to
+ * pick its own abbreviation. The template's labels are the long form, for
+ * anywhere with room to print them.
+ */
+const LABELS: Record<ResponseCode, 'response.Y' | 'response.P' | 'response.N' | 'response.NA'> = {
+    Y: 'response.Y',
+    P: 'response.P',
+    N: 'response.N',
+    NA: 'response.NA',
 }
 
 const TONES: Record<ResponseCode, string> = {
@@ -71,7 +79,7 @@ function choose(value: ResponseCode): void {
             ]"
             @click="choose(value)"
         >
-            {{ LABELS[value] }}
+            {{ t(LABELS[value]) }}
         </RadioGroupItem>
     </RadioGroupRoot>
 </template>
