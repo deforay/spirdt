@@ -9,13 +9,28 @@ canvas or a full disk strand a finished assessment on a tablet.
 
 ## What is captured
 
-| Role | Name printed beside the mark | Where the name comes from |
+| Role | Who | Where the name comes from |
 |---|---|---|
 | `assessor_1` | The assessor | Whoever is signed in |
+| `assessor_2` | A second assessor, if one attended | Typed |
 | `site_representative` | The person debriefed | Part A's `interviewee_name` |
 
-Neither name is typed twice. `assessor_2` exists in the server's vocabulary for
-a two-person team; nothing offers it yet.
+Two of the three names are not typed, because asking for a name already on file
+invites a second version of it. A second assessor is the exception: nothing in
+the system knows a colleague attended.
+
+That exception is why the name is **stored with the mark** rather than resolved
+afterwards, and the second reason below is the one that forced it:
+
+- A user can be renamed, deactivated or corrected after a visit, and a derived
+  name would follow them. What has to stay recoverable is the name as it stood
+  when the pen went down — the same principle that makes an assessment pin its
+  template version.
+- For a second assessor there is nowhere to derive it from at all.
+
+`signed_name` is required for a signature and refused if blank. Once a mark is
+saved, the stored name is what is shown: it is what was filed, and it must not
+appear to change because a box was edited afterwards.
 
 A signature can be **redrawn** but not removed. The new mark replaces the old
 one on the device and on the server, file and row. There is no un-sign: on an
@@ -58,6 +73,10 @@ Nothing the caller says about the file is believed:
   information.
 - **The checksum is computed from what arrived.** A checksum the caller can
   choose cannot detect anything — and it is the key idempotency turns on.
+  Idempotency matches on **role and checksum**, not checksum alone: a signature
+  slot accepts a single tap, and a tap in the same place on the same device is
+  byte-identical, so a second signatory would otherwise be handed the first
+  one's row and the device would mark its own mark clean and stop retrying.
 - **The size is checked against the bytes read**, not the size the upload
   declares. Limit is 5 MB.
 - **The assessment must be the caller's.** Refused as 404 rather than 403, so

@@ -132,7 +132,9 @@ export const messages: Messages = {
     'signature.signedAt': 'Signé à {time}',
     'signature.pending': 'En attente d’envoi',
     'signature.assessor': 'Évaluateur',
+    'signature.secondAssessor': 'Second évaluateur',
     'signature.siteRepresentative': 'Représentant du site',
+    'signature.namePlaceholder': 'Nom, si un second évaluateur était présent',
     'signature.noName': 'Nom non renseigné',
     'signature.siteNameHint': 'Renseignez d’abord le nom de la personne interrogée dans la partie A.',
     'signature.optional':

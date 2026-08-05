@@ -84,17 +84,86 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Grace Phiri',
         ]);
 
         $this->assertSame('signature', $result['kind']);
         $this->assertSame('assessor_1', $result['role']);
+        $this->assertSame('Grace Phiri', $result['signed_name']);
 
         $row = Attachment::query()->first();
 
         $this->assertNotNull($row);
         $this->assertSame('image/png', $row->mime_type);
+        $this->assertSame('Grace Phiri', $row->signed_name);
         $this->assertSame($this->orgA, (int) $row->organization_id);
         $this->assertFileExists($this->storage . '/' . $row->storage_path);
+    }
+
+    /**
+     * A mark with no name against it is a squiggle, and the name is stored
+     * rather than resolved later because a user can be renamed after a visit
+     * and a second assessor is nowhere in the data at all.
+     */
+    public function testRefusesASignatureWithNoName(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->service->store($this->png(), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'signature',
+            'role'          => 'assessor_2',
+            'signed_name'   => '   ',
+        ]);
+    }
+
+    public function testAcceptsAllThreeSignatureRoles(): void
+    {
+        foreach (
+            [['assessor_1', 2], ['assessor_2', 3], ['site_representative', 4]] as [$role, $size]
+        ) {
+            $this->service->store($this->png($size, $size), [
+                'assessment_id' => $this->assessmentA,
+                'kind'          => 'signature',
+                'role'          => $role,
+                'signed_name'   => 'Someone ' . $role,
+            ]);
+        }
+
+        $this->assertSame(3, Attachment::query()->count());
+    }
+
+    /**
+     * A signature slot accepts a single tap, and a tap in the same place on
+     * the same device is byte-identical. Matching idempotency on the checksum
+     * alone handed the second signatory the first one's row, and the device
+     * then marked its own mark clean and stopped retrying — one image on the
+     * server, two roles claiming it, nothing looking wrong anywhere.
+     */
+    public function testTwoRolesWithIdenticalBytesBothKeepTheirOwnMark(): void
+    {
+        $first = $this->service->store($this->png(), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'signature',
+            'role'          => 'assessor_1',
+            'signed_name'   => 'First Assessor',
+        ]);
+
+        $second = $this->service->store($this->png(), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'signature',
+            'role'          => 'assessor_2',
+            'signed_name'   => 'Second Assessor',
+        ]);
+
+        $this->assertNotSame($first['id'], $second['id']);
+        $this->assertSame(2, Attachment::query()->count());
+        $this->assertCount(2, $this->storedFiles());
+
+        $names = Attachment::query()->pluck('signed_name')->all();
+
+        $this->assertContains('First Assessor', $names);
+        $this->assertContains('Second Assessor', $names);
     }
 
     /**
@@ -108,6 +177,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
             'checksum'      => str_repeat('0', 64),
         ]);
 
@@ -124,6 +194,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ];
 
         $first = $this->service->store($this->png(), $meta);
@@ -144,6 +215,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ];
 
         $first = $this->service->store($this->png(2, 2), $meta);
@@ -160,12 +232,14 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ]);
 
         $this->service->store($this->png(3, 3), [
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'site_representative',
+            'signed_name'   => 'Site Person',
         ]);
 
         $this->assertSame(2, Attachment::query()->count());
@@ -179,6 +253,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentB,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ]);
     }
 
@@ -196,6 +271,7 @@ final class AttachmentServiceTest extends TestCase
                 'assessment_id' => $this->assessmentA,
                 'kind'          => 'signature',
                 'role'          => 'assessor_1',
+                'signed_name'   => 'Test Signatory',
             ],
         );
     }
@@ -211,6 +287,7 @@ final class AttachmentServiceTest extends TestCase
                 'assessment_id' => $this->assessmentA,
                 'kind'          => 'signature',
                 'role'          => 'assessor_1',
+                'signed_name'   => 'Test Signatory',
             ],
         );
     }
@@ -223,6 +300,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ]);
     }
 
@@ -247,6 +325,7 @@ final class AttachmentServiceTest extends TestCase
                 'assessment_id' => $this->assessmentA,
                 'kind'          => 'signature',
                 'role'          => 'assessor_1',
+                'signed_name'   => 'Test Signatory',
             ],
         );
     }
@@ -259,6 +338,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'the_inspector',
+            'signed_name'   => 'Test Signatory',
         ]);
     }
 
@@ -270,6 +350,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'video',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ]);
     }
 
@@ -282,6 +363,7 @@ final class AttachmentServiceTest extends TestCase
                 'assessment_id' => $this->assessmentA,
                 'kind'          => 'signature',
                 'role'          => 'assessor_1',
+                'signed_name'   => 'Test Signatory',
             ],
         );
 
@@ -299,6 +381,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ]);
 
         $found = $this->service->read($stored['id']);
@@ -314,6 +397,7 @@ final class AttachmentServiceTest extends TestCase
             'assessment_id' => $this->assessmentA,
             'kind'          => 'signature',
             'role'          => 'assessor_1',
+            'signed_name'   => 'Test Signatory',
         ]);
 
         TenantContext::forget();

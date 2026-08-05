@@ -22,6 +22,7 @@ interface UploadAck {
     id: string
     kind: string
     role: string | null
+    signed_name: string | null
     checksum: string
     byte_size: number
 }
@@ -35,6 +36,11 @@ async function upload(row: StoredAttachment): Promise<void> {
     form.append('assessment_id', row.assessmentId)
     form.append('kind', row.kind)
     form.append('role', String(row.role))
+
+    // Filed with the mark rather than resolved later. A user can be renamed
+    // after a visit, and for a second assessor there is nothing to resolve
+    // from at all — the system never knew they were there.
+    form.append('signed_name', row.signedName)
 
     if (row.questionCode !== null) {
         form.append('question_code', row.questionCode)

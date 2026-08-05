@@ -15,14 +15,19 @@ import { formatTime, t } from '@/i18n'
  * and then both sides put their name to it. Signing before the findings were
  * shown would be signing a blank page.
  *
- * Neither signature blocks submission. That is the documented design and it is
- * the right way round — media uploads separately and can fail on its own, so
+ * No signature blocks submission. That is the documented design and it is the
+ * right way round — media uploads separately and can fail on its own, so
  * requiring one here would let a broken camera or a dead canvas strand a
  * finished assessment on a tablet.
  *
- * Neither name is typed. The assessor is whoever is signed in, and the site
- * representative is the interviewee Part A already recorded — asking again
- * would be asking for a second version of a name already on file.
+ * Two of the three names are not typed: the assessor is whoever is signed in,
+ * and the site representative is the interviewee Part A already recorded.
+ * Asking again would invite a second version of a name already on file.
+ *
+ * A second assessor is the exception, because nothing in the system knows a
+ * colleague attended. That name is typed, and it is the reason the server
+ * stores the name with the mark rather than resolving it afterwards — there is
+ * nowhere to resolve this one from.
  */
 
 const props = defineProps<{
@@ -42,17 +47,31 @@ const siteRepresentativeName = computed(() => {
     return typeof value === 'string' ? value.trim() : ''
 })
 
+/** Typed, and only for the second assessor. Kept until the mark is saved with it. */
+const secondAssessorName = ref('')
+
 const SLOTS = computed(() => [
     {
         role: 'assessor_1' as SignatureRole,
         label: t('signature.assessor'),
-        name: assessorName.value,
+        name: rowFor('assessor_1')?.signedName ?? assessorName.value,
+        typed: false,
+        hint: '',
+    },
+    {
+        role: 'assessor_2' as SignatureRole,
+        label: t('signature.secondAssessor'),
+        // Once signed, the stored name wins. It is what was actually filed,
+        // and it must not appear to change because a box was edited after.
+        name: rowFor('assessor_2')?.signedName ?? secondAssessorName.value.trim(),
+        typed: rowFor('assessor_2') === undefined,
         hint: '',
     },
     {
         role: 'site_representative' as SignatureRole,
         label: t('signature.siteRepresentative'),
-        name: siteRepresentativeName.value,
+        name: rowFor('site_representative')?.signedName ?? siteRepresentativeName.value,
+        typed: false,
         // Signing on behalf of an unnamed person is not a signature, so the
         // slot says where the name comes from rather than offering a blank.
         hint: siteRepresentativeName.value === '' ? t('signature.siteNameHint') : '',
@@ -125,7 +144,16 @@ onBeforeUnmount(() => {
                 <div class="flex items-center justify-between gap-3 px-3.5 py-3">
                     <div class="min-w-0 flex-1">
                         <span class="block text-[13px] text-label-2">{{ slot.label }}</span>
-                        <span class="block truncate text-[17px]">
+
+                        <input
+                            v-if="slot.typed"
+                            v-model="secondAssessorName"
+                            type="text"
+                            :placeholder="t('signature.namePlaceholder')"
+                            :aria-label="slot.label"
+                            class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
+                        />
+                        <span v-else class="block truncate text-[17px]">
                             {{ slot.name === '' ? t('signature.noName') : slot.name }}
                         </span>
 

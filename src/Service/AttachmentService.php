@@ -61,8 +61,15 @@ final class AttachmentService
     /**
      * One signature per role. A second one for the same role means the
      * assessor redrew it, so it replaces rather than joins.
+     *
+     * Two assessors and the site. A second assessor is optional and common
+     * enough to be worth a slot; the site's countersignature is what makes the
+     * findings agreed rather than asserted.
      */
     private const SIGNATURE_ROLES = ['assessor_1', 'assessor_2', 'site_representative'];
+
+    /** The column is VARCHAR(200). Longer than any name, short enough to bound. */
+    private const MAX_NAME_LENGTH = 200;
 
     public function __construct(private readonly string $baseDirectory)
     {
@@ -82,6 +89,7 @@ final class AttachmentService
         $assessmentId = $this->requireUuid($meta, 'assessment_id');
         $kind = $this->requireKind($meta);
         $role = $this->requireRole($meta, $kind);
+        $signedName = $this->requireSignedName($meta, $kind);
         $questionCode = $this->questionCode($meta, $kind);
 
         // The scope means an assessment belonging to another organisation
@@ -99,9 +107,21 @@ final class AttachmentService
 
         // Idempotency, checked before anything is written. A retried upload
         // must cost one hash and one indexed lookup, not a second file.
-        $existing = Attachment::query()
+        //
+        // Scoped by role as well as checksum. A signature slot accepts a
+        // single tap, and a tap in the same place on the same device produces
+        // byte-identical bytes — so matching on checksum alone would hand a
+        // second signatory the first one's row, and the device would mark its
+        // own mark clean and stop retrying with nothing looking wrong.
+        //
+        // IS NULL rather than = NULL for a photograph, which carries no role.
+        // `where('role', null)` compiles to `role = NULL`, which matches
+        // nothing, and a check that never matches is not a check.
+        $query = Attachment::query()
             ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
-            ->where('checksum', $checksum)
+            ->where('checksum', $checksum);
+
+        $existing = ($role === null ? $query->whereNull('role') : $query->where('role', $role))
             ->first();
 
         if ($existing instanceof Attachment) {
@@ -121,7 +141,7 @@ final class AttachmentService
 
         try {
             $attachment = Capsule::connection()->transaction(
-                function () use ($id, $organizationId, $assessmentId, $kind, $role, $questionCode, $relative, $mime, $bytes, $checksum): Attachment {
+                function () use ($id, $organizationId, $assessmentId, $kind, $role, $signedName, $questionCode, $relative, $mime, $bytes, $checksum): Attachment {
                     if ($kind === 'signature') {
                         $this->replaceSignature($assessmentId, $role);
                     }
@@ -133,6 +153,7 @@ final class AttachmentService
                         'assessment_id'   => $assessmentId,
                         'kind'            => $kind,
                         'role'            => $role,
+                        'signed_name'     => $signedName,
                         'question_code'   => $questionCode,
                         'storage_path'    => $relative,
                         'mime_type'       => $mime,
@@ -208,11 +229,12 @@ final class AttachmentService
     private function acknowledge(Attachment $attachment): array
     {
         return [
-            'id'        => (string) $attachment->id,
-            'kind'      => (string) $attachment->kind,
-            'role'      => $attachment->role,
-            'checksum'  => (string) $attachment->checksum,
-            'byte_size' => (int) $attachment->byte_size,
+            'id'          => (string) $attachment->id,
+            'kind'        => (string) $attachment->kind,
+            'role'        => $attachment->role,
+            'signed_name' => $attachment->signed_name,
+            'checksum'    => (string) $attachment->checksum,
+            'byte_size'   => (int) $attachment->byte_size,
         ];
     }
 
@@ -359,6 +381,39 @@ final class AttachmentService
         }
 
         return $role;
+    }
+
+    /**
+     * Who the mark claims to be.
+     *
+     * Required for a signature and stored with it, rather than resolved later
+     * from the assessment's creator or from Part A. A user can be renamed
+     * after a visit; what has to stay recoverable is the name as it stood when
+     * the pen went down. For a second assessor there is nowhere else to get it
+     * from at all.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private function requireSignedName(array $meta, string $kind): ?string
+    {
+        $name = $meta['signed_name'] ?? null;
+        $name = is_string($name) ? trim($name) : '';
+
+        if ($kind !== 'signature') {
+            return $name === '' ? null : mb_substr($name, 0, self::MAX_NAME_LENGTH);
+        }
+
+        if ($name === '') {
+            throw new InvalidArgumentException('signed_name is required for a signature.');
+        }
+
+        if (mb_strlen($name) > self::MAX_NAME_LENGTH) {
+            throw new InvalidArgumentException(
+                sprintf('signed_name must be %d characters or fewer.', self::MAX_NAME_LENGTH),
+            );
+        }
+
+        return $name;
     }
 
     /** @param array<string,mixed> $meta */
