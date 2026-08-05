@@ -163,6 +163,33 @@ render($results, $quiet);
 $failed = array_filter($results, static fn (array $r): bool => $r['status'] === PF_FAIL);
 exit($failed === [] ? 0 : 1);
 
+/**
+ * Usable terminal width, falling back to 100 where nothing will say.
+ *
+ * COLUMNS is a shell variable and is usually not exported to child processes,
+ * so tput is what actually answers on a real terminal. Both are checked
+ * because tput is absent in some minimal container images.
+ */
+function terminal_width(): int
+{
+    static $width = null;
+
+    if ($width !== null) {
+        return $width;
+    }
+
+    $env = (int) getenv('COLUMNS');
+
+    if ($env > 0) {
+        return $width = $env;
+    }
+
+    [$out, $code] = con_run('tput cols');
+    $reported     = (int) trim($out);
+
+    return $width = ($code === 0 && $reported > 0) ? $reported : 100;
+}
+
 /** @param list<array{status:string,label:string,detail:string}> $results */
 function render(array $results, bool $quiet): void
 {
@@ -188,6 +215,43 @@ function render(array $results, bool $quiet): void
             default => ['FAIL', $red],
         };
 
+        // 2 spaces + 4-char mark + 2 spaces + 26-char label + 1 space.
+        $gutter = 35;
+        $detail = $r['detail'];
+
+        // A remedy runs to several lines, and left alone the terminal breaks
+        // it mid-word at the right edge with the continuation starting at
+        // column 0 — which reads as a separate finding rather than the rest of
+        // this one. Every line is indented to the detail column so the block
+        // holds together.
+        //
+        // The author's own line breaks are honoured either way; only the
+        // width-driven wrapping is skipped when not attached to a terminal,
+        // since piped output is being grepped or pasted into a ticket and a
+        // break inserted mid-sentence hides that sentence from a search.
+        if ($detail !== '') {
+            $usable = $tty ? terminal_width() - $gutter : 0;
+            $lines  = [];
+
+            // Split on the author's own line breaks first, then wrap each one.
+            // wordwrap() counts from the start of the whole string rather than
+            // resetting at an embedded newline, so handing it a multi-line
+            // remedy wraps the later lines in the wrong places.
+            foreach (explode("\n", $detail) as $line) {
+                // An indented line is a command to be copied. Never hard-wrap
+                // one: the terminal soft-wraps it and it still copies as a
+                // single line, whereas a real newline in the middle of it
+                // copies as two and runs as neither.
+                $wrap = $usable > 20 && !str_starts_with($line, ' ');
+
+                foreach ($wrap ? explode("\n", wordwrap($line, $usable, "\n", false)) : [$line] as $part) {
+                    $lines[] = $part;
+                }
+            }
+
+            $detail = implode("\n" . str_repeat(' ', $gutter), $lines);
+        }
+
         printf(
             "  %s%s%s  %-26s %s%s%s\n",
             $colour,
@@ -195,7 +259,7 @@ function render(array $results, bool $quiet): void
             $reset,
             $r['label'],
             $dim,
-            $r['detail'],
+            $detail,
             $reset,
         );
     }

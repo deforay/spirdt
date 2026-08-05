@@ -384,21 +384,29 @@ if (!function_exists('con_db_remedy')) {
         // The reliable marker: the file exists in a container and nowhere else.
         $inContainer = is_file('/.dockerenv');
 
+        // Newlines are deliberate, and callers are expected to honour them.
+        // A command that wraps at the terminal edge gets copied in half, so
+        // each one is given a line it will fit on at any sane width.
         if ($host === 'mysql' && !$inContainer) {
-            return 'DB_HOST=mysql is the Compose service name and resolves only inside the Compose network. '
-                 . 'Running natively: set DB_HOST=127.0.0.1 in .env. '
-                 . 'Running under Docker: start it with docker compose up -d, then run inside the container — '
-                 . 'docker compose exec php composer preflight';
+            return "DB_HOST=mysql is the Compose service name. It resolves only inside the Compose network.\n"
+                 . "Running natively — set this in .env:\n"
+                 . "    DB_HOST=127.0.0.1\n"
+                 . "Running under Docker — start the stack, then work inside it:\n"
+                 . "    docker compose up -d\n"
+                 . '    docker compose exec php composer preflight';
         }
 
         if ($inContainer && in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
-            return 'Inside a container, ' . $host . ' is the container itself, not your machine. '
-                 . 'Set DB_HOST=mysql for the Compose database, or host.docker.internal for a MySQL running on the host.';
+            return "Inside a container, {$host} is the container itself, not your machine.\n"
+                 . "Set DB_HOST=mysql for the Compose database, or host.docker.internal\n"
+                 . 'for a MySQL running on the host.';
         }
 
         if ($host === 'localhost') {
-            return 'localhost makes PHP try a unix socket and ignore DB_PORT entirely, which fails when the '
-                 . 'socket path differs from what php.ini expects. Use DB_HOST=127.0.0.1 to force TCP.';
+            return "localhost makes PHP try a unix socket and ignore DB_PORT entirely, which\n"
+                 . "fails when the socket path differs from what php.ini expects. Set this\n"
+                 . "in .env to force TCP:\n"
+                 . '    DB_HOST=127.0.0.1';
         }
 
         return '';

@@ -170,7 +170,11 @@ try {
     $remedy = con_db_remedy($env['DB_HOST'] ?? '', $e);
 
     if ($remedy !== '') {
-        con_print('info', $remedy);
+        // One call per line: con_print prefixes each line it is given, so a
+        // multi-line remedy passed whole would indent only its first line.
+        foreach (explode("\n", $remedy) as $line) {
+            con_print('info', $line);
+        }
     } else {
         con_print('info', 'Check DB_HOST/DB_PORT/DB_USER/DB_PASS in .env.');
         con_print('info', 'Using Docker? Start it first: docker compose up -d');
