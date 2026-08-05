@@ -1,0 +1,27 @@
+{
+    "name": "not-applicable-is-per-pathogen",
+    "why": "Question 4.10 — whether equipment required for the test is available — is Not Applicable for one pathogen and answered for the other. Section 4 repeats per pathogen, so Not Applicable attaches to the instance and not to the question code: HIV is scored out of 44 while syphilis is scored out of 46. Collapsing the two would either drop a scored question or count an inapplicable one.",
+    "template": "spi-rdt-1.0.0",
+    "context": { "refers_specimens": "no" },
+    "pathogens": ["hiv", "syphilis"],
+    "default_response": "Y",
+    "answers": {
+        "4.10@hiv": "NA"
+    },
+    "expect": {
+        "total_score": 144,
+        "total_possible": 144,
+        "percentage": 100.0,
+        "level": 4,
+        "pathogen_count": 2,
+        "is_complete": true,
+        "is_valid": true,
+        "sections": {
+            "4": { "score": 90, "possible": 90, "answered": 45, "excluded": 1, "applicable": true }
+        },
+        "pathogens": {
+            "hiv": { "score": 44, "possible": 44, "answered": 22, "excluded": 1 },
+            "syphilis": { "score": 46, "possible": 46, "answered": 23, "excluded": 0 }
+        }
+    }
+}

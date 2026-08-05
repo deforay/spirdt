@@ -54,8 +54,16 @@ $targets = array_values(array_filter(
 ));
 
 if ($targets === []) {
+    // Every template in the repository, not just the shipped ones. The
+    // synthetic templates behind the scoring fixtures express cases the
+    // canonical instrument cannot — an entirely Not Applicable assessment,
+    // relocated band thresholds — and they are only worth testing against if
+    // they are templates the product would actually accept.
     $targets = array_values(array_filter(
-        glob($root . '/resources/templates/*.json') ?: [],
+        array_merge(
+            glob($root . '/resources/templates/*.json') ?: [],
+            glob($root . '/tests/fixtures/scoring/templates/*.json') ?: [],
+        ),
         static fn (string $p): bool => basename($p) !== 'template.schema.json',
     ));
 }

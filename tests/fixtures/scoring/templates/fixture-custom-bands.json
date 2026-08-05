@@ -1,0 +1,37 @@
+{
+    "schema_version": 1,
+    "code": "fixture-custom-bands",
+    "version": "1.0.0",
+    "title": { "en": "Fixture: relocated band thresholds" },
+    "description": { "en": "Synthetic. The User's Guide states countries adjust the band thresholds during tool customisation, so they are template data. This template moves them somewhere the canonical instrument's thresholds would give a different answer, which is the only way to prove the engine reads them rather than knowing them." },
+    "locales": ["en"],
+    "default_locale": "en",
+    "scoring": {
+        "responses": {
+            "Y": { "points": 2, "label": { "en": "Yes" } },
+            "P": { "points": 1, "label": { "en": "Partial" } },
+            "N": { "points": 0, "label": { "en": "No" } },
+            "NA": { "points": null, "excluded": true, "label": { "en": "Not Applicable" } }
+        },
+        "round_dp": 2,
+        "bands": [
+            { "level": 0, "min_percent": 0, "label": { "en": "Not yet" } },
+            { "level": 1, "min_percent": 50, "label": { "en": "Halfway" } },
+            { "level": 2, "min_percent": 75, "label": { "en": "Certified" } }
+        ]
+    },
+    "sections": [
+        {
+            "number": 1,
+            "code": "1",
+            "title": { "en": "Four questions" },
+            "scope": "assessment",
+            "questions": [
+                { "code": "1.1", "text": { "en": "First" }, "na_allowed": false },
+                { "code": "1.2", "text": { "en": "Second" }, "na_allowed": false },
+                { "code": "1.3", "text": { "en": "Third" }, "na_allowed": false },
+                { "code": "1.4", "text": { "en": "Fourth" }, "na_allowed": false }
+            ]
+        }
+    ]
+}

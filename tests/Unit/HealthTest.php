@@ -7,8 +7,8 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Placeholder that proves the harness and autoloader are wired up.
- * Replace with the scoring-engine fixture suite once the engine lands.
+ * Proves the harness and autoloader are wired up, independently of anything
+ * with logic in it — so a red suite can be told apart from a broken one.
  */
 final class HealthTest extends TestCase
 {

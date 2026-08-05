@@ -1,0 +1,35 @@
+{
+    "schema_version": 1,
+    "code": "fixture-all-na",
+    "version": "1.0.0",
+    "title": { "en": "Fixture: every question may be Not Applicable" },
+    "description": { "en": "Synthetic. The real instrument permits Not Applicable on five of its fifty-nine questions, so an entirely Not Applicable assessment cannot be expressed with it — but it is a reachable state on a customised template, and the engine must not divide by zero when it happens." },
+    "locales": ["en"],
+    "default_locale": "en",
+    "scoring": {
+        "responses": {
+            "Y": { "points": 2, "label": { "en": "Yes" } },
+            "P": { "points": 1, "label": { "en": "Partial" } },
+            "N": { "points": 0, "label": { "en": "No" } },
+            "NA": { "points": null, "excluded": true, "label": { "en": "Not Applicable" } }
+        },
+        "round_dp": 2,
+        "bands": [
+            { "level": 0, "min_percent": 0, "label": { "en": "Level 0" } },
+            { "level": 4, "min_percent": 90, "label": { "en": "Level 4" } }
+        ]
+    },
+    "sections": [
+        {
+            "number": 1,
+            "code": "1",
+            "title": { "en": "Everything optional" },
+            "scope": "assessment",
+            "questions": [
+                { "code": "1.1", "text": { "en": "First" }, "na_allowed": true, "criteria": { "NA": { "en": "Does not apply to this site" } } },
+                { "code": "1.2", "text": { "en": "Second" }, "na_allowed": true, "criteria": { "NA": { "en": "Does not apply to this site" } } },
+                { "code": "1.3", "text": { "en": "Third" }, "na_allowed": true, "criteria": { "NA": { "en": "Does not apply to this site" } } }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,19 @@
+{
+    "name": "band-thresholds-come-from-the-template",
+    "why": "62.5% against bands set at 0, 50 and 75. Under the canonical instrument's thresholds this is Level 2; under these it is Level 1. The two answers differ, which is the only way to show the engine reads the bands rather than knowing them — and the User's Guide is explicit that countries move these during customisation, so an engine that knew them would be wrong the first time a country did.",
+    "template": "fixture-custom-bands",
+    "default_response": "Y",
+    "answers": {
+        "1.3": "P",
+        "1.4": "N"
+    },
+    "expect": {
+        "total_score": 5,
+        "total_possible": 8,
+        "percentage": 62.5,
+        "level": 1,
+        "is_scorable": true,
+        "is_complete": true,
+        "is_valid": true
+    }
+}

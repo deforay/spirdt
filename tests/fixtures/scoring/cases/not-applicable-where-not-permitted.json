@@ -1,0 +1,23 @@
+{
+    "name": "not-applicable-where-not-permitted",
+    "why": "Question 1.1 marked Not Applicable, which its template forbids. The number that comes out is 100%, and that is exactly the problem the na_allowed flag exists to prevent — every Not Applicable narrows the denominator, so permitting it freely lets a site certify by declaring questions inapplicable. The engine honours what was recorded, so the figure on screen matches the data, and reports the violation. The submission is refused on is_valid, not on the percentage.",
+    "template": "spi-rdt-1.0.0",
+    "context": { "refers_specimens": "no" },
+    "pathogens": ["hiv"],
+    "default_response": "Y",
+    "answers": {
+        "1.1": "NA"
+    },
+    "expect": {
+        "total_score": 98,
+        "total_possible": 98,
+        "percentage": 100.0,
+        "level": 4,
+        "is_complete": true,
+        "is_valid": false,
+        "violation_count": 1,
+        "sections": {
+            "1": { "score": 14, "possible": 14, "answered": 7, "excluded": 1, "applicable": true }
+        }
+    }
+}

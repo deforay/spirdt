@@ -24,7 +24,24 @@ Two implementation rules:
 
 **Round to two decimal places, then band.** Banding on the rounded value means 89.995 becomes 90.00 and lands in Level 4. Banding on the unrounded value would put it in Level 3 — and the boundary cases are exactly where a certification dispute happens.
 
-**Guard division by zero.** A fully-N/A assessment must not crash or produce `NaN`.
+**Guard division by zero.** A fully-N/A assessment must not crash or produce `NaN`. It produces a `null` percentage and a `null` level — not a zero, and not Level 0. An unscorable assessment is not a failing one.
+
+### The percentage never becomes a float until it is displayed
+
+The obvious implementation is `round($score / $possible * 100, 2)`, and it works — until the TypeScript build has to agree with it. PHP's `round()` applies a pre-rounding correction that JavaScript's `Math.round` does not, so the two disagree on values sitting near a midpoint once binary floating point has finished with them. Two implementations disagreeing at exactly the boundary, on the number that decides whether a site is certified, is the defect this system can least afford.
+
+So the percentage is carried as an **integer scaled by 10^dp**, computed by exact division with an explicit round-half-up, and banded by comparing scaled integers:
+
+```
+numerator = score × 100 × 10^dp
+quotient  = numerator ÷ possible          (integer division)
+remainder = numerator mod possible
+if remainder × 2 ≥ possible: quotient += 1
+```
+
+Every step is reproducible in any language with 64-bit integers, which includes JavaScript at these magnitudes — a score of 500 scales to 5,000,000, six orders of magnitude below `Number.MAX_SAFE_INTEGER`.
+
+Band thresholds are scaled the same way before comparison, so a band at 89.9 does not fail to match a score of exactly 89.9 because `89.9 * 100` is `8989.999999999999` in binary.
 
 ## Levels
 
@@ -82,6 +99,20 @@ Two implementations of the same rules will drift unless something stops them. Th
 
 1. **The rules live in template data** — point values, `na_allowed`, band thresholds. What remains in code is summation with exclusions, which is small.
 2. **A shared JSON fixture set** in `tests/fixtures/scoring/`, consumed by both the PHPUnit and Vitest suites. Any drift fails the build.
-3. **Fixtures cover the boundaries explicitly** — N/A exclusion, multi-pathogen Section 4, whole-Section-5 N/A, every band boundary (39.99/40.00, 59.99/60.00, 79.99/80.00, 89.99/90.00), a fully-N/A assessment, and zero pathogens.
+3. **Fixtures cover the boundaries explicitly** — N/A exclusion, multi-pathogen Section 4, whole-Section-5 N/A, every band boundary from both sides, a fully-N/A assessment, and zero pathogens.
 
-Computed scores are **snapshotted** into `assessment_scores` at submission and never recomputed from a live template. A certification level has to mean the same thing in a year's time, after the organisation has edited its template five times.
+The fixture format is documented in `tests/fixtures/scoring/README.md`. Both suites discover files by glob, so adding a case is adding a file — a case that needed a code change to run is a case that would not get added.
+
+### Reported, not scored
+
+Three things the engine refuses to resolve on its own, because each one silently inflates a percentage if handled any other way:
+
+| | What it is | Why it is not just scored |
+|---|---|---|
+| `missing` | Expected but unanswered | Not in the denominator, so a half-finished assessment of all Y reads 100% |
+| `unexpected` | An answer the template does not expect here — a retired question code, a removed pathogen, a Section 5 answer left behind after the site was marked as referring nothing | Scoring it adds points the site never earned, on a question nobody asked |
+| `violations` | Something the template forbids, chiefly N/A where `na_allowed` is false; also a duplicate or unrecognised response | Every N/A narrows the denominator, so permitting it freely lets a site certify by declaring questions inapplicable |
+
+The engine returns these alongside the score rather than throwing. A running score on the device is **legitimately incomplete** — the assessor watches it while working, and an exception mid-visit would take away the total needed to debrief the site. The submission endpoint is what refuses, on `is_complete` and `is_valid`.
+
+Computed scores are **snapshotted** into `assessment_scores` at submission and never recomputed from a live template. A certification level has to mean the same thing in a year's time, after the organisation has edited its template five times. `scoring_version` records which implementation produced the numbers, so a later correction to the engine can be identified rather than silently rewriting history.

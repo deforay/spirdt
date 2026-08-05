@@ -1,0 +1,31 @@
+{
+    "name": "full-marks-single-pathogen",
+    "why": "The simplest complete assessment: one pathogen, no specimen referral, every answer Yes. Pins the denominator of the canonical instrument at 100 — 8 + 10 + 9 + 23 questions at two points each — which is the number every other case is a deviation from.",
+    "template": "spi-rdt-1.0.0",
+    "context": { "refers_specimens": "no" },
+    "pathogens": ["hiv"],
+    "default_response": "Y",
+    "expect": {
+        "total_score": 100,
+        "total_possible": 100,
+        "percentage": 100.0,
+        "level": 4,
+        "pathogen_count": 1,
+        "is_scorable": true,
+        "is_complete": true,
+        "is_valid": true,
+        "missing_count": 0,
+        "unexpected_count": 0,
+        "violation_count": 0,
+        "sections": {
+            "1": { "score": 16, "possible": 16, "answered": 8, "excluded": 0, "applicable": true },
+            "2": { "score": 20, "possible": 20, "answered": 10, "excluded": 0, "applicable": true },
+            "3": { "score": 18, "possible": 18, "answered": 9, "excluded": 0, "applicable": true },
+            "4": { "score": 46, "possible": 46, "answered": 23, "excluded": 0, "applicable": true },
+            "5": { "score": 0, "possible": 0, "answered": 0, "excluded": 0, "applicable": false }
+        },
+        "pathogens": {
+            "hiv": { "score": 46, "possible": 46, "answered": 23, "excluded": 0 }
+        }
+    }
+}

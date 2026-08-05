@@ -1,0 +1,28 @@
+{
+    "name": "no-pathogens-assessed",
+    "why": "A site assessed on organisation, facility and safety but with no testing algorithm recorded. Section 4 expands to nothing and contributes nothing to either side of the fraction, leaving a denominator of 54. The section still appears in the breakdown, marked applicable with zero possible — a section absent from a report reads as an oversight, a section present with zeroes reads as a finding.",
+    "template": "spi-rdt-1.0.0",
+    "context": { "refers_specimens": "no" },
+    "pathogens": [],
+    "default_response": "Y",
+    "expect": {
+        "total_score": 54,
+        "total_possible": 54,
+        "percentage": 100.0,
+        "level": 4,
+        "pathogen_count": 0,
+        "is_scorable": true,
+        "is_complete": true,
+        "is_valid": true,
+        "missing_count": 0,
+        "unexpected_count": 0,
+        "sections": {
+            "1": { "score": 16, "possible": 16, "answered": 8, "excluded": 0, "applicable": true },
+            "2": { "score": 20, "possible": 20, "answered": 10, "excluded": 0, "applicable": true },
+            "3": { "score": 18, "possible": 18, "answered": 9, "excluded": 0, "applicable": true },
+            "4": { "score": 0, "possible": 0, "answered": 0, "excluded": 0, "applicable": true },
+            "5": { "score": 0, "possible": 0, "answered": 0, "excluded": 0, "applicable": false }
+        },
+        "pathogens": {}
+    }
+}

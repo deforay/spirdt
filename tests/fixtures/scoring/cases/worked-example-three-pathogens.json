@@ -1,0 +1,67 @@
+{
+    "name": "worked-example-three-pathogens",
+    "why": "The worked example in docs/scoring.md, scored end to end: three pathogens, specimens referred, 1.3 and 3.9 Not Applicable, 168 of a possible 206 — 81.55%, Level 3. The 206 is the point. Two questions dropped out of the denominator rather than scoring zero, and Section 4 was counted three times, so this total exists nowhere in the instrument and cannot be hardcoded.",
+    "template": "spi-rdt-1.0.0",
+    "context": { "refers_specimens": "yes" },
+    "pathogens": ["hiv", "syphilis", "malaria"],
+    "default_response": "Y",
+    "answers": {
+        "1.3": "NA",
+        "3.9": "NA",
+
+        "1.5": "N",
+        "1.6": "P",
+
+        "2.1": "N",
+        "2.2": "N",
+        "2.3": "P",
+
+        "3.1": "N",
+        "3.2": "P",
+
+        "4.1@hiv": "N",
+        "4.2@hiv": "N",
+        "4.3@hiv": "N",
+        "4.4@hiv": "P",
+
+        "4.1@syphilis": "N",
+        "4.2@syphilis": "N",
+        "4.5@syphilis": "P",
+
+        "4.1@malaria": "N",
+        "4.7@malaria": "P",
+
+        "5.1": "N",
+        "5.2": "N",
+        "5.3": "N",
+        "5.4": "N",
+        "5.5": "N",
+        "5.6": "P",
+        "5.7": "P"
+    },
+    "expect": {
+        "total_score": 168,
+        "total_possible": 206,
+        "percentage": 81.55,
+        "level": 3,
+        "pathogen_count": 3,
+        "is_scorable": true,
+        "is_complete": true,
+        "is_valid": true,
+        "missing_count": 0,
+        "unexpected_count": 0,
+        "violation_count": 0,
+        "sections": {
+            "1": { "score": 11, "possible": 14, "answered": 7, "excluded": 1, "applicable": true },
+            "2": { "score": 15, "possible": 20, "answered": 10, "excluded": 0, "applicable": true },
+            "3": { "score": 13, "possible": 16, "answered": 8, "excluded": 1, "applicable": true },
+            "4": { "score": 123, "possible": 138, "answered": 69, "excluded": 0, "applicable": true },
+            "5": { "score": 6, "possible": 18, "answered": 9, "excluded": 0, "applicable": true }
+        },
+        "pathogens": {
+            "hiv": { "score": 39, "possible": 46, "answered": 23, "excluded": 0 },
+            "syphilis": { "score": 41, "possible": 46, "answered": 23, "excluded": 0 },
+            "malaria": { "score": 43, "possible": 46, "answered": 23, "excluded": 0 }
+        }
+    }
+}

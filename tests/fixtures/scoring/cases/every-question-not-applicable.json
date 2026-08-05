@@ -1,0 +1,22 @@
+{
+    "name": "every-question-not-applicable",
+    "why": "Nothing to divide by. The percentage and the level are both null — not zero, and not Level 0. An unscorable assessment is not a failing one, and banding it at the bottom would be a worse error than declining to band it. Needs a synthetic template because the canonical instrument permits Not Applicable on only five of its fifty-nine questions.",
+    "template": "fixture-all-na",
+    "default_response": "NA",
+    "expect": {
+        "total_score": 0,
+        "total_possible": 0,
+        "percentage": null,
+        "level": null,
+        "pathogen_count": 0,
+        "is_scorable": false,
+        "is_complete": true,
+        "is_valid": true,
+        "missing_count": 0,
+        "unexpected_count": 0,
+        "violation_count": 0,
+        "sections": {
+            "1": { "score": 0, "possible": 0, "answered": 0, "excluded": 3, "applicable": true }
+        }
+    }
+}

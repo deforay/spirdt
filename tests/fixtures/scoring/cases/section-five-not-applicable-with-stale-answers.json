@@ -1,0 +1,63 @@
+{
+    "name": "section-five-not-applicable-with-stale-answers",
+    "why": "The worked example with specimen referral turned off, and the nine Section 5 answers left behind from before it was turned off. Two things must hold at once: the section drops out entirely, taking the denominator from 206 to 188, and the orphaned answers are ignored rather than scored. Scoring them would add 18 to both sides of a fraction the site never earned, and it would do so silently — hence the count in the breakdown.",
+    "template": "spi-rdt-1.0.0",
+    "context": { "refers_specimens": "no" },
+    "pathogens": ["hiv", "syphilis", "malaria"],
+    "default_response": "Y",
+    "answers": {
+        "1.3": "NA",
+        "3.9": "NA",
+
+        "1.5": "N",
+        "1.6": "P",
+
+        "2.1": "N",
+        "2.2": "N",
+        "2.3": "P",
+
+        "3.1": "N",
+        "3.2": "P",
+
+        "4.1@hiv": "N",
+        "4.2@hiv": "N",
+        "4.3@hiv": "N",
+        "4.4@hiv": "P",
+
+        "4.1@syphilis": "N",
+        "4.2@syphilis": "N",
+        "4.5@syphilis": "P",
+
+        "4.1@malaria": "N",
+        "4.7@malaria": "P"
+    },
+    "extra_answers": [
+        { "question_code": "5.1", "pathogen": null, "response": "Y" },
+        { "question_code": "5.2", "pathogen": null, "response": "Y" },
+        { "question_code": "5.3", "pathogen": null, "response": "Y" },
+        { "question_code": "5.4", "pathogen": null, "response": "Y" },
+        { "question_code": "5.5", "pathogen": null, "response": "Y" },
+        { "question_code": "5.6", "pathogen": null, "response": "Y" },
+        { "question_code": "5.7", "pathogen": null, "response": "Y" },
+        { "question_code": "5.8", "pathogen": null, "response": "Y" },
+        { "question_code": "5.9", "pathogen": null, "response": "Y" }
+    ],
+    "expect": {
+        "total_score": 162,
+        "total_possible": 188,
+        "percentage": 86.17,
+        "level": 3,
+        "pathogen_count": 3,
+        "is_complete": true,
+        "is_valid": true,
+        "missing_count": 0,
+        "unexpected_count": 9,
+        "sections": {
+            "1": { "score": 11, "possible": 14, "answered": 7, "excluded": 1, "applicable": true },
+            "2": { "score": 15, "possible": 20, "answered": 10, "excluded": 0, "applicable": true },
+            "3": { "score": 13, "possible": 16, "answered": 8, "excluded": 1, "applicable": true },
+            "4": { "score": 123, "possible": 138, "answered": 69, "excluded": 0, "applicable": true },
+            "5": { "score": 0, "possible": 0, "answered": 0, "excluded": 0, "applicable": false }
+        }
+    }
+}
