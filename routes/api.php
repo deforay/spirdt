@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Action\Admin\AssignmentsAction;
 use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
+use App\Http\Action\Admin\ReportsAction;
 use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\ChangePasswordAction;
@@ -127,6 +128,11 @@ return static function (App $app): void {
         $group->get('/testing-sites/{id}', [RegistryAction::class, 'testingSite']);
         $group->get('/testing-sites', [RegistryAction::class, 'testingSites']);
         $group->get('/assignments', [AssignmentsAction::class, 'index']);
+
+        // What was collected. A viewer belongs here more than anywhere else —
+        // reading this is the whole of the role.
+        $group->get('/reports/assessments', [ReportsAction::class, 'index']);
+        $group->get('/reports/assessments/{id}', [ReportsAction::class, 'show']);
     })
         ->add(new RequireRoleMiddleware('admin', 'superadmin', 'viewer'))
         ->add(new AuthMiddleware());

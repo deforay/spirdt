@@ -32,7 +32,7 @@ const routes: RouteRecordRaw[] = [
         name: 'home',
         // Nothing of its own: it decides where this person belongs and sends
         // them there, so a shared bookmark works for everybody.
-        redirect: () => (canManage() ? { name: 'admin-users' } : { name: 'assess' }),
+        redirect: () => (canManage() ? { name: 'admin-reports' } : { name: 'assess' }),
     },
     {
         path: '/assess',
@@ -47,6 +47,21 @@ const routes: RouteRecordRaw[] = [
         // A viewer cannot administer people; the API refuses them too. Kept in
         // MANAGING rather than narrowed here so there is one list of roles
         // that reach management at all, and the API decides the rest.
+        meta: { roles: MANAGING },
+    },
+    {
+        // The first screen that shows collected data rather than the things
+        // data is collected about, and what a viewer signs in for — so it is
+        // where management lands.
+        path: '/admin/reports',
+        name: 'admin-reports',
+        component: () => import('@/views/admin/ReportsView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/reports/:id',
+        name: 'admin-report',
+        component: () => import('@/views/admin/ReportView.vue'),
         meta: { roles: MANAGING },
     },
     {
@@ -165,10 +180,11 @@ router.beforeEach((to) => {
     const allowed = to.meta.roles
 
     if (Array.isArray(allowed) && !allowed.includes(role())) {
-        // Somewhere they can actually go, rather than a dead end. A viewer who
-        // follows a link to the checklist lands on the dashboard instead of an
-        // error they cannot act on.
-        return { name: canManage() ? 'admin-users' : 'assess' }
+        // Somewhere they can actually go, rather than a dead end. Reports and
+        // not users: a viewer reaches management but the users API refuses
+        // them, so sending them there swapped one dead end for another that
+        // merely took a round trip to reveal itself.
+        return { name: canManage() ? 'admin-reports' : 'assess' }
     }
 
     return true

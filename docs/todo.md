@@ -160,3 +160,23 @@ targets** — mouse users tolerate large ones, fingers do not tolerate small one
   delta sync.
 - **Local storage is not namespaced by user.** On a shared tablet, signing in as
   somebody else leaves the previous person's cached site list in place.
+- **A deleted finding stays on the server.** Removing one locally deletes the
+  only row without leaving a tombstone or marking the assessment pending, and
+  sync only ever upserts what is present — so a corrective action the assessor
+  withdrew stays in the site's action plan for good. `discardFindingsFor` hits
+  the same path when an answer changes to Yes or N/A, which makes it the
+  commoner way in. Fixing it means the payload has to be able to say what is
+  gone, not just what is there, so it is a change to the protocol rather than a
+  patch to a function.
+- **A finding keeps the response it was created under.** Raise a finding while
+  the answer is Partial, change the answer to No, and the finding still says
+  Partial. `FindingPatch` has no way to correct it afterwards either.
+- **A v4 device with an already-synced finding would duplicate it.** Findings
+  were keyed server-side on (assessment, question, pathogen) and given a
+  server-minted id; they are keyed on a device-minted id now. The v5 upgrade
+  assigns a fresh id to a legacy row, so the server cannot recognise it and
+  inserts a second one. No database has a finding in it yet and nothing is
+  deployed, so the affected population is currently empty — but the window
+  closes the moment it is not, and reconciling after the fact means matching on
+  the natural key without hijacking the second finding on a question, which
+  findings v2 explicitly allows.

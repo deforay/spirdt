@@ -92,10 +92,18 @@ final class ReportService
 
         $this->applyFilters($query, $filters);
 
-        // Counted on the assessment's own key. The joins can only ever match
-        // one row each, but saying so costs nothing and a later join that
-        // fans out would otherwise inflate the total silently.
-        $total = (int) (clone $query)->getQuery()->distinct()->count('assessments.id');
+        // Counted through the ELOQUENT builder, never through getQuery(). The
+        // organisation scope is applied by the model as the query is run, so a
+        // count taken off the bare query builder underneath skips it and
+        // reports every organisation's visits — while the rows beside it,
+        // fetched properly, show only this one. A total that disagrees with
+        // the page it labels is the quietest possible way to leak the fact
+        // that other organisations' assessments exist.
+        //
+        // Counted on the assessment's own key, distinctly. The joins can only
+        // match one row each today, but a later join that fans out would
+        // otherwise inflate the total with nothing to show for it.
+        $total = (int) (clone $query)->distinct()->count('assessments.id');
 
         $query->getQuery()
             ->select([
@@ -265,7 +273,7 @@ final class ReportService
 
         $site = Capsule::table('testing_sites')
             ->where('id', BinaryUuid::toBytes($siteId))
-            ->first(['name', 'code', 'site_type']);
+            ->first(['name', 'location_description']);
 
         $facility = Capsule::table('facilities')
             ->where('id', BinaryUuid::toBytes($facilityId))
@@ -304,10 +312,12 @@ final class ReportService
             // Whatever the template asked for beyond the fixed fields.
             'context'               => $assessment->context ?? [],
             'site'                  => [
-                'id'   => $siteId,
-                'name' => $site?->name,
-                'code' => $site?->code,
-                'type' => $site?->site_type,
+                'id'       => $siteId,
+                'name'     => $site?->name,
+                // Where in the building — "the bench by the window". Written
+                // down because two testing sites in one hospital are otherwise
+                // told apart only by whoever remembers.
+                'location' => $site?->location_description,
             ],
             'facility'              => [
                 'id'      => $facilityId,
