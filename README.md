@@ -6,7 +6,7 @@ Replaces a paper/Word checklist and supersedes the older ODK-based SPI-RRT tool.
 
 > **Documentation:** <https://deforay.github.io/spirdt/>
 >
-> **Start here:** [`docs/design-brief.md`](docs/design-brief.md) is the authoritative brief — the domain, the scoring rules, the architecture decisions, and the conventions this codebase follows. Read it before writing code.
+> **Start here:** [`docs/design-brief.md`](docs/design-brief.md) is the authoritative brief — the domain, the scoring rules, the architecture decisions, and the conventions this codebase follows.
 
 ---
 
@@ -206,7 +206,7 @@ var/            log/, cache/, exports/, backups/, uploads/
 
 ## Conventions
 
-Carried over from the house reference project (`~/www/house-reference`) — follow them rather than inventing alternatives.
+Carried over from earlier projects in the same house style, and worth following rather than inventing alternatives.
 
 **Migrations** are plain SQL, named `<semver>-<slug>.sql`, applied in semver order by `bin/migrate` and tracked in `system_config.app_version`. Common DDL is routed through idempotent helpers that check `information_schema` first, so a retried deploy is safe. Every migration opens with a comment explaining *why*, not just what.
 
@@ -216,10 +216,10 @@ Carried over from the house reference project (`~/www/house-reference`) — foll
 
 **Housekeeping** will live in one idempotent `bin/housekeeping` sweep with retention policy in a single array. Audit-bearing tables — assessments, answers, findings, scores, raw submissions, audit log — are never pruned.
 
-### Non-negotiables
+### Two hard limits
 
-- **Tenant isolation is the top security concern.** Tenant is resolved from the authenticated user in middleware — never from a request parameter. See `docs/design-brief.md` §5.
-- **Maintainability over smart code.** If a junior developer can't follow it in a year, it's wrong.
+- Tenant isolation is the top security concern. Tenant is resolved from the authenticated user in middleware, never from a request parameter. See `docs/design-brief.md` §5.
+- Maintainability over smart code. If a junior developer can't follow it in a year, it's wrong.
 
 ---
 

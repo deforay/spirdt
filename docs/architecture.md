@@ -29,13 +29,13 @@ A user belongs to exactly one organisation. Email is unique **per organisation**
 
 ### Making leakage structurally impossible
 
-Discipline is not a control:
+Discipline is not a control, so the isolation is structural:
 
-1. **A global model scope** applied automatically to every tenant-scoped model. Hand-written `where('organization_id', …)` in application code is a smell — if you are writing it, the scope is not wired up.
-2. **A CI code-guard** that fails the build when a tenant-scoped model is queried outside the scope, or when a migration adds a tenant-scoped table without `organization_id` plus an index.
-3. **Composite indexes lead with `organization_id`** — correct for performance, and it makes the scoped access path the natural one.
-4. **A standing cross-tenant isolation test** that creates two organisations and table-drives over the full route list, asserting every endpoint returns 404/403 for cross-org access.
-5. IDs are unguessable (UUIDv7), but that is **never** treated as the control. Scope enforcement is the control; opaque IDs are defence in depth.
+1. A global model scope applied automatically to every tenant-scoped model. Hand-written `where('organization_id', …)` in application code is a smell — if it is being written, the scope is not wired up.
+2. A CI code-guard that fails the build when a tenant-scoped model is queried outside the scope, or when a migration adds a tenant-scoped table without `organization_id` plus an index.
+3. Composite indexes lead with `organization_id` — correct for performance, and it makes the scoped access path the natural one.
+4. A standing cross-tenant isolation test that creates two organisations and table-drives over the full route list, asserting every endpoint returns 404/403 for cross-org access.
+5. IDs are unguessable (UUIDv7), but that is never treated as the control. Scope enforcement is the control; opaque IDs are defence in depth.
 
 ### Roles
 
@@ -68,12 +68,12 @@ Two assessors per visit is the norm. One device is the scribe and holds the reco
 
 These are not negotiable, because the failure mode is an assessor losing an hour of work after leaving the site:
 
-1. **Authentication expiry must never destroy local drafts.** A token expiring offline must not trigger a redirect-and-clear.
-2. **Autosave on every answer change**, not on section navigation.
-3. **Prompt for service-worker updates, never auto-apply** — and suppress the prompt entirely while an assessment is in progress with unsynced data. A silent update can swap app code underneath a database written by the previous version.
-4. **iOS requires install-to-home-screen** for durable storage, and has no Background Sync API, so sync is foreground-triggered.
-5. **Never render all 160+ inputs at once.** One section, or one question, per screen — older tablets will not cope, and it matches how the work actually happens.
-6. **Namespace local storage by organisation and user.** Shared tablets are normal in these settings; a second assessor must not inherit the first one's cached sites or drafts.
+1. Authentication expiry never destroys local drafts. A token expiring offline must not trigger a redirect-and-clear.
+2. Every answer change autosaves, not on section navigation.
+3. Service-worker updates prompt rather than auto-apply, and the prompt is suppressed entirely while an assessment is in progress with unsynced data. A silent update can swap app code underneath a database written by the previous version.
+4. iOS requires install-to-home-screen for durable storage, and has no Background Sync API, so sync is foreground-triggered.
+5. All 160+ inputs never render at once. One section, or one question, per screen — older tablets will not cope, and it matches how the work actually happens.
+6. Local storage is namespaced by organisation and user. Shared tablets are normal in these settings; a second assessor must not inherit the first one's cached sites or drafts.
 
 ## Request handling
 

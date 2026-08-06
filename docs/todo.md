@@ -127,7 +127,7 @@ targets** — mouse users tolerate large ones, fingers do not tolerate small one
 - **Duplicate reconciliation.** `source = 'field'` and `merged_into_id` exist for
   it; no screen merges anything.
 - **Guidance sheet.** `QuestionRow` emits the event; nothing catches it.
-- **Page-specific slide-out help**, following the pattern in `~/www/house-reference`.
+- **Page-specific slide-out help**, following the pattern used in earlier house projects.
 - **`bin/housekeeping`** and OpenAPI generation.
 - **Component tests** for the Vue side — there is no jsdom environment yet, so
   every frontend test today is logic rather than rendering.
