@@ -35,12 +35,14 @@ export interface SyncPayload {
         answered_at?: string
     }>
     findings: Array<{
+        id: string
         question_code: string
         pathogen?: string
         response: string
         gap: string
         recommendation?: string
         responsibility_level: string
+        urgency?: string
         responsible_person?: string
         due_date?: string
     }>
@@ -108,12 +110,16 @@ export function buildPayload(
                 ...(answer.answeredAt === null ? {} : { answered_at: answer.answeredAt }),
             })),
             findings: sendableFindings.map((finding) => ({
+                // The finding's own id, which is what the server upserts on
+                // now that one question may carry several.
+                id: finding.key,
                 question_code: finding.questionCode,
                 ...(finding.pathogen === null ? {} : { pathogen: finding.pathogen }),
                 response: finding.response,
                 gap: finding.gap,
                 ...(finding.recommendation === '' ? {} : { recommendation: finding.recommendation }),
                 responsibility_level: finding.responsibilityLevel,
+                ...(finding.urgency === null ? {} : { urgency: finding.urgency }),
                 ...(finding.responsiblePerson === ''
                     ? {}
                     : { responsible_person: finding.responsiblePerson }),

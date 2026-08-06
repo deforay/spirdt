@@ -14,38 +14,69 @@ Province → District and Region → Zone → Woreda without a change.
 What is still missing there: renaming a place or facility in place (only add
 and deactivate today), the merge screen for duplicates, and bulk import.
 
-### Managing the organisations in a programme
-Asked for as "manage the Implementing Partners". **Blocked on one decision: who
-holds programme-level power.** Roles are per-organisation rows, and
-`bin/provision-org` creates the first user as `admin`, so `superadmin` is seeded
-everywhere and assigned nowhere.
+### The tenant hierarchy and what to call it — PARKED
+**Waiting on the client. Do not build against a guess.**
 
-1. Add a `programme_admin` role key — the capability is programme-scoped, so the
-   role should be. Needs a migration to seed it into existing organisations.
-   **Recommended.**
-2. Treat `superadmin` as programme-level. No migration, but it gives a
-   per-organisation row cross-organisation power.
-3. Mark one organisation as the programme owner. New column, and awkward where
-   the ministry is not itself a tenant.
+The layers exist in the schema today as `programmes` → `organizations`, with
+the registry on the programme and audit data on the organisation. What is not
+settled is whether that is the right *shape* or the right *vocabulary*. Names
+floated so far, none chosen:
 
-Whichever wins also decides who may read assessments across organisations for
-the cross-organisation comparison.
+- `organization` renamed to **country**, with a country admin
+- `organization` renamed to **instance**, with an instance admin
+- keep **organisation**, add a level above it for the country or programme
+- "implementing partner" — raised, and already doubted by the person who raised
+  it; my advice against it stands, because it implies a funding relationship and
+  makes a ministry's own team sound like an outsider
 
-### Findings v2
-Both agreed, neither built:
+Whatever is chosen has to answer three things at once, which is why it is worth
+waiting for rather than guessing: who owns the **site registry**, who may
+**manage the organisations** beneath them, and who may **read assessments
+across** them.
 
-- **`urgency ENUM('immediate','follow_up')`** alongside `responsibility_level`.
-  Orthogonal axes — *when* versus *who* — and a national-level immediate action
-  is a coherent thing to record. Per finding, not per section.
-- **Several findings per question.** The natural key
-  `(assessment, question_code, pathogen)` has to relax to a device-minted
-  finding UUID, `SyncService::upsertFindings` keys on that instead, and
-  `useAssessment.setResponse` discards *all* findings for a question when the
-  answer stops being P/N. Scoring is unaffected — findings never touch it.
+**Blocked on this:**
 
-My reading of "multiple gaps/corrective actions" is N findings per question,
-each one gap plus one recommendation, rather than one gap with a child table of
-actions. Flagged, not confirmed.
+- managing the organisations in a programme — there is no role for it, and
+  inventing one before the hierarchy is named means renaming it afterwards
+- the "may A see B's score on a shared site" question, which shapes the
+  dashboard
+- any rename of `organizations`, which reaches every scoped table, both tenancy
+  traits, the token claims and the CLI tools
+
+**Not blocked on this:** findings v2, reports, photographs, the responsive
+layout, and the remaining registry gaps. Those are the places to spend time
+while it is open.
+
+### Stable question ids — decided, waiting on the hierarchy pass
+`code` (`1.1`, `4.23`) is unique within a template and enforced, so referencing
+a question works today. What it is not is stable across instrument versions: it
+encodes position, so inserting a question renumbers everything after it and
+`1.4` in the new template is a different question from `1.4` in the old one —
+with every stored answer still saying `1.4`, and nothing erroring.
+
+**Agreed:** add a `uid` to every question as the identity and demote `code` to a
+display label. **Readable, not opaque** — `spi-rdt.s1.q1` rather than a UUID,
+because the failure being guarded against is renumbering, not somebody
+inferring structure from the id.
+
+Reaches: the template JSON and its schema, `answers.question_code` and
+`findings.question_code`, both scoring engines, the device's answer keys, and
+the sync payload. `question_catalog` exists for this and is **empty** — nothing
+populates it — so publishing should fill it as part of the same change.
+
+Held only so it lands in one pass with any rename of `organizations`, since
+both touch the template pipeline.
+
+### Findings v2 — done
+`findings.urgency` records *when* alongside `responsibility_level`'s *who*, per
+finding rather than per section. Nullable with no default: blank means nobody
+said, which is not the same as follow-up, and defaulting would invent a
+judgement the assessor never made.
+
+One question can now carry several findings. The upsert keys on the finding's
+own device-minted id rather than the answer's natural key, and a payload
+without one is dropped rather than inserted fresh on every retry. Correcting an
+answer away from P/N discards *all* of that question's findings.
 
 ### Responsive layout
 Every screen is `max-w-[430px]` — right for a phone in one hand, wrong on the

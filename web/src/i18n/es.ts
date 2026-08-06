@@ -220,4 +220,11 @@ export const messages: Messages = {
     'assignments.assign': 'Asignar',
     'assignments.withdraw': 'Retirar',
     'assignments.noSites': 'Ningún sitio de prueba en esta selección.',
+
+    'review.gapNumber': 'Brecha {number}',
+    'review.howUrgent': 'Urgencia',
+    'review.describeThisGap': 'Describir esta brecha',
+    'review.addAnotherGap': 'Añadir otra brecha',
+    'urgency.immediate': 'Inmediata',
+    'urgency.followUp': 'Seguimiento',
 }

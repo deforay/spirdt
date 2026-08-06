@@ -172,7 +172,7 @@ final class SyncService
 
             if ($existing === null) {
                 $existing = new AssessmentPathogen();
-                $existing->id = $id ?? $this->uuidv7();
+                $existing->id = $id ?? BinaryUuid::v7();
                 $existing->assessment_id = $assessmentId;
                 $existing->sequence = $sequence;
             }
@@ -258,10 +258,16 @@ final class SyncService
     /**
      * Gaps recorded during the visit.
      *
-     * Upserted on the same natural key as an answer — one finding per answer —
-     * so a retry corrects rather than duplicates. A duplicate matters more here
-     * than elsewhere: findings become a site's action list, and the same gap
-     * listed three times is three things for someone to chase.
+     * ONE QUESTION MAY CARRY SEVERAL. A single No can hide more than one
+     * problem — no SOP, and the staff untrained on the one that is missing —
+     * and each needs its own recommendation, owner and date. Collapsing them
+     * into one text box produces an action list nobody can work from.
+     *
+     * So the upsert keys on the finding's own device-minted id rather than on
+     * the answer's natural key. That is what makes a retry correct rather than
+     * duplicate now that the natural key is no longer unique — and duplicates
+     * matter more here than anywhere else, because findings become a site's
+     * action list and the same gap three times is three things to chase.
      *
      * Only a Partial or a No may carry one. Anything else is dropped rather
      * than stored, because a finding against a Yes has nothing to describe and
@@ -269,7 +275,7 @@ final class SyncService
      *
      * @param  array<string,mixed>  $payload
      * @param  array<string,string> $pathogenIds
-     * @return list<string>         natural keys the device may now mark clean
+     * @return list<string>         finding ids the device may now mark clean
      */
     private function upsertFindings(
         array $payload,
@@ -285,11 +291,20 @@ final class SyncService
                 continue;
             }
 
+            $findingId = (string) ($row['id'] ?? '');
             $questionCode = (string) ($row['question_code'] ?? '');
             $response = (string) ($row['response'] ?? '');
             $gap = trim((string) ($row['gap'] ?? ''));
 
             if ($questionCode === '' || $gap === '' || !in_array($response, ['P', 'N'], true)) {
+                continue;
+            }
+
+            // The id is the identity now, so a payload without one cannot be
+            // upserted — accepting it would insert a fresh row on every retry.
+            // Dropped rather than refused: the assessment is worth storing even
+            // when one finding comes from a build that predates this.
+            if (!BinaryUuid::isValid($findingId)) {
                 continue;
             }
 
@@ -308,28 +323,38 @@ final class SyncService
                 $level = 'site';
             }
 
+            $urgency = $row['urgency'] ?? null;
+
+            // Blank means nobody said, which is different from follow-up.
+            // Defaulting would invent a judgement the assessor never made.
+            if (!in_array($urgency, ['immediate', 'follow_up'], true)) {
+                $urgency = null;
+            }
+
             $existing = Finding::query()
-                ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
-                ->where('question_code', $questionCode)
-                ->where(
-                    'pathogen_id',
-                    $pathogenId === null ? null : BinaryUuid::toBytes($pathogenId),
-                )
+                ->where('findings.id', BinaryUuid::toBytes($findingId))
                 ->first();
 
             if ($existing === null) {
                 $existing = new Finding();
-                $existing->id = $this->uuidv7();
+                $existing->id = $findingId;
                 $existing->assessment_id = $assessmentId;
-                $existing->question_code = $questionCode;
-                $existing->pathogen_id = $pathogenId;
+            } elseif ((string) $existing->assessment_id !== $assessmentId) {
+                // The id belongs to another visit. Moving a finding between
+                // assessments would detach it from the answer that justifies
+                // it, and the scope above already means it cannot belong to
+                // another organisation — so this is a malformed payload.
+                continue;
             }
 
             $existing->organization_id = $organizationId;
+            $existing->question_code = $questionCode;
+            $existing->pathogen_id = $pathogenId;
             $existing->response = $response;
             $existing->gap = $gap;
             $existing->recommendation = $row['recommendation'] ?? null;
             $existing->responsibility_level = $level;
+            $existing->urgency = $urgency;
             $existing->responsible_person = $row['responsible_person'] ?? null;
             $existing->due_date = $row['due_date'] ?? null;
 
@@ -338,7 +363,7 @@ final class SyncService
             // and letting a sync carry it would reopen closed work.
             $existing->save();
 
-            $accepted[] = $questionCode . '|' . ($pathogenKey ?? '');
+            $accepted[] = $findingId;
         }
 
         return $accepted;
@@ -534,22 +559,5 @@ final class SyncService
         }
 
         return $value;
-    }
-
-    /** Server-side UUIDv7, for rows the device did not name. */
-    private function uuidv7(): string
-    {
-        $bytes = random_bytes(16);
-        $millis = (int) (microtime(true) * 1000);
-
-        for ($i = 5; $i >= 0; --$i) {
-            $bytes[$i] = chr($millis & 0xff);
-            $millis >>= 8;
-        }
-
-        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x70);
-        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
-
-        return BinaryUuid::toString($bytes);
     }
 }

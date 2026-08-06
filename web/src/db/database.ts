@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 
+import { uuidv7 } from './uuid'
+
 /**
  * The local database. This is where an assessment lives until it reaches the
  * server, which on a site visit is hours, and over a weekend can be days.
@@ -100,15 +102,33 @@ export interface StoredAnswer {
  * stays open forever.
  */
 export interface StoredFinding {
-    /** `${assessmentId}|${questionCode}|${pathogen ?? ''}` — one per answer. */
+    /**
+     * UUIDv7, minted here. The identity the server upserts on.
+     *
+     * It used to be the answer's natural key, which made one finding per
+     * answer a structural fact. It is not one: a single No can hide the SOP
+     * being missing AND the staff being untrained on it, and each needs its
+     * own recommendation, owner and date.
+     */
     key: string
     assessmentId: string
+    /** `${questionCode}|${pathogen ?? ''}` — what groups several findings under one answer. */
+    questionKey: string
     questionCode: string
     pathogen: string | null
     response: 'P' | 'N'
     gap: string
     recommendation: string
+    /** Who acts. */
     responsibilityLevel: 'site' | 'facility' | 'district' | 'regional' | 'national'
+    /**
+     * When — a separate axis from who, and from the due date.
+     *
+     * Null means nobody said, which is not the same as follow-up. In a
+     * quality-audit SOP "immediate" means correct before the assessor leaves,
+     * or stop testing until it is fixed; a date cannot express that.
+     */
+    urgency: 'immediate' | 'follow_up' | null
     responsiblePerson: string
     dueDate: string | null
     updatedAt: string
@@ -268,6 +288,49 @@ export class SpirdtDatabase extends Dexie {
             attachments: 'key, assessmentId',
             journal: '++id, assessmentId, at',
         })
+
+        // Version 5 lets one question carry several findings.
+        //
+        // The primary key changes meaning: it was the answer's natural key,
+        // which made one-per-answer structural, and is now the finding's own
+        // UUID. `questionKey` takes over the grouping.
+        //
+        // The upgrade re-keys rather than leaving the old rows alone, and that
+        // is not tidiness. The server now upserts on this id and refuses
+        // anything that is not a UUID, so a finding carried through with its
+        // old composite key would be dropped on every sync — silently, with
+        // the gap still on screen.
+        this.version(5)
+            .stores({
+                assessments: 'id, status, syncState, syncedAt, updatedAt',
+                answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
+                findings: 'key, assessmentId, [assessmentId+questionKey]',
+                attachments: 'key, assessmentId',
+                journal: '++id, assessmentId, at',
+            })
+            .upgrade(async (transaction) => {
+                const table = transaction.table('findings')
+                const existing = (await table.toArray()) as Array<Record<string, unknown>>
+
+                if (existing.length === 0) {
+                    return
+                }
+
+                await table.clear()
+
+                await table.bulkAdd(
+                    existing.map((row) => ({
+                        ...row,
+                        key: uuidv7(),
+                        questionKey: `${String(row.questionCode)}|${row.pathogen ?? ''}`,
+                        urgency: null,
+                        // The server has never seen this id, so it has to go
+                        // again whatever the old row claimed.
+                        dirty: true,
+                        revision: Number(row.revision ?? 0) + 1,
+                    })),
+                )
+            })
     }
 }
 

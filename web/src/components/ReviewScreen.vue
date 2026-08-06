@@ -27,7 +27,8 @@ import type { ScoreResult, Template } from '@/scoring/types'
 const props = defineProps<{
     template: Template
     result: ScoreResult
-    findings: Map<string, StoredFinding>
+    /** Several per question, keyed by `${questionCode}|${pathogen}`. */
+    findings: Map<string, StoredFinding[]>
     /** Response by `${questionCode}|${pathogen}`. Passed in rather than re-derived. */
     answersByKey: Map<string, string | null>
     siteName: string
@@ -41,15 +42,20 @@ const props = defineProps<{
 const emit = defineEmits<{
     back: []
     jump: [sectionCode: string, pathogen: string | null]
-    finding: [
-        questionCode: string,
-        pathogen: string | null,
-        patch: Partial<Omit<StoredFinding, 'key' | 'assessmentId'>>,
-    ]
+    /** Edit one finding, by its own id. */
+    finding: [key: string, patch: Partial<Omit<StoredFinding, 'key' | 'assessmentId'>>]
+    /** Start another one against this answer. */
+    addFinding: [questionCode: string, pathogen: string | null]
+    removeFinding: [key: string]
     submit: []
 }>()
 
 const open = ref<string | null>(null)
+
+const URGENCY = [
+    { key: 'immediate', label: 'urgency.immediate' },
+    { key: 'follow_up', label: 'urgency.followUp' },
+] as const
 
 const RESPONSIBILITY = [
     { key: 'site', label: 'responsibility.site' },
@@ -115,7 +121,10 @@ const gaps = computed<Gap[]>(() => {
 })
 
 const described = computed(
-    () => gaps.value.filter((gap) => (props.findings.get(gap.key)?.gap ?? '').trim() !== '').length,
+    () =>
+        gaps.value.filter((gap) =>
+            (props.findings.get(gap.key) ?? []).some((finding) => finding.gap.trim() !== ''),
+        ).length,
 )
 
 /** Missing questions grouped by section, so the list is navigable rather than long. */
@@ -148,8 +157,16 @@ const missingBySection = computed(() => {
     return [...bySection.values()]
 })
 
-function findingOf(gap: Gap): Partial<StoredFinding> {
-    return props.findings.get(gap.key) ?? {}
+function findingsOf(gap: Gap): StoredFinding[] {
+    return props.findings.get(gap.key) ?? []
+}
+
+/** The first line of each described gap, for the collapsed row. */
+function summaryOf(gap: Gap): string {
+    return findingsOf(gap)
+        .map((finding) => finding.gap.trim())
+        .filter((text) => text !== '')
+        .join(' · ')
 }
 </script>
 
@@ -272,10 +289,10 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                                     {{ questionText.get(gap.questionCode) }}
                                 </span>
                                 <span
-                                    v-if="(findingOf(gap).gap ?? '').trim() !== ''"
+                                    v-if="summaryOf(gap) !== ''"
                                     class="mt-1 block text-[13px] text-label-2"
                                 >
-                                    {{ findingOf(gap).gap }}
+                                    {{ summaryOf(gap) }}
                                 </span>
                                 <span v-else class="mt-1 block text-[13px] font-medium text-accent">
                                     {{ t('question.describeGap') }}
@@ -283,80 +300,147 @@ function findingOf(gap: Gap): Partial<StoredFinding> {
                             </span>
                         </button>
 
-                        <div v-if="open === gap.key" class="flex flex-col gap-2.5 px-3.5 pb-3.5">
-                            <textarea
-                                :value="findingOf(gap).gap ?? ''"
-                                rows="2"
-                                :placeholder="t('review.gapPlaceholder')"
-                                class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-                                @change="
-                                    emit('finding', gap.questionCode, gap.pathogen, {
-                                        gap: ($event.target as HTMLTextAreaElement).value,
-                                    })
-                                "
-                            ></textarea>
-
-                            <textarea
-                                :value="findingOf(gap).recommendation ?? ''"
-                                rows="2"
-                                :placeholder="t('review.recommendationPlaceholder')"
-                                class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-                                @change="
-                                    emit('finding', gap.questionCode, gap.pathogen, {
-                                        recommendation: ($event.target as HTMLTextAreaElement).value,
-                                    })
-                                "
-                            ></textarea>
-
-                            <div>
-                                <span class="mb-1 block px-0.5 text-[13px] text-label-2">
-                                    {{ t('review.whoActs') }}
-                                </span>
-                                <div class="scroll-thin flex gap-1.5 overflow-x-auto">
+                        <!-- One block per finding. A single No can hide more
+                             than one problem, and each needs its own action,
+                             owner and date. -->
+                        <div v-if="open === gap.key" class="flex flex-col gap-4 px-3.5 pb-3.5">
+                            <div
+                                v-for="(finding, index) in findingsOf(gap)"
+                                :key="finding.key"
+                                class="flex flex-col gap-2.5"
+                                :class="index > 0 ? 'border-t border-hairline pt-3.5' : ''"
+                            >
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[12px] font-semibold uppercase tracking-wide text-label-2">
+                                        {{ t('review.gapNumber', { number: index + 1 }) }}
+                                    </span>
                                     <button
-                                        v-for="level in RESPONSIBILITY"
-                                        :key="level.key"
                                         type="button"
-                                        class="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium"
-                                        :class="
-                                            (findingOf(gap).responsibilityLevel ?? 'site') === level.key
-                                                ? 'bg-accent text-white'
-                                                : 'bg-ground text-label-2'
-                                        "
-                                        @click="
-                                            emit('finding', gap.questionCode, gap.pathogen, {
-                                                responsibilityLevel: level.key,
+                                        class="text-[13px] text-no"
+                                        @click="emit('removeFinding', finding.key)"
+                                    >
+                                        {{ t('action.remove') }}
+                                    </button>
+                                </div>
+
+                                <textarea
+                                    :value="finding.gap"
+                                    rows="2"
+                                    :placeholder="t('review.gapPlaceholder')"
+                                    class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                                    @change="
+                                        emit('finding', finding.key, {
+                                            gap: ($event.target as HTMLTextAreaElement).value,
+                                        })
+                                    "
+                                ></textarea>
+
+                                <textarea
+                                    :value="finding.recommendation"
+                                    rows="2"
+                                    :placeholder="t('review.recommendationPlaceholder')"
+                                    class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                                    @change="
+                                        emit('finding', finding.key, {
+                                            recommendation: ($event.target as HTMLTextAreaElement).value,
+                                        })
+                                    "
+                                ></textarea>
+
+                                <!-- When. A separate axis from who, and from the
+                                     due date: "immediate" means before the
+                                     assessor leaves, which a date cannot say.
+                                     Nothing is preselected, because a default
+                                     would invent a judgement. -->
+                                <div>
+                                    <span class="mb-1 block px-0.5 text-[13px] text-label-2">
+                                        {{ t('review.howUrgent') }}
+                                    </span>
+                                    <div class="flex gap-1.5">
+                                        <button
+                                            v-for="option in URGENCY"
+                                            :key="option.key"
+                                            type="button"
+                                            class="rounded-full px-3 py-1.5 text-[13px] font-medium"
+                                            :class="
+                                                finding.urgency === option.key
+                                                    ? 'bg-accent text-white'
+                                                    : 'bg-ground text-label-2'
+                                            "
+                                            @click="
+                                                emit('finding', finding.key, {
+                                                    urgency:
+                                                        finding.urgency === option.key ? null : option.key,
+                                                })
+                                            "
+                                        >
+                                            {{ t(option.label) }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span class="mb-1 block px-0.5 text-[13px] text-label-2">
+                                        {{ t('review.whoActs') }}
+                                    </span>
+                                    <div class="scroll-thin flex gap-1.5 overflow-x-auto">
+                                        <button
+                                            v-for="level in RESPONSIBILITY"
+                                            :key="level.key"
+                                            type="button"
+                                            class="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium"
+                                            :class="
+                                                finding.responsibilityLevel === level.key
+                                                    ? 'bg-accent text-white'
+                                                    : 'bg-ground text-label-2'
+                                            "
+                                            @click="
+                                                emit('finding', finding.key, {
+                                                    responsibilityLevel: level.key,
+                                                })
+                                            "
+                                        >
+                                            {{ t(level.label) }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-2">
+                                    <input
+                                        :value="finding.responsiblePerson"
+                                        type="text"
+                                        :placeholder="t('review.responsiblePerson')"
+                                        class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                                        @change="
+                                            emit('finding', finding.key, {
+                                                responsiblePerson: ($event.target as HTMLInputElement).value,
                                             })
                                         "
-                                    >
-                                        {{ t(level.label) }}
-                                    </button>
+                                    />
+                                    <input
+                                        :value="finding.dueDate ?? ''"
+                                        type="date"
+                                        class="tnum shrink-0 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none"
+                                        @change="
+                                            emit('finding', finding.key, {
+                                                dueDate: ($event.target as HTMLInputElement).value || null,
+                                            })
+                                        "
+                                    />
                                 </div>
                             </div>
 
-                            <div class="flex gap-2">
-                                <input
-                                    :value="findingOf(gap).responsiblePerson ?? ''"
-                                    type="text"
-                                    :placeholder="t('review.responsiblePerson')"
-                                    class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-                                    @change="
-                                        emit('finding', gap.questionCode, gap.pathogen, {
-                                            responsiblePerson: ($event.target as HTMLInputElement).value,
-                                        })
-                                    "
-                                />
-                                <input
-                                    :value="findingOf(gap).dueDate ?? ''"
-                                    type="date"
-                                    class="tnum shrink-0 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none"
-                                    @change="
-                                        emit('finding', gap.questionCode, gap.pathogen, {
-                                            dueDate: ($event.target as HTMLInputElement).value || null,
-                                        })
-                                    "
-                                />
-                            </div>
+                            <button
+                                type="button"
+                                class="rounded-lg bg-ground py-2.5 text-[14px] font-medium text-accent"
+                                @click="emit('addFinding', gap.questionCode, gap.pathogen)"
+                            >
+                                {{
+                                    findingsOf(gap).length === 0
+                                        ? t('review.describeThisGap')
+                                        : t('review.addAnotherGap')
+                                }}
+                            </button>
                         </div>
                     </div>
                 </div>

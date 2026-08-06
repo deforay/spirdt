@@ -28,6 +28,10 @@ final class SyncServiceTest extends TestCase
 {
     use MakesTenants;
 
+    /** Device-minted, because the finding's own id is the upsert key now. */
+    private const FINDING_ID = '019fd600-0000-7000-8000-00000000000a';
+    private const SECOND_FINDING_ID = '019fd600-0000-7000-8000-00000000000b';
+
     private int $orgA;
     private int $orgB;
     private string $siteId;
@@ -105,18 +109,20 @@ final class SyncServiceTest extends TestCase
         $payload = $this->payload();
         $payload['findings'] = [
             [
+                'id'                   => self::FINDING_ID,
                 'question_code'        => '3.2',
                 'response'             => 'N',
                 'gap'                  => 'No exposure SOP on site.',
                 'recommendation'       => 'Adapt the national SOP and post it at the bench.',
                 'responsibility_level' => 'facility',
+                'urgency'              => 'immediate',
                 'responsible_person'   => 'Lab manager',
                 'due_date'             => '2026-09-30',
             ],
         ];
 
         $first = $sync->accept($payload);
-        self::assertSame(['3.2|'], $first['accepted_findings']);
+        self::assertSame([self::FINDING_ID], $first['accepted_findings']);
 
         $sync->accept($payload);
 
@@ -125,7 +131,109 @@ final class SyncServiceTest extends TestCase
         $finding = Finding::query()->first();
         self::assertNotNull($finding);
         self::assertSame('facility', $finding->responsibility_level);
+        self::assertSame('immediate', $finding->urgency);
         self::assertSame('open', $finding->status);
+    }
+
+    /**
+     * One No can hide more than one problem — no SOP, and staff untrained on
+     * the one that is missing — and each needs its own recommendation, owner
+     * and date. Collapsing them into one text box produces an action list
+     * nobody can work from.
+     */
+    public function testOneQuestionCanCarrySeveralFindings(): void
+    {
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'id'            => self::FINDING_ID,
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'No exposure SOP on site.',
+                'urgency'       => 'follow_up',
+            ],
+            [
+                'id'            => self::SECOND_FINDING_ID,
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'Staff have not been trained on exposure response.',
+                'urgency'       => 'immediate',
+            ],
+        ];
+
+        $result = (new SyncService())->accept($payload);
+
+        self::assertSame(2, Finding::query()->count());
+        self::assertSame([self::FINDING_ID, self::SECOND_FINDING_ID], $result['accepted_findings']);
+
+        $urgencies = Finding::query()->pluck('urgency')->all();
+
+        self::assertContains('immediate', $urgencies);
+        self::assertContains('follow_up', $urgencies);
+    }
+
+    /** Several on one question, and a retry still corrects rather than doubling. */
+    public function testSeveralFindingsOnOneQuestionSurviveARetry(): void
+    {
+        $payload = $this->payload();
+        $payload['findings'] = [
+            ['id' => self::FINDING_ID, 'question_code' => '3.2', 'response' => 'N', 'gap' => 'First gap.'],
+            ['id' => self::SECOND_FINDING_ID, 'question_code' => '3.2', 'response' => 'N', 'gap' => 'Second gap.'],
+        ];
+
+        $sync = new SyncService();
+        $sync->accept($payload);
+        $sync->accept($payload);
+
+        self::assertSame(2, Finding::query()->count());
+    }
+
+    /**
+     * The id is the identity now, so a payload without one cannot be upserted
+     * — accepting it would insert a fresh row on every retry.
+     */
+    public function testAFindingWithNoIdIsDropped(): void
+    {
+        $payload = $this->payload();
+        $payload['findings'] = [
+            ['question_code' => '3.2', 'response' => 'N', 'gap' => 'No exposure SOP on site.'],
+        ];
+
+        $result = (new SyncService())->accept($payload);
+
+        self::assertSame(0, Finding::query()->count());
+        self::assertSame([], $result['accepted_findings']);
+    }
+
+    /** Blank means nobody said, which is not the same as follow-up. */
+    public function testAnUnstatedUrgencyStaysUnstated(): void
+    {
+        $payload = $this->payload();
+        $payload['findings'] = [
+            ['id' => self::FINDING_ID, 'question_code' => '3.2', 'response' => 'N', 'gap' => 'A gap.'],
+        ];
+
+        (new SyncService())->accept($payload);
+
+        self::assertNull(Finding::query()->first()?->urgency);
+    }
+
+    public function testAnUrgencyItDoesNotRecogniseIsIgnoredRatherThanStored(): void
+    {
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'id'            => self::FINDING_ID,
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'A gap.',
+                'urgency'       => 'whenever',
+            ],
+        ];
+
+        (new SyncService())->accept($payload);
+
+        self::assertNull(Finding::query()->first()?->urgency);
     }
 
     public function testAFindingAgainstAPassingAnswerIsDropped(): void
@@ -134,8 +242,8 @@ final class SyncServiceTest extends TestCase
         // in the site's action list with nothing behind it.
         $payload = $this->payload();
         $payload['findings'] = [
-            ['question_code' => '3.1', 'response' => 'Y', 'gap' => 'Nothing wrong.'],
-            ['question_code' => '3.2', 'response' => 'N', 'gap' => ''],
+            ['id' => self::FINDING_ID, 'question_code' => '3.1', 'response' => 'Y', 'gap' => 'Nothing wrong.'],
+            ['id' => self::SECOND_FINDING_ID, 'question_code' => '3.2', 'response' => 'N', 'gap' => ''],
         ];
 
         $result = (new SyncService())->accept($payload);
@@ -149,7 +257,7 @@ final class SyncServiceTest extends TestCase
         $sync = new SyncService();
         $payload = $this->payload();
         $payload['findings'] = [
-            ['question_code' => '3.2', 'response' => 'N', 'gap' => 'No exposure SOP on site.'],
+            ['id' => self::FINDING_ID, 'question_code' => '3.2', 'response' => 'N', 'gap' => 'No exposure SOP on site.'],
         ];
 
         $sync->accept($payload);

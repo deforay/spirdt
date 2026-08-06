@@ -1,14 +1,17 @@
 import { computed, reactive, ref, shallowRef } from 'vue'
 
 import {
+    addFinding,
     createAssessment,
-    discardFinding,
+    discardFindingsFor,
     type FindingPatch,
     flushWrites,
     loadAnswers,
     loadFindings,
     saveAnswer,
     saveContext,
+    questionGroupKey,
+    removeFinding,
     saveFinding,
     savePathogens,
     setStatus,
@@ -45,7 +48,8 @@ export function useAssessment(template: Template) {
     const assessment = shallowRef<StoredAssessment | null>(null)
     const responses = reactive(new Map<string, StoredResponse | null>())
     const comments = reactive(new Map<string, string>())
-    const findings = reactive(new Map<string, StoredFinding>())
+    /** Several per question now, keyed by `${questionCode}|${pathogen}`. */
+    const findings = reactive(new Map<string, StoredFinding[]>())
 
     const storage = ref<StorageReport | null>(null)
     const saveState = ref<SaveState>('idle')
@@ -107,7 +111,8 @@ export function useAssessment(template: Template) {
         }
 
         for (const row of await loadFindings(existing.id)) {
-            findings.set(questionKey(row.questionCode, row.pathogen), row)
+            const key = questionGroupKey(row.questionCode, row.pathogen)
+            findings.set(key, [...(findings.get(key) ?? []), row])
         }
     }
 
@@ -169,22 +174,23 @@ export function useAssessment(template: Template) {
         // question the assessment says is fine. The gap text stays in the
         // journal, so a mis-tap is recoverable.
         const current = assessment.value
+        const group = questionGroupKey(questionCode, pathogen)
 
-        if (current && value !== 'P' && value !== 'N' && findings.has(keyOf(questionCode, pathogen))) {
-            findings.delete(keyOf(questionCode, pathogen))
-            void discardFinding(current.id, questionCode, pathogen)
+        // ALL of them, not one. A question may carry several, and leaving the
+        // rest would hand the site an action list for a shortfall the
+        // assessment no longer records.
+        if (current && value !== 'P' && value !== 'N' && findings.has(group)) {
+            findings.delete(group)
+            void discardFindingsFor(current.id, questionCode, pathogen)
         }
     }
 
-    function findingFor(questionCode: string, pathogen: string | null): StoredFinding | null {
-        return findings.get(keyOf(questionCode, pathogen)) ?? null
+    function findingsFor(questionCode: string, pathogen: string | null): StoredFinding[] {
+        return findings.get(questionGroupKey(questionCode, pathogen)) ?? []
     }
 
-    async function setFinding(
-        questionCode: string,
-        pathogen: string | null,
-        patch: Omit<FindingPatch, 'response'>,
-    ) {
+    /** Add an empty slot for the assessor to type into. */
+    async function newFinding(questionCode: string, pathogen: string | null) {
         const current = assessment.value
         const response = responseFor(questionCode, pathogen)
 
@@ -192,9 +198,38 @@ export function useAssessment(template: Template) {
             return
         }
 
-        const saved = await saveFinding(current.id, questionCode, pathogen, { ...patch, response })
+        const created = await addFinding(current.id, questionCode, pathogen, response)
+        const group = questionGroupKey(questionCode, pathogen)
 
-        findings.set(keyOf(questionCode, pathogen), saved)
+        findings.set(group, [...(findings.get(group) ?? []), created])
+    }
+
+    async function setFinding(key: string, patch: FindingPatch) {
+        const saved = await saveFinding(key, patch)
+
+        if (saved === null) {
+            return
+        }
+
+        findings.set(
+            saved.questionKey,
+            (findings.get(saved.questionKey) ?? []).map((row) => (row.key === key ? saved : row)),
+        )
+    }
+
+    async function dropFinding(key: string) {
+        const group = [...findings.entries()].find(([, rows]) =>
+            rows.some((row) => row.key === key),
+        )
+
+        await removeFinding(key)
+
+        if (group !== undefined) {
+            findings.set(
+                group[0],
+                group[1].filter((row) => row.key !== key),
+            )
+        }
     }
 
     async function updatePathogens(next: StoredPathogen[]) {
@@ -307,8 +342,10 @@ export function useAssessment(template: Template) {
         setComment,
         updateContext,
         findings,
-        findingFor,
+        findingsFor,
+        newFinding,
         setFinding,
+        dropFinding,
         updatePathogens,
         submit,
         flush: flushWrites,

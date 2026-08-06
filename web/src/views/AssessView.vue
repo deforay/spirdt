@@ -280,7 +280,9 @@ async function onSubmit() {
         :submit-error="submitError"
         @back="stage = 'checklist'"
         @jump="jumpTo"
-        @finding="(code, pathogen, patch) => assessment.setFinding(code, pathogen, patch)"
+        @finding="(key, patch) => assessment.setFinding(key, patch)"
+        @add-finding="(code, pathogen) => assessment.newFinding(code, pathogen)"
+        @remove-finding="(key) => assessment.dropFinding(key)"
         @submit="onSubmit"
     />
 

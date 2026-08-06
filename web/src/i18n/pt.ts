@@ -221,4 +221,11 @@ export const messages: Messages = {
     'assignments.assign': 'Atribuir',
     'assignments.withdraw': 'Retirar',
     'assignments.noSites': 'Nenhum local de teste nesta seleção.',
+
+    'review.gapNumber': 'Lacuna {number}',
+    'review.howUrgent': 'Urgência',
+    'review.describeThisGap': 'Descrever esta lacuna',
+    'review.addAnotherGap': 'Adicionar outra lacuna',
+    'urgency.immediate': 'Imediata',
+    'urgency.followUp': 'Seguimento',
 }

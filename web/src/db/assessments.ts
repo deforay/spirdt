@@ -228,48 +228,52 @@ export async function savePathogens(
 }
 
 export interface FindingPatch {
-    response: 'P' | 'N'
     gap?: string
     recommendation?: string
     responsibilityLevel?: StoredFinding['responsibilityLevel']
+    urgency?: StoredFinding['urgency']
     responsiblePerson?: string
     dueDate?: string | null
 }
 
+/** `${questionCode}|${pathogen ?? ''}` — what groups several findings under one answer. */
+export function questionGroupKey(questionCode: string, pathogen: string | null): string {
+    return `${questionCode}|${pathogen ?? ''}`
+}
+
 /**
- * Write one finding.
+ * Start a new finding against an answer.
  *
- * Journalled like an answer, and for the same reason: this is the part of the
- * visit the site is debriefed on, and it is typed at the end of a long day.
+ * Separate from updating one, because a question may carry several and the
+ * caller has to say which it means. The row is created empty: an assessor adds
+ * the slot and then types into it, which is the order the screen works in.
  */
-export async function saveFinding(
+export async function addFinding(
     assessmentId: string,
     questionCode: string,
     pathogen: string | null,
-    patch: FindingPatch,
+    response: 'P' | 'N',
 ): Promise<StoredFinding> {
-    const key = answerKey(assessmentId, questionCode, pathogen)
+    const key = uuidv7()
+    const now = new Date().toISOString()
 
-    return chain(`finding:${key}`, async () => {
-        const now = new Date().toISOString()
-
-        return db.transaction('rw', db.findings, db.assessments, db.journal, async () => {
-            const existing = await db.findings.get(key)
-
+    return chain(`finding:${key}`, async () =>
+        db.transaction('rw', db.findings, db.assessments, db.journal, async () => {
             const row: StoredFinding = {
                 key,
                 assessmentId,
+                questionKey: questionGroupKey(questionCode, pathogen),
                 questionCode,
                 pathogen,
-                response: patch.response,
-                gap: patch.gap ?? existing?.gap ?? '',
-                recommendation: patch.recommendation ?? existing?.recommendation ?? '',
-                responsibilityLevel:
-                    patch.responsibilityLevel ?? existing?.responsibilityLevel ?? 'site',
-                responsiblePerson: patch.responsiblePerson ?? existing?.responsiblePerson ?? '',
-                dueDate: patch.dueDate !== undefined ? patch.dueDate : (existing?.dueDate ?? null),
+                response,
+                gap: '',
+                recommendation: '',
+                responsibilityLevel: 'site',
+                urgency: null,
+                responsiblePerson: '',
+                dueDate: null,
                 updatedAt: now,
-                revision: (existing?.revision ?? 0) + 1,
+                revision: 1,
                 dirty: true,
             }
 
@@ -288,6 +292,55 @@ export async function saveFinding(
             })
 
             return row
+        }),
+    )
+}
+
+/**
+ * Write to one finding, by its own id.
+ *
+ * Journalled like an answer, and for the same reason: this is the part of the
+ * visit the site is debriefed on, and it is typed at the end of a long day.
+ */
+export async function saveFinding(key: string, patch: FindingPatch): Promise<StoredFinding | null> {
+    return chain(`finding:${key}`, async () => {
+        const now = new Date().toISOString()
+
+        return db.transaction('rw', db.findings, db.assessments, db.journal, async () => {
+            const existing = await db.findings.get(key)
+
+            if (existing === undefined) {
+                return null
+            }
+
+            const row: StoredFinding = {
+                ...existing,
+                gap: patch.gap ?? existing.gap,
+                recommendation: patch.recommendation ?? existing.recommendation,
+                responsibilityLevel: patch.responsibilityLevel ?? existing.responsibilityLevel,
+                urgency: patch.urgency !== undefined ? patch.urgency : existing.urgency,
+                responsiblePerson: patch.responsiblePerson ?? existing.responsiblePerson,
+                dueDate: patch.dueDate !== undefined ? patch.dueDate : existing.dueDate,
+                updatedAt: now,
+                revision: existing.revision + 1,
+                dirty: true,
+            }
+
+            await db.findings.put(row)
+            await db.journal.add({
+                assessmentId: row.assessmentId,
+                at: now,
+                kind: 'finding',
+                subject: key,
+                payload: row,
+            })
+            await db.assessments.update(row.assessmentId, {
+                updatedAt: now,
+                syncState: 'pending',
+                syncError: null,
+            })
+
+            return row
         })
     })
 }
@@ -296,21 +349,8 @@ export function loadFindings(assessmentId: string): Promise<StoredFinding[]> {
     return db.findings.where('assessmentId').equals(assessmentId).toArray()
 }
 
-/**
- * Drop a finding that no longer has an answer to hang on.
- *
- * Called when a Partial or No is corrected to Yes or Not applicable. The gap
- * text is kept in the journal, so a finding removed by a mis-tap is still
- * recoverable, but it stops being reported against a question that no longer
- * records a shortfall.
- */
-export async function discardFinding(
-    assessmentId: string,
-    questionCode: string,
-    pathogen: string | null,
-): Promise<void> {
-    const key = answerKey(assessmentId, questionCode, pathogen)
-
+/** Remove one finding the assessor no longer wants. */
+export async function removeFinding(key: string): Promise<void> {
     await chain(`finding:${key}`, async () => {
         const existing = await db.findings.get(key)
 
@@ -322,7 +362,7 @@ export async function discardFinding(
 
         await db.transaction('rw', db.findings, db.journal, async () => {
             await db.journal.add({
-                assessmentId,
+                assessmentId: existing.assessmentId,
                 at: now,
                 kind: 'finding',
                 subject: key,
@@ -331,6 +371,29 @@ export async function discardFinding(
             await db.findings.delete(key)
         })
     })
+}
+
+/**
+ * Drop every finding on a question that no longer has an answer to hang on.
+ *
+ * Called when a Partial or No is corrected to Yes or Not applicable. ALL of
+ * them go, not one — a question may carry several, and leaving the rest would
+ * hand the site an action list for a shortfall the assessment no longer
+ * records. The gap text stays in the journal, so a mis-tap is recoverable.
+ */
+export async function discardFindingsFor(
+    assessmentId: string,
+    questionCode: string,
+    pathogen: string | null,
+): Promise<void> {
+    const doomed = await db.findings
+        .where('[assessmentId+questionKey]')
+        .equals([assessmentId, questionGroupKey(questionCode, pathogen)])
+        .toArray()
+
+    for (const finding of doomed) {
+        await removeFinding(finding.key)
+    }
 }
 
 /** Mark the assessment ready to submit, and then submitted. */

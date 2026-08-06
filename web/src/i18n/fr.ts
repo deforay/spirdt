@@ -223,4 +223,11 @@ export const messages: Messages = {
     'assignments.assign': 'Attribuer',
     'assignments.withdraw': 'Retirer',
     'assignments.noSites': 'Aucun site de test dans cette sélection.',
+
+    'review.gapNumber': 'Écart {number}',
+    'review.howUrgent': 'Degré d\'urgence',
+    'review.describeThisGap': 'Décrire cet écart',
+    'review.addAnotherGap': 'Ajouter un autre écart',
+    'urgency.immediate': 'Immédiat',
+    'urgency.followUp': 'À suivre',
 }

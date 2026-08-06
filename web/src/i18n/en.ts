@@ -223,4 +223,11 @@ export const messages = {
     'assignments.assign': 'Assign',
     'assignments.withdraw': 'Withdraw',
     'assignments.noSites': 'No testing sites in this selection.',
+
+    'review.gapNumber': 'Gap {number}',
+    'review.howUrgent': 'How urgent',
+    'review.describeThisGap': 'Describe this gap',
+    'review.addAnotherGap': 'Add another gap',
+    'urgency.immediate': 'Immediate',
+    'urgency.followUp': 'Follow-up',
 }
