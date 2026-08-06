@@ -115,8 +115,28 @@ try {
     $organizationId = $statement->fetchColumn();
 
     if ($organizationId === false) {
-        $pdo->prepare('INSERT INTO organizations (code, name) VALUES (?, ?)')
-            ->execute([$orgCode, ucfirst($orgCode)]);
+        // An organisation with no programme is a broken account rather than a
+        // partial one: its token carries no programme, so every registry read
+        // throws instead of returning an empty list. This makes one, named
+        // after the organisation and belonging to it alone.
+        //
+        // Sharing a registry between two organisations is a deliberate act with
+        // real consequences — it is how a partner comes to see a country's
+        // entire site list — so it stays in `bin/provision-org --programme`,
+        // where it is asked for by name, and never in a development shortcut
+        // that guessed.
+        $statement = $pdo->prepare('SELECT id FROM programmes WHERE code = ?');
+        $statement->execute([$orgCode]);
+        $programmeId = (int) $statement->fetchColumn();
+
+        if ($programmeId === 0) {
+            $pdo->prepare('INSERT INTO programmes (code, name) VALUES (?, ?)')
+                ->execute([$orgCode, ucfirst($orgCode)]);
+            $programmeId = (int) $pdo->lastInsertId();
+        }
+
+        $pdo->prepare('INSERT INTO organizations (programme_id, code, name) VALUES (?, ?, ?)')
+            ->execute([$programmeId, $orgCode, ucfirst($orgCode)]);
         $organizationId = (int) $pdo->lastInsertId();
         con_print('success', 'Created organisation ' . $orgCode);
     } else {

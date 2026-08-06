@@ -10,6 +10,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Tests\Support\MakesTenants;
 
 /**
  * Two controls that were decorative until now, tested where they bite.
@@ -26,6 +27,8 @@ use Slim\Psr7\Factory\ServerRequestFactory;
  */
 final class PasswordAndRoleTest extends TestCase
 {
+    use MakesTenants;
+
     private const PASSWORD = 'correct-horse-battery';
     private const NEW_PASSWORD = 'a-different-long-one';
 
@@ -44,8 +47,7 @@ final class PasswordAndRoleTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
         });
 
-        $this->organizationId = (int) Capsule::table('organizations')
-            ->insertGetId(['code' => 'pw-org', 'name' => 'Password Org']);
+        $this->organizationId = $this->makeTenant('pw-org', 'Password Org');
     }
 
     protected function tearDown(): void

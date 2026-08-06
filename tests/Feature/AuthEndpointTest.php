@@ -10,6 +10,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Tests\Support\MakesTenants;
 
 /**
  * Signing in.
@@ -21,6 +22,8 @@ use Slim\Psr7\Factory\ServerRequestFactory;
  */
 final class AuthEndpointTest extends TestCase
 {
+    use MakesTenants;
+
     private const PASSWORD = 'correct-horse-battery';
 
     private int $orgA;
@@ -39,8 +42,8 @@ final class AuthEndpointTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
         });
 
-        $this->orgA = (int) Capsule::table('organizations')->insertGetId(['code' => 'org-a', 'name' => 'A']);
-        $this->orgB = (int) Capsule::table('organizations')->insertGetId(['code' => 'org-b', 'name' => 'B']);
+        $this->orgA = $this->makeTenant('org-a', 'A');
+        $this->orgB = $this->makeTenant('org-b', 'B');
 
         $this->makeUser($this->orgA, 'jane@example.org', self::PASSWORD);
     }

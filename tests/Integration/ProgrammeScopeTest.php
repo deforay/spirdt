@@ -166,6 +166,40 @@ final class ProgrammeScopeTest extends TestCase
         });
     }
 
+    // ─── deleting an organisation must not take the shared registry with it ───
+
+    /**
+     * organization_id on the registry became PROVENANCE when the programme
+     * layer landed — it records who first entered a row, not who may see it.
+     * The foreign key underneath still said ON DELETE CASCADE, so removing the
+     * organisation that happened to type a facility in would delete it out
+     * from under every other organisation in the programme.
+     */
+    public function testDeletingAnOrganisationLeavesTheSharedRegistryStanding(): void
+    {
+        $this->useTenant($this->orgA);
+        $siteId = $this->makeSite($this->orgA, 'aa');
+
+        // The partner is using it, which is the whole point of sharing.
+        $this->useTenant($this->orgB);
+        self::assertSame(1, TestingSite::query()->count());
+
+        TenantContext::withoutScope(function (): void {
+            Capsule::table('organizations')->where('id', $this->orgA)->delete();
+        });
+
+        $this->useTenant($this->orgB);
+
+        $survivors = TestingSite::query()->where('testing_sites.id', BinaryUuid::toBytes($siteId));
+
+        self::assertSame(1, $survivors->count(), 'the partner still needs this site');
+        self::assertNull(
+            $survivors->value('organization_id'),
+            'and the provenance is simply forgotten, not carried to a row that no longer exists',
+        );
+        self::assertSame(1, Facility::query()->count());
+    }
+
     // ─── failing closed ───
 
     public function testARegistryQueryWithNoProgrammeThrows(): void

@@ -25,10 +25,16 @@ trait MakesTenants
     /** An organisation, with a programme of its own. */
     private function makeTenant(string $code, ?string $name = null): int
     {
-        $programmeId = (int) Capsule::table('programmes')->insertGetId([
-            'code' => $code,
-            'name' => $name ?? strtoupper($code),
-        ]);
+        // Reused when one with this code is already there, rather than
+        // inserted blindly. Most suites clear `organizations` and leave
+        // `programmes` alone — deleting programmes would orphan whatever
+        // registry rows another suite is holding. The code identifies it, so
+        // reusing one is the same programme, not a stale one.
+        $programmeId = (int) (Capsule::table('programmes')->where('code', $code)->value('id')
+            ?? Capsule::table('programmes')->insertGetId([
+                'code' => $code,
+                'name' => $name ?? strtoupper($code),
+            ]));
 
         $organizationId = (int) Capsule::table('organizations')->insertGetId([
             'code'         => $code,
