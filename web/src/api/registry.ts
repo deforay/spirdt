@@ -224,9 +224,18 @@ export async function listTestingSites(
     })
 }
 
+export async function getTestingSite(id: string): Promise<RegistryTestingSite> {
+    return (
+        await apiRequest<{ testing_site: RegistryTestingSite }>(`/admin/testing-sites/${id}`, {
+            method: 'GET',
+        })
+    ).testing_site
+}
+
 export async function createTestingSite(input: {
     name: string
     facility_id: string
+    location_description?: string | null
 }): Promise<RegistryTestingSite> {
     return (
         await apiRequest<{ testing_site: RegistryTestingSite }>('/admin/testing-sites', {
@@ -237,7 +246,9 @@ export async function createTestingSite(input: {
 
 export async function updateTestingSite(
     id: string,
-    patch: Partial<Pick<RegistryTestingSite, 'name' | 'is_active'>>,
+    patch: Partial<
+        Pick<RegistryTestingSite, 'name' | 'location_description' | 'facility_id' | 'is_active'>
+    >,
 ): Promise<RegistryTestingSite> {
     return (
         await apiRequest<{ testing_site: RegistryTestingSite }>(`/admin/testing-sites/${id}`, {

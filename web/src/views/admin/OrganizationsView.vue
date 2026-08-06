@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 import { apiRequest } from '@/api/client'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import { t } from '@/i18n'
+import { RouterLink } from 'vue-router'
 
 /**
  * The organisations auditing in this country.
@@ -33,11 +34,6 @@ interface OrganizationRow {
 const organizations = ref<OrganizationRow[]>([])
 const loading = ref(true)
 const error = ref('')
-const issued = ref<{ name: string; email: string; password: string } | null>(null)
-
-const adding = ref(false)
-const draft = ref({ code: '', name: '', admin_email: '', admin_name: '' })
-
 async function act<T>(run: () => Promise<T>): Promise<T | null> {
     error.value = ''
 
@@ -64,128 +60,21 @@ async function load(): Promise<void> {
     loading.value = false
 }
 
-async function onAdd(): Promise<void> {
-    const created = await act(() =>
-        apiRequest<{ organization: OrganizationRow; password: string }>('/admin/organizations', {
-            body: draft.value,
-        }),
-    )
-
-    if (created === null) {
-        return
-    }
-
-    issued.value = {
-        name: created.organization.name,
-        email: draft.value.admin_email,
-        password: created.password,
-    }
-    adding.value = false
-    draft.value = { code: '', name: '', admin_email: '', admin_name: '' }
-    await load()
-}
-
-async function onToggle(organization: OrganizationRow): Promise<void> {
-    const updated = await act(() =>
-        apiRequest(`/admin/organizations/${organization.id}`, {
-            method: 'PATCH',
-            body: { is_active: !organization.is_active },
-        }),
-    )
-
-    if (updated !== null) {
-        await load()
-    }
-}
-
 onMounted(load)
 </script>
 
 <template>
     <AdminShell :title="t('organizations.title')" :subtitle="t('organizations.subtitle')">
-        <div
-            v-if="issued"
-            class="mb-4 rounded-card border border-accent bg-accent-soft px-4 py-3"
-            role="alert"
-        >
-            <p class="text-[14px] font-semibold text-accent">
-                {{ t('organizations.created', { name: issued.name }) }}
-            </p>
-            <p class="mt-1 text-[14px]">{{ issued.email }}</p>
-            <p class="tnum mt-1 select-all font-mono text-[18px]">{{ issued.password }}</p>
-            <p class="mt-1 text-[13px] text-label-2">{{ t('admin.passwordOnce') }}</p>
-            <button
-                type="button"
-                class="mt-2 text-[14px] font-medium text-accent"
-                @click="issued = null"
-            >
-                {{ t('admin.passwordNoted') }}
-            </button>
-        </div>
-
         <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex justify-end">
-            <button
-                type="button"
+            <RouterLink
+                :to="{ name: 'admin-organization-new' }"
                 class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
-                @click="adding = !adding"
             >
-                {{ adding ? t('action.cancel') : t('organizations.add') }}
-            </button>
+                {{ t('organizations.add') }}
+            </RouterLink>
         </div>
-
-        <form
-            v-if="adding"
-            class="mb-5 grid gap-3 rounded-card bg-surface p-4 sm:grid-cols-2"
-            @submit.prevent="onAdd"
-        >
-            <input
-                v-model="draft.name"
-                type="text"
-                :placeholder="t('organizations.name')"
-                class="rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-            />
-            <input
-                v-model="draft.code"
-                type="text"
-                autocapitalize="off"
-                spellcheck="false"
-                :placeholder="t('organizations.code')"
-                class="rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-            />
-            <input
-                v-model="draft.admin_name"
-                type="text"
-                :placeholder="t('organizations.adminName')"
-                class="rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-            />
-            <input
-                v-model="draft.admin_email"
-                type="email"
-                autocapitalize="off"
-                spellcheck="false"
-                :placeholder="t('organizations.adminEmail')"
-                class="rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-            />
-            <p class="text-[13px] text-label-2 sm:col-span-2">
-                {{ t('organizations.createsAdmin') }}
-            </p>
-            <div class="sm:col-span-2">
-                <button
-                    type="submit"
-                    class="rounded-lg bg-accent px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-40"
-                    :disabled="
-                        draft.name.trim() === '' ||
-                        draft.code.trim() === '' ||
-                        draft.admin_email.trim() === '' ||
-                        draft.admin_name.trim() === ''
-                    "
-                >
-                    {{ t('organizations.add') }}
-                </button>
-            </div>
-        </form>
 
         <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
 
@@ -207,10 +96,14 @@ onMounted(load)
                         :class="organization.is_active ? '' : 'opacity-50'"
                     >
                         <td class="px-4 py-3">
-                            <span class="block text-[15px]">{{ organization.name }}</span>
-                            <span class="tnum block text-[13px] text-label-2">
-                                {{ organization.code }}
-                            </span>
+                            <RouterLink :to="{ name: 'admin-organization', params: { id: organization.id } }">
+                                <span class="block text-[15px] hover:text-accent">
+                                    {{ organization.name }}
+                                </span>
+                                <span class="tnum block text-[13px] text-label-2">
+                                    {{ organization.code }}
+                                </span>
+                            </RouterLink>
                         </td>
                         <td class="tnum px-4 py-3 text-[14px]">
                             {{ organization.user_count }}
@@ -223,18 +116,12 @@ onMounted(load)
                         </td>
                         <td class="tnum px-4 py-3 text-[14px]">{{ organization.assessments }}</td>
                         <td class="px-4 py-3 text-right">
-                            <button
-                                type="button"
-                                class="text-[14px]"
-                                :class="organization.is_active ? 'text-no' : 'text-yes'"
-                                @click="onToggle(organization)"
+                            <RouterLink
+                                :to="{ name: 'admin-organization', params: { id: organization.id } }"
+                                class="text-[14px] text-accent"
                             >
-                                {{
-                                    organization.is_active
-                                        ? t('admin.deactivate')
-                                        : t('admin.activate')
-                                }}
-                            </button>
+                                {{ t('form.edit') }}
+                            </RouterLink>
                         </td>
                     </tr>
                 </tbody>

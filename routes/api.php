@@ -124,6 +124,7 @@ return static function (App $app): void {
         $group->get('/facilities', [RegistryAction::class, 'facilities']);
         $group->get('/facility-options', [RegistryAction::class, 'facilityOptions']);
         $group->get('/facilities/{id}', [RegistryAction::class, 'facility']);
+        $group->get('/testing-sites/{id}', [RegistryAction::class, 'testingSite']);
         $group->get('/testing-sites', [RegistryAction::class, 'testingSites']);
         $group->get('/assignments', [AssignmentsAction::class, 'index']);
     })

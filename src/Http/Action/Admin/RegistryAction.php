@@ -157,6 +157,21 @@ final class RegistryAction
         }
     }
 
+    /** @param array<string,string> $args */
+    public function testingSite(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        try {
+            return $this->json($response, 200, [
+                'testing_site' => $this->registry->testingSite((string) ($args['id'] ?? '')),
+            ]);
+        } catch (InvalidArgumentException $e) {
+            return $this->json($response, 404, ['error' => ['message' => $e->getMessage()]]);
+        }
+    }
+
     /** The instrument's own vocabulary for type, level and affiliation. */
     public function facilityOptions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {

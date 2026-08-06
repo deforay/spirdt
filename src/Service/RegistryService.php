@@ -547,11 +547,16 @@ final class RegistryService
         ?string $search = null,
         int $page = 1,
         int $perPage = self::PAGE_SIZE,
+        ?string $id = null,
     ): array {
         $perPage = max(1, min($perPage, 200));
         $page = max(1, $page);
 
         $query = TestingSite::query();
+
+        if ($id !== null) {
+            $query->where('testing_sites.id', BinaryUuid::toBytes($id));
+        }
 
         if ($facilityId !== null) {
             $query->where('facility_id', BinaryUuid::toBytes($facilityId));
@@ -677,6 +682,20 @@ final class RegistryService
             $attributes['location_description'] = $this->optionalText($input, 'location_description');
         }
 
+        // A bench can be recorded under the wrong building. Moving it is safe:
+        // assessments reference the SITE, so its history travels with it.
+        if (array_key_exists('facility_id', $input)) {
+            $facilityId = trim((string) $input['facility_id']);
+
+            if (!BinaryUuid::isValid($facilityId)
+                || Facility::query()->where('facilities.id', BinaryUuid::toBytes($facilityId))->first() === null
+            ) {
+                throw new InvalidArgumentException('That facility is not in this programme.');
+            }
+
+            $attributes['facility_id'] = BinaryUuid::toBytes($facilityId);
+        }
+
         if (array_key_exists('is_active', $input)) {
             $attributes['is_active'] = (bool) $input['is_active'] ? 1 : 0;
         }
@@ -726,16 +745,26 @@ final class RegistryService
         return $found[0];
     }
 
+    /**
+     * One testing site by id, for the form that edits it.
+     *
+     * @return array<string,mixed>
+     */
+    public function testingSite(string $id): array
+    {
+        return $this->oneTestingSite($id);
+    }
+
     /** @return array<string,mixed> */
     private function oneTestingSite(string $id): array
     {
-        foreach ($this->testingSites(null, null, null, 1, 200)['rows'] as $site) {
-            if ($site['id'] === $id) {
-                return $site;
-            }
+        $found = $this->testingSites(null, null, null, 1, 1, $id)['rows'];
+
+        if ($found === []) {
+            throw new InvalidArgumentException('No such testing site in this programme.');
         }
 
-        throw new InvalidArgumentException('No such testing site in this programme.');
+        return $found[0];
     }
 
     /** @param array<string,mixed> $input */

@@ -92,6 +92,54 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/AssignmentsView.vue'),
         meta: { roles: MANAGING },
     },
+    {
+        path: '/admin/places/new',
+        name: 'admin-place-new',
+        component: () => import('@/views/admin/PlaceFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/places/:id',
+        name: 'admin-place',
+        component: () => import('@/views/admin/PlaceFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/sites/new',
+        name: 'admin-site-new',
+        component: () => import('@/views/admin/SiteFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/sites/:id',
+        name: 'admin-site',
+        component: () => import('@/views/admin/SiteFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/users/new',
+        name: 'admin-user-new',
+        component: () => import('@/views/admin/UserFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/users/:id',
+        name: 'admin-user',
+        component: () => import('@/views/admin/UserFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/organizations/new',
+        name: 'admin-organization-new',
+        component: () => import('@/views/admin/OrganizationFormView.vue'),
+        meta: { roles: ['superadmin'] },
+    },
+    {
+        path: '/admin/organizations/:id',
+        name: 'admin-organization',
+        component: () => import('@/views/admin/OrganizationFormView.vue'),
+        meta: { roles: ['superadmin'] },
+    },
 ]
 
 export const router = createRouter({
