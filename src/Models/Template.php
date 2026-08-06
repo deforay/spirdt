@@ -29,6 +29,30 @@ final class Template extends Model
     ];
 
     /**
+     * The instrument this organisation is working to, whichever version.
+     *
+     * For screens that need the instrument's own vocabulary rather than a
+     * specific version — the facility type and affiliation lists, which a
+     * country may customise. Prefers the organisation's own copy over the
+     * platform default, then the newest published version.
+     */
+    public static function published(int $organizationId): ?self
+    {
+        $rows = Capsule::table('templates')
+            ->where('status', 'published')
+            ->whereIn('org_key', [$organizationId, 0])
+            ->orderByDesc('org_key')
+            ->orderByDesc('id')
+            ->limit(1)
+            ->get()
+            ->all();
+
+        return self::query()
+            ->hydrate(array_map(static fn (object $row): array => (array) $row, $rows))
+            ->first();
+    }
+
+    /**
      * The published template for a code and version, preferring the
      * organisation's own copy over the platform default.
      */

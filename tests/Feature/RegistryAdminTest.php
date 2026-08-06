@@ -40,7 +40,8 @@ final class RegistryAdminTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['site_assignments', 'assessments', 'testing_sites', 'facilities', 'geo_units',
-                    'refresh_tokens', 'users', 'roles', 'organizations', 'programmes'] as $table
+                    'templates', 'refresh_tokens', 'users', 'roles', 'organizations',
+                    'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
             }
@@ -52,6 +53,20 @@ final class RegistryAdminTest extends TestCase
         $this->foreignOrgId = $this->makeTenant('reg-z', 'Another Country');
 
         $this->shareProgramme($this->partnerOrgId, $this->orgId);
+
+        // Seeded here rather than relied on. The facility option lists are read
+        // from the published instrument, and a suite that happened to leave a
+        // stub template behind made this pass alone and fail in company.
+        Capsule::table('templates')->insert([
+            'organization_id' => null,
+            'code'            => 'spi-rdt',
+            'version'         => '1.0.0',
+            'title'           => 'SPI-RDT',
+            'definition'      => (string) file_get_contents(
+                dirname(__DIR__, 2) . '/resources/templates/spi-rdt-1.0.0.json',
+            ),
+            'status'          => 'published',
+        ]);
 
         foreach ([$this->orgId, $this->partnerOrgId, $this->foreignOrgId] as $org) {
             foreach (['admin', 'assessor', 'viewer'] as $key) {
@@ -281,6 +296,143 @@ final class RegistryAdminTest extends TestCase
         self::assertSame(2, $found['total']);
         self::assertSame('Kitwe', $found['rows'][0]['place']);
         self::assertNotNull($found['rows'][0]['facility_name']);
+    }
+
+    // ─── the full facility record ───
+
+    public function testAFacilityCarriesItsCodeContactsAndCoordinates(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $facility = $this->created($this->post('/api/admin/facilities', [
+            'name'          => 'Kitwe Central Hospital',
+            'code'          => 'ZM-CB-001',
+            'contact_name'  => 'Grace Phiri',
+            'contact_phone' => '+260 21 1234567',
+            'contact_email' => 'lab@kitwe.example.org',
+            'latitude'      => -12.8024,
+            'longitude'     => 28.2132,
+        ], $token), 'facility');
+
+        self::assertSame('ZM-CB-001', $facility['code']);
+        self::assertSame('Grace Phiri', $facility['contact_name']);
+        self::assertSame('lab@kitwe.example.org', $facility['contact_email']);
+        self::assertEqualsWithDelta(-12.8024, $facility['latitude'], 0.0000001);
+    }
+
+    /**
+     * A malformed address is worse than a blank one: it looks like a way to
+     * reach somebody right up until the message bounces.
+     */
+    public function testAMalformedContactEmailIsRefused(): void
+    {
+        $response = $this->post('/api/admin/facilities', [
+            'name'          => 'Somewhere',
+            'contact_email' => 'not-an-address',
+        ], $this->signIn('boss@example.org'));
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    /** Catches latitude and longitude entered the wrong way round, sometimes. */
+    public function testACoordinateOutOfRangeIsRefused(): void
+    {
+        $response = $this->post('/api/admin/facilities', [
+            'name'     => 'Somewhere',
+            'latitude' => 128.5,
+        ], $this->signIn('boss@example.org'));
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    public function testTypeAndAffiliationOptionsComeFromThePublishedInstrument(): void
+    {
+        $options = $this->body($this->get('/api/admin/facility-options', $this->signIn('boss@example.org')))['options'];
+
+        self::assertNotEmpty($options['facility_type']);
+        self::assertContains(
+            'hospital_bedside',
+            array_column($options['facility_type'], 'key'),
+        );
+        self::assertContains('government', array_column($options['affiliation'], 'key'));
+    }
+
+    // ─── merging a duplicate ───
+
+    /**
+     * The same building entered twice, which the design invites: an assessor
+     * arriving somewhere unlisted creates it on the spot.
+     */
+    public function testMergingMovesTheTestingSitesAndKeepsTheLoser(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $keep = $this->created($this->post('/api/admin/facilities', [
+            'name' => 'Kitwe Central Hospital',
+        ], $token), 'facility');
+
+        $duplicate = $this->created($this->post('/api/admin/facilities', [
+            'name' => 'Kitwe Central Hosp.', 'code' => 'ZM-CB-001',
+        ], $token), 'facility');
+
+        $this->post('/api/admin/testing-sites', [
+            'name' => 'TB clinic', 'facility_id' => $duplicate['id'],
+        ], $token);
+
+        $response = $this->post('/api/admin/facilities/' . $duplicate['id'] . '/merge', [
+            'into' => $keep['id'],
+        ], $token);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+
+        // The site moved, so assessments through it still resolve.
+        $sites = $this->body($this->get('/api/admin/testing-sites?facility=' . $keep['id'], $token));
+
+        self::assertSame(1, $sites['total']);
+
+        // The loser survives, deactivated and pointing at the survivor.
+        $loser = Capsule::table('facilities')
+            ->where('id', hex2bin(str_replace('-', '', $duplicate['id'])))
+            ->first();
+
+        self::assertNotNull($loser);
+        self::assertSame(0, (int) $loser->is_active);
+        self::assertNotNull($loser->merged_into_id);
+
+        // And the survivor took the code it was missing, without losing its name.
+        self::assertSame('ZM-CB-001', $this->body($response)['facility']['code']);
+        self::assertSame('Kitwe Central Hospital', $this->body($response)['facility']['name']);
+    }
+
+    public function testAFacilityCannotBeMergedIntoItself(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $facility = $this->created($this->post('/api/admin/facilities', ['name' => 'One'], $token), 'facility');
+
+        $response = $this->post('/api/admin/facilities/' . $facility['id'] . '/merge', [
+            'into' => $facility['id'],
+        ], $token);
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    /** A chain would make "which facility is this really?" a walk of unknown length. */
+    public function testMergingIntoAnAlreadyMergedFacilityIsRefused(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $keep = $this->created($this->post('/api/admin/facilities', ['name' => 'Keep'], $token), 'facility');
+        $first = $this->created($this->post('/api/admin/facilities', ['name' => 'First'], $token), 'facility');
+        $second = $this->created($this->post('/api/admin/facilities', ['name' => 'Second'], $token), 'facility');
+
+        $this->post('/api/admin/facilities/' . $first['id'] . '/merge', ['into' => $keep['id']], $token);
+
+        $response = $this->post('/api/admin/facilities/' . $second['id'] . '/merge', [
+            'into' => $first['id'],
+        ], $token);
+
+        self::assertSame(422, $response->getStatusCode());
     }
 
     // ─── the registry is shared inside a programme ───

@@ -138,6 +138,53 @@ final class RegistryAction
         );
     }
 
+    /**
+     * One facility, for the form that edits it.
+     *
+     * @param array<string,string> $args
+     */
+    public function facility(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        try {
+            return $this->json($response, 200, [
+                'facility' => $this->registry->facility((string) ($args['id'] ?? '')),
+            ]);
+        } catch (InvalidArgumentException $e) {
+            return $this->json($response, 404, ['error' => ['message' => $e->getMessage()]]);
+        }
+    }
+
+    /** The instrument's own vocabulary for type, level and affiliation. */
+    public function facilityOptions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $locale = $request->getQueryParams()['locale'] ?? 'en';
+
+        return $this->json($response, 200, [
+            'options' => $this->registry->facilityOptions(is_string($locale) ? $locale : 'en'),
+        ]);
+    }
+
+    /** @param array<string,string> $args */
+    public function mergeFacility(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        return $this->handle(
+            $response,
+            fn (array $body): array => [
+                'facility' => $this->registry->mergeFacility(
+                    (string) ($args['id'] ?? ''),
+                    (string) ($body['into'] ?? ''),
+                ),
+            ],
+            $request,
+        );
+    }
+
     /** @param array<string,mixed> $query */
     private function intParam(array $query, string $key): ?int
     {

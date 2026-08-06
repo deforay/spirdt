@@ -62,6 +62,18 @@ const routes: RouteRecordRaw[] = [
         meta: { roles: MANAGING },
     },
     {
+        path: '/admin/facilities/new',
+        name: 'admin-facility-new',
+        component: () => import('@/views/admin/FacilityFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/facilities/:id',
+        name: 'admin-facility',
+        component: () => import('@/views/admin/FacilityFormView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
         path: '/admin/sites',
         name: 'admin-sites',
         component: () => import('@/views/admin/SitesView.vue'),

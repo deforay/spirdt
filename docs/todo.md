@@ -48,6 +48,31 @@ needs its own settings screen, whether organisations need types (ministry
 versus partner), and **whether organisation A may see organisation B's score on
 a site they both audit** — today, no.
 
+### Form management — deferred, and blocked on one ruling
+Letting a country customise the instrument. The schema already takes a
+position: `templates.organization_id NULL` is the platform's base instrument,
+organisations **fork** it, publishing freezes a version, editing copy-on-writes
+to v(n+1), and a template with submitted assessments cannot be edited at all —
+only forked.
+
+What is not settled is **what may be changed**, and that is a programme
+decision rather than a UI one. SPI-RDT's value is that a Level 3 in one country
+means what a Level 3 means in another; customisation is in direct tension with
+that. My recommendation:
+
+| | |
+|---|---|
+| Question wording, guidance, criteria | Yes — translation and local phrasing is the point |
+| Part A fields (facility types, affiliations, roster) | Yes — already a per-country customisation point |
+| `na_allowed` per question | Yes, with a warning: every N/A narrows the denominator |
+| A country's own extra questions | Yes, scored separately or not at all |
+| Removing or renumbering core questions | No — this is what the stable `uid` is for |
+| Scoring points (Y=2, P=1, N=0, NA excluded) | No — changes these and no score is comparable |
+| Band thresholds (40/60/80/90) | **Needs the programme's ruling.** Defensible as national policy, but Level 3 then means different things in different countries |
+
+Until the table is agreed, the editor cannot be designed: "translate and tune"
+and "build your own instrument" are different products.
+
 ### Stable question ids — decided, waiting on the hierarchy pass
 `code` (`1.1`, `4.23`) is unique within a template and enforced, so referencing
 a question works today. What it is not is stable across instrument versions: it

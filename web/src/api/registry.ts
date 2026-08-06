@@ -36,10 +36,47 @@ export interface Facility {
     facility_type: string | null
     level: string | null
     affiliation: string | null
+    address: string | null
+    contact_name: string | null
+    contact_phone: string | null
+    contact_email: string | null
+    latitude: number | null
+    longitude: number | null
     /** 'field' means an assessor created it on the spot and nobody has reconciled it. */
     source: string
     is_active: boolean
 }
+
+/** What the instrument allows for type, level and affiliation. */
+export interface FacilityOption {
+    key: string
+    label: string
+}
+
+export interface FacilityOptions {
+    facility_type: FacilityOption[]
+    level: FacilityOption[]
+    affiliation: FacilityOption[]
+}
+
+export type FacilityInput = Partial<
+    Pick<
+        Facility,
+        | 'name'
+        | 'code'
+        | 'geo_unit_id'
+        | 'facility_type'
+        | 'level'
+        | 'affiliation'
+        | 'address'
+        | 'contact_name'
+        | 'contact_phone'
+        | 'contact_email'
+        | 'latitude'
+        | 'longitude'
+        | 'is_active'
+    >
+>
 
 export interface RegistryTestingSite {
     id: string
@@ -138,19 +175,39 @@ export async function listFacilities(query: ListQuery = {}): Promise<Page<Facili
     return apiRequest<Page<Facility>>(`/admin/facilities${queryString(query)}`, { method: 'GET' })
 }
 
-export async function createFacility(input: {
-    name: string
-    geo_unit_id?: number | null
-    facility_type?: string
-    affiliation?: string
-}): Promise<Facility> {
+export async function getFacility(id: string): Promise<Facility> {
+    return (await apiRequest<{ facility: Facility }>(`/admin/facilities/${id}`, { method: 'GET' }))
+        .facility
+}
+
+export async function facilityOptions(locale: string): Promise<FacilityOptions> {
+    return (
+        await apiRequest<{ options: FacilityOptions }>(`/admin/facility-options?locale=${locale}`, {
+            method: 'GET',
+        })
+    ).options
+}
+
+export async function createFacility(input: FacilityInput): Promise<Facility> {
     return (await apiRequest<{ facility: Facility }>('/admin/facilities', { body: input })).facility
 }
 
-export async function updateFacility(
-    id: string,
-    patch: Partial<Pick<Facility, 'name' | 'geo_unit_id' | 'facility_type' | 'affiliation' | 'is_active'>>,
-): Promise<Facility> {
+/**
+ * Fold a duplicate into the record that survives.
+ *
+ * Nothing is deleted: the loser keeps its row and gains a pointer, because
+ * assessments already reference it and "which facility was this visit against?"
+ * has to keep resolving.
+ */
+export async function mergeFacility(loserId: string, intoId: string): Promise<Facility> {
+    return (
+        await apiRequest<{ facility: Facility }>(`/admin/facilities/${loserId}/merge`, {
+            body: { into: intoId },
+        })
+    ).facility
+}
+
+export async function updateFacility(id: string, patch: FacilityInput): Promise<Facility> {
     return (
         await apiRequest<{ facility: Facility }>(`/admin/facilities/${id}`, {
             method: 'PATCH',

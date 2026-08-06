@@ -6,8 +6,11 @@ namespace App\Service;
 
 use App\Models\Facility;
 use App\Models\GeoUnit;
+use App\Models\Template;
 use App\Models\TestingSite;
 use App\Support\BinaryUuid;
+use App\Tenancy\TenantContext;
+use Illuminate\Database\Capsule\Manager as Capsule;
 use InvalidArgumentException;
 
 /**
@@ -202,11 +205,16 @@ final class RegistryService
         ?string $search = null,
         int $page = 1,
         int $perPage = self::PAGE_SIZE,
+        ?string $id = null,
     ): array {
         $perPage = max(1, min($perPage, 200));
         $page = max(1, $page);
 
         $query = Facility::query();
+
+        if ($id !== null) {
+            $query->where('facilities.id', BinaryUuid::toBytes($id));
+        }
 
         if ($geoUnitId !== null) {
             $query->whereIn('geo_unit_id', $this->subtree($geoUnitId));
@@ -247,6 +255,12 @@ final class RegistryService
                 'facility_type' => $facility->facility_type,
                 'level'         => $facility->level,
                 'affiliation'   => $facility->affiliation,
+                'address'       => $facility->address,
+                'contact_name'  => $facility->contact_name,
+                'contact_phone' => $facility->contact_phone,
+                'contact_email' => $facility->contact_email,
+                'latitude'      => $facility->latitude === null ? null : (float) $facility->latitude,
+                'longitude'     => $facility->longitude === null ? null : (float) $facility->longitude,
                 // 'field' means an assessor created it on the spot and nobody
                 // has reconciled it against the registry yet. Worth showing.
                 'source'        => (string) $facility->source,
@@ -311,6 +325,11 @@ final class RegistryService
             'name'          => $name,
             'code'          => $this->optionalText($input, 'code'),
             'address'       => $this->optionalText($input, 'address'),
+            'contact_name'  => $this->optionalText($input, 'contact_name'),
+            'contact_phone' => $this->optionalText($input, 'contact_phone'),
+            'contact_email' => $this->optionalEmail($input, 'contact_email'),
+            'latitude'      => $this->optionalCoordinate($input, 'latitude', 90),
+            'longitude'     => $this->optionalCoordinate($input, 'longitude', 180),
             'facility_type' => $this->optionalText($input, 'facility_type'),
             'level'         => $this->optionalText($input, 'level'),
             'affiliation'   => $this->optionalText($input, 'affiliation'),
@@ -353,9 +372,22 @@ final class RegistryService
             $attributes['geo_unit_id'] = $geoUnitId;
         }
 
-        foreach (['code', 'address', 'facility_type', 'level', 'affiliation'] as $field) {
+        foreach ([
+            'code', 'address', 'facility_type', 'level', 'affiliation',
+            'contact_name', 'contact_phone',
+        ] as $field) {
             if (array_key_exists($field, $input)) {
                 $attributes[$field] = $this->optionalText($input, $field);
+            }
+        }
+
+        if (array_key_exists('contact_email', $input)) {
+            $attributes['contact_email'] = $this->optionalEmail($input, 'contact_email');
+        }
+
+        foreach (['latitude' => 90, 'longitude' => 180] as $field => $limit) {
+            if (array_key_exists($field, $input)) {
+                $attributes[$field] = $this->optionalCoordinate($input, $field, $limit);
             }
         }
 
@@ -368,6 +400,134 @@ final class RegistryService
         }
 
         return $this->oneFacility($id);
+    }
+
+    /**
+     * Fold one facility into another, because the same place was entered twice.
+     *
+     * It happens for a reason the design invites: an assessor arriving at a
+     * site that is not in the registry creates it on the spot, and "Kitwe
+     * Central Hosp." and "Kitwe Central Hospital" are then two rows for one
+     * building. That trade was made deliberately — refusing to let an assessor
+     * work would have been worse — and this is the other half of it.
+     *
+     * NOTHING IS DELETED. The loser keeps its row, gains `merged_into_id`, and
+     * is deactivated. Assessments already reference it, and an audit trail that
+     * loses the thing it audited is not one — "which facility was this visit
+     * against?" has to keep resolving, even to a name nobody uses any more.
+     *
+     * ITS TESTING SITES MOVE. They are what assessments actually point at, so
+     * leaving them behind on a deactivated facility would strand every visit
+     * ever made through them.
+     *
+     * Fields are filled, never overwritten: the winner keeps everything it
+     * already has and takes only what it was missing. A merge is a correction
+     * of duplication, not an invitation to prefer the newer typing.
+     *
+     * @return array<string,mixed> the surviving facility
+     */
+    public function mergeFacility(string $loserId, string $winnerId): array
+    {
+        if ($loserId === $winnerId) {
+            throw new InvalidArgumentException('A facility cannot be merged into itself.');
+        }
+
+        // Both scoped, so one from another programme resolves to null here.
+        $loser = Facility::query()->where('facilities.id', BinaryUuid::toBytes($loserId))->first();
+        $winner = Facility::query()->where('facilities.id', BinaryUuid::toBytes($winnerId))->first();
+
+        if ($loser === null || $winner === null) {
+            throw new InvalidArgumentException('Both facilities must be in this programme.');
+        }
+
+        if ($loser->merged_into_id !== null) {
+            throw new InvalidArgumentException('That facility has already been merged.');
+        }
+
+        // A chain would make "which facility is this really?" a walk of unknown
+        // length, and a cycle would make it an infinite one.
+        if ($winner->merged_into_id !== null) {
+            throw new InvalidArgumentException(
+                'That facility has itself been merged into another. Merge into the surviving one.',
+            );
+        }
+
+        Capsule::connection()->transaction(function () use ($loser, $winner): void {
+            TestingSite::query()
+                ->where('facility_id', BinaryUuid::toBytes((string) $loser->id))
+                ->update(['facility_id' => BinaryUuid::toBytes((string) $winner->id)]);
+
+            $fill = [];
+
+            foreach ([
+                'code', 'address', 'geo_unit_id', 'facility_type', 'level', 'affiliation',
+                'contact_name', 'contact_phone', 'contact_email', 'latitude', 'longitude',
+            ] as $field) {
+                if ($winner->{$field} === null && $loser->{$field} !== null) {
+                    $fill[$field] = $loser->{$field};
+                }
+            }
+
+            if ($fill !== []) {
+                Facility::query()
+                    ->where('facilities.id', BinaryUuid::toBytes((string) $winner->id))
+                    ->update($fill);
+            }
+
+            Facility::query()
+                ->where('facilities.id', BinaryUuid::toBytes((string) $loser->id))
+                ->update([
+                    'merged_into_id' => BinaryUuid::toBytes((string) $winner->id),
+                    'is_active'      => 0,
+                ]);
+        });
+
+        return $this->oneFacility($winnerId);
+    }
+
+    /**
+     * The option keys a facility's type, level and affiliation may take.
+     *
+     * Read from the PUBLISHED TEMPLATE rather than hard-coded, because they are
+     * the instrument's own vocabulary and a country may customise them. A list
+     * repeated here would be one instrument revision away from offering a key
+     * that scores against nothing.
+     *
+     * @return array<string,list<array{key: string, label: string}>>
+     */
+    public function facilityOptions(string $locale = 'en'): array
+    {
+        $template = Template::published(TenantContext::requireOrganizationId());
+
+        if ($template === null) {
+            return ['facility_type' => [], 'level' => [], 'affiliation' => []];
+        }
+
+        $definition = $template->definition;
+        $definition = is_string($definition)
+            ? json_decode($definition, true, 512, JSON_THROW_ON_ERROR)
+            : $definition;
+
+        $options = ['facility_type' => [], 'level' => [], 'affiliation' => []];
+
+        foreach ((array) ($definition['context_fields'] ?? []) as $field) {
+            $code = (string) ($field['code'] ?? '');
+
+            if (!array_key_exists($code, $options)) {
+                continue;
+            }
+
+            foreach ((array) ($field['options'] ?? []) as $option) {
+                $label = (array) ($option['label'] ?? []);
+
+                $options[$code][] = [
+                    'key'   => (string) ($option['key'] ?? ''),
+                    'label' => (string) ($label[$locale] ?? $label['en'] ?? reset($label) ?: ''),
+                ];
+            }
+        }
+
+        return $options;
     }
 
     /**
@@ -542,16 +702,28 @@ final class RegistryService
         throw new InvalidArgumentException('No such place in this programme.');
     }
 
+    /**
+     * One facility by id, for the form.
+     *
+     * @return array<string,mixed>
+     */
+    public function facility(string $id): array
+    {
+        return $this->oneFacility($id);
+    }
+
     /** @return array<string,mixed> */
     private function oneFacility(string $id): array
     {
-        foreach ($this->facilities(null, null, 1, 200)['rows'] as $facility) {
-            if ($facility['id'] === $id) {
-                return $facility;
-            }
+        // Looked up by id rather than scanned out of a page: with thousands of
+        // facilities the first page almost never contains the one just saved.
+        $found = $this->facilities(null, null, 1, 1, $id)['rows'];
+
+        if ($found === []) {
+            throw new InvalidArgumentException('No such facility in this programme.');
         }
 
-        throw new InvalidArgumentException('No such facility in this programme.');
+        return $found[0];
     }
 
     /** @return array<string,mixed> */
@@ -584,6 +756,56 @@ final class RegistryService
         $value = trim((string) ($input[$key] ?? ''));
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * An address, checked rather than stored as typed.
+     *
+     * A malformed one is worse than a blank: it looks like a way to reach
+     * somebody right up until the message bounces, and by then whoever entered
+     * it has moved on.
+     *
+     * @param array<string,mixed> $input
+     */
+    private function optionalEmail(array $input, string $key): ?string
+    {
+        $value = $this->optionalText($input, $key);
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
+            throw new InvalidArgumentException('That does not look like an email address.');
+        }
+
+        return $value;
+    }
+
+    /**
+     * A coordinate, bounded.
+     *
+     * The commonest real error is latitude and longitude the wrong way round,
+     * which the range catches whenever the longitude is past 90 — not always,
+     * but for free.
+     *
+     * @param array<string,mixed> $input
+     */
+    private function optionalCoordinate(array $input, string $key, float $limit): ?float
+    {
+        $value = $input[$key] ?? null;
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_numeric($value) || abs((float) $value) > $limit) {
+            throw new InvalidArgumentException(
+                ucfirst($key) . ' must be between -' . $limit . ' and ' . $limit . '.',
+            );
+        }
+
+        return (float) $value;
     }
 
     /** @param array<string,mixed> $input */

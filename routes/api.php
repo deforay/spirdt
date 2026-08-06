@@ -92,6 +92,8 @@ return static function (App $app): void {
         $group->patch('/geo-units/{id}', [RegistryAction::class, 'updateGeoUnit']);
         $group->post('/facilities', [RegistryAction::class, 'createFacility']);
         $group->patch('/facilities/{id}', [RegistryAction::class, 'updateFacility']);
+        // Folding a duplicate into the record that survives. Never deletes.
+        $group->post('/facilities/{id}/merge', [RegistryAction::class, 'mergeFacility']);
         $group->post('/testing-sites', [RegistryAction::class, 'createTestingSite']);
         $group->patch('/testing-sites/{id}', [RegistryAction::class, 'updateTestingSite']);
 
@@ -120,6 +122,8 @@ return static function (App $app): void {
     $app->group('/admin', function (RouteCollectorProxy $group): void {
         $group->get('/geo-units', [RegistryAction::class, 'geoUnits']);
         $group->get('/facilities', [RegistryAction::class, 'facilities']);
+        $group->get('/facility-options', [RegistryAction::class, 'facilityOptions']);
+        $group->get('/facilities/{id}', [RegistryAction::class, 'facility']);
         $group->get('/testing-sites', [RegistryAction::class, 'testingSites']);
         $group->get('/assignments', [AssignmentsAction::class, 'index']);
     })

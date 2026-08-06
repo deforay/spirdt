@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 
-import {
-    createFacility,
-    type Facility,
-    type GeoTree,
-    listFacilities,
-    listGeoUnits,
-    updateFacility,
-} from '@/api/registry'
+import { type Facility, type GeoTree, listFacilities, listGeoUnits } from '@/api/registry'
 import { session } from '@/auth/session'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import PagedList from '@/components/admin/PagedList.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
 import { t } from '@/i18n'
+import { RouterLink } from 'vue-router'
 
 /**
  * Facilities, on their own page, searched rather than browsed.
@@ -39,9 +33,6 @@ const loading = ref(true)
 const error = ref('')
 
 const canWrite = computed(() => ['admin', 'superadmin'].includes(session.value?.user.role ?? ''))
-
-const adding = ref(false)
-const draft = ref<{ name: string; geoUnitId: number | null }>({ name: '', geoUnitId: null })
 
 async function act<T>(run: () => Promise<T>): Promise<T | null> {
     error.value = ''
@@ -90,30 +81,6 @@ watch([search, geoUnitId], () => {
 
 watch(page, load)
 
-async function onAdd(): Promise<void> {
-    if (draft.value.name.trim() === '') {
-        return
-    }
-
-    const created = await act(() =>
-        createFacility({ name: draft.value.name.trim(), geo_unit_id: draft.value.geoUnitId }),
-    )
-
-    if (created !== null) {
-        draft.value = { name: '', geoUnitId: null }
-        adding.value = false
-        await load()
-    }
-}
-
-async function onToggle(facility: Facility): Promise<void> {
-    const updated = await act(() => updateFacility(facility.id, { is_active: !facility.is_active }))
-
-    if (updated !== null) {
-        await load()
-    }
-}
-
 onMounted(async () => {
     await act(async () => {
         tree.value = await listGeoUnits()
@@ -140,38 +107,14 @@ onMounted(async () => {
                     :placeholder="t('facilities.anywhere')"
                 />
             </div>
-            <button
+            <RouterLink
                 v-if="canWrite"
-                type="button"
+                :to="{ name: 'admin-facility-new' }"
                 class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
-                @click="adding = !adding"
             >
-                {{ adding ? t('action.cancel') : t('facilities.add') }}
-            </button>
+                {{ t('facilities.add') }}
+            </RouterLink>
         </div>
-
-        <form
-            v-if="adding && canWrite"
-            class="mb-5 flex flex-wrap items-start gap-2 rounded-card bg-surface p-4"
-            @submit.prevent="onAdd"
-        >
-            <input
-                v-model="draft.name"
-                type="text"
-                :placeholder="t('registry.facilityName')"
-                class="min-w-[200px] flex-1 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-            />
-            <div class="min-w-[260px]">
-                <PlacePicker v-model="draft.geoUnitId" :tree="tree" />
-            </div>
-            <button
-                type="submit"
-                class="rounded-lg bg-accent px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-40"
-                :disabled="draft.name.trim() === ''"
-            >
-                {{ t('action.add') }}
-            </button>
-        </form>
 
         <div class="overflow-hidden rounded-card bg-surface">
             <p v-if="!loading && facilities.length === 0" class="px-4 py-3 text-[14px] text-label-2">
@@ -186,26 +129,24 @@ onMounted(async () => {
                     facility.is_active ? '' : 'opacity-50',
                 ]"
             >
-                <div class="min-w-0 flex-1">
-                    <span class="block truncate text-[15px]">
+                <RouterLink
+                    :to="{ name: 'admin-facility', params: { id: facility.id } }"
+                    class="min-w-0 flex-1"
+                >
+                    <span class="block truncate text-[15px] hover:text-accent">
                         {{ facility.name }}
+                        <span v-if="facility.code" class="text-[12px] text-label-3">
+                            {{ facility.code }}
+                        </span>
                         <span v-if="facility.source === 'field'" class="text-[12px] text-partial">
                             {{ t('registry.fromTheField') }}
                         </span>
                     </span>
                     <span class="block truncate text-[12px] text-label-2">
                         {{ facility.place ?? t('facilities.noPlace') }}
+                        <template v-if="facility.contact_phone"> · {{ facility.contact_phone }}</template>
                     </span>
-                </div>
-                <button
-                    v-if="canWrite"
-                    type="button"
-                    class="shrink-0 text-[13px]"
-                    :class="facility.is_active ? 'text-no' : 'text-yes'"
-                    @click="onToggle(facility)"
-                >
-                    {{ facility.is_active ? t('admin.deactivate') : t('admin.activate') }}
-                </button>
+                </RouterLink>
             </div>
         </div>
 
