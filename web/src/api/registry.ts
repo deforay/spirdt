@@ -19,9 +19,18 @@ export interface GeoUnit {
     is_active: boolean
 }
 
+export interface Page<T> {
+    rows: T[]
+    total: number
+    page: number
+    per_page: number
+}
+
 export interface Facility {
     id: string
     geo_unit_id: number | null
+    /** "Copperbelt › Kitwe". Sent by the server so a row says where it is. */
+    place: string | null
     name: string
     code: string | null
     facility_type: string | null
@@ -35,6 +44,8 @@ export interface Facility {
 export interface RegistryTestingSite {
     id: string
     facility_id: string
+    facility_name: string | null
+    place: string | null
     name: string
     location_description: string | null
     source: string
@@ -50,9 +61,19 @@ export interface Assignment {
     is_active: boolean
 }
 
-export async function listGeoUnits(): Promise<GeoUnit[]> {
-    return (await apiRequest<{ geo_units: GeoUnit[] }>('/admin/geo-units', { method: 'GET' }))
-        .geo_units
+export interface GeoTree {
+    units: GeoUnit[]
+    /** id → "Copperbelt › Kitwe", built once by the server rather than per row. */
+    paths: Record<number, string>
+}
+
+export async function listGeoUnits(): Promise<GeoTree> {
+    const body = await apiRequest<{ geo_units: GeoUnit[]; paths: Record<number, string> }>(
+        '/admin/geo-units',
+        { method: 'GET' },
+    )
+
+    return { units: body.geo_units, paths: body.paths }
 }
 
 export async function createGeoUnit(input: {
@@ -75,11 +96,46 @@ export async function updateGeoUnit(
     ).geo_unit
 }
 
-export async function listFacilities(geoUnitId?: number | null): Promise<Facility[]> {
-    const query = geoUnitId === null || geoUnitId === undefined ? '' : `?geo_unit=${geoUnitId}`
+export interface ListQuery {
+    geoUnitId?: number | null
+    search?: string
+    page?: number
+    perPage?: number
+}
 
-    return (await apiRequest<{ facilities: Facility[] }>(`/admin/facilities${query}`, { method: 'GET' }))
-        .facilities
+/**
+ * Nothing here fetches "all of them".
+ *
+ * A national registry runs to thousands of facilities. Every list is a page
+ * with a total beside it, because "50 of 1,240" is the difference between a
+ * list somebody trusts and one they scroll to the bottom of hoping it ended.
+ */
+function queryString(query: ListQuery & { facilityId?: string | null }): string {
+    const parts = new URLSearchParams()
+
+    if (query.geoUnitId !== null && query.geoUnitId !== undefined) {
+        parts.set('geo_unit', String(query.geoUnitId))
+    }
+
+    if (query.facilityId !== null && query.facilityId !== undefined && query.facilityId !== '') {
+        parts.set('facility', query.facilityId)
+    }
+
+    if ((query.search ?? '').trim() !== '') {
+        parts.set('q', (query.search ?? '').trim())
+    }
+
+    parts.set('page', String(query.page ?? 1))
+
+    if (query.perPage !== undefined) {
+        parts.set('per_page', String(query.perPage))
+    }
+
+    return `?${parts.toString()}`
+}
+
+export async function listFacilities(query: ListQuery = {}): Promise<Page<Facility>> {
+    return apiRequest<Page<Facility>>(`/admin/facilities${queryString(query)}`, { method: 'GET' })
 }
 
 export async function createFacility(input: {
@@ -103,14 +159,12 @@ export async function updateFacility(
     ).facility
 }
 
-export async function listTestingSites(facilityId?: string | null): Promise<RegistryTestingSite[]> {
-    const query = facilityId === null || facilityId === undefined ? '' : `?facility=${facilityId}`
-
-    return (
-        await apiRequest<{ testing_sites: RegistryTestingSite[] }>(`/admin/testing-sites${query}`, {
-            method: 'GET',
-        })
-    ).testing_sites
+export async function listTestingSites(
+    query: ListQuery & { facilityId?: string | null } = {},
+): Promise<Page<RegistryTestingSite>> {
+    return apiRequest<Page<RegistryTestingSite>>(`/admin/testing-sites${queryString(query)}`, {
+        method: 'GET',
+    })
 }
 
 export async function createTestingSite(input: {

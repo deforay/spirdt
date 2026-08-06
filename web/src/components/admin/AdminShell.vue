@@ -36,7 +36,9 @@ const links = computed(() =>
         // People is administrators only; the registry and the plan are readable
         // by a viewer, because the dashboard filters by the same hierarchy.
         { to: { name: 'admin-users' }, label: t('admin.users'), show: canAdminister.value },
-        { to: { name: 'admin-registry' }, label: t('registry.title'), show: true },
+        { to: { name: 'admin-places' }, label: t('places.title'), show: true },
+        { to: { name: 'admin-facilities' }, label: t('facilities.title'), show: true },
+        { to: { name: 'admin-sites' }, label: t('sitesAdmin.title'), show: true },
         { to: { name: 'admin-assignments' }, label: t('assignments.title'), show: true },
         { to: { name: 'admin-organizations' }, label: t('organizations.title'), show: ownsProgramme.value },
     ].filter((link) => link.show),

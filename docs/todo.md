@@ -5,14 +5,26 @@ so work can resume cold.
 
 ## Decided but not built
 
-### Registry screens — done
-Places, facilities and testing sites are managed at `/admin/registry`, and
-`/admin/assignments` covers who visits what. `GeoCascade` renders N levels from
-the tree and takes its labels from `geo_units.level`, so it works for
-Province → District and Region → Zone → Woreda without a change.
+### Registry screens — done, and rebuilt for scale
+Separate pages: `/admin/places`, `/admin/facilities`, `/admin/sites`, plus
+`/admin/assignments`. Search-first and paginated, because a country runs to
+thousands of facilities and hundreds of places.
 
-What is still missing there: renaming a place or facility in place (only add
-and deactivate today), the merge screen for duplicates, and bulk import.
+The first version was built for a demo of four rows and had two real bugs at
+scale, both now covered by tests: choosing a **province** matched nothing,
+because facilities hang off districts and the filter was an exact
+`geo_unit_id` rather than the subtree; and the assignments screen fetched a
+place's facilities and then asked **one request per facility** for its sites.
+
+The cascade of selects is gone. Twenty provinces of thirty districts made
+finding a place two guesses in a fixed order, and it only worked if you already
+knew which province a district was in. `PlacePicker` is a type-ahead over the
+whole tree matching on the full path — "copper kit" finds Kitwe in Copperbelt —
+and every row anywhere prints its path, since district and facility names
+repeat.
+
+Still missing there: renaming in place (only add and deactivate), the merge
+screen for field-created duplicates, and bulk import.
 
 ### The tenant hierarchy — basic version in place
 `programmes` → `organizations`, with the registry on the programme and audit

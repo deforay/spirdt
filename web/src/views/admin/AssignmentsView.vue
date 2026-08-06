@@ -5,17 +5,16 @@ import { type AdminUser, listUsers } from '@/api/admin'
 import {
     type Assignment,
     createAssignment,
-    type Facility,
-    type GeoUnit,
+    type GeoTree,
     listAssignments,
-    listFacilities,
     listGeoUnits,
     listTestingSites,
     type RegistryTestingSite,
     withdrawAssignment,
 } from '@/api/registry'
 import AdminShell from '@/components/admin/AdminShell.vue'
-import GeoCascade from '@/components/admin/GeoCascade.vue'
+import PagedList from '@/components/admin/PagedList.vue'
+import PlacePicker from '@/components/admin/PlacePicker.vue'
 import { t } from '@/i18n'
 
 /**
@@ -30,15 +29,21 @@ import { t } from '@/i18n'
  * across the programme makes that stricter rather than looser.
  */
 
-const units = ref<GeoUnit[]>([])
-const facilities = ref<Facility[]>([])
+const tree = ref<GeoTree>({ units: [], paths: {} })
 const sites = ref<RegistryTestingSite[]>([])
 const assignments = ref<Assignment[]>([])
 const users = ref<AdminUser[]>([])
 
+const total = ref(0)
+const page = ref(1)
+const perPage = ref(50)
 const geoUnitId = ref<number | null>(null)
+const search = ref('')
 const loading = ref(true)
 const error = ref('')
+
+/** Ticked rows, so a district can be handed over in one action. */
+const selected = ref(new Set<string>())
 
 /** Blank means the whole organisation, which is what most plans want. */
 const assignTo = ref<string>('')
@@ -50,8 +55,6 @@ const assessors = computed(() =>
 )
 
 const nameOf = computed(() => new Map(users.value.map((user) => [user.id, user.full_name])))
-
-const facilityName = computed(() => new Map(facilities.value.map((f) => [f.id, f.name])))
 
 /** Live assignments by site, so each row can show what is already true of it. */
 const bySite = computed(() => {
@@ -87,7 +90,7 @@ async function load(): Promise<void> {
     loading.value = true
 
     await act(async () => {
-        units.value = await listGeoUnits()
+        tree.value = await listGeoUnits()
         users.value = await listUsers()
         assignments.value = await listAssignments()
     })
@@ -97,25 +100,76 @@ async function load(): Promise<void> {
 }
 
 /**
- * Every site under the chosen place, across all of its facilities.
+ * Every site under the chosen place, in ONE request.
  *
- * The site endpoint filters by facility, so this walks the facilities in the
- * selection. It is one round trip per facility, which is fine for a district
- * and would not be for a country — bounded by the cascade rather than by luck.
+ * This used to fetch the place's facilities and then ask per facility. In a
+ * district with two hundred facilities that was two hundred requests to fill
+ * one table, and it got worse the more real the data became.
  */
 async function loadSites(): Promise<void> {
+    loading.value = true
+
     await act(async () => {
-        facilities.value = await listFacilities(geoUnitId.value)
+        const result = await listTestingSites({
+            geoUnitId: geoUnitId.value,
+            search: search.value,
+            page: page.value,
+            perPage: perPage.value,
+        })
 
-        const lists = await Promise.all(
-            facilities.value.map((facility) => listTestingSites(facility.id)),
-        )
-
-        sites.value = lists.flat()
+        sites.value = result.rows
+        total.value = result.total
+        perPage.value = result.per_page
     })
+
+    loading.value = false
 }
 
-watch(geoUnitId, loadSites)
+let timer: ReturnType<typeof setTimeout> | undefined
+
+watch([geoUnitId, search], () => {
+    page.value = 1
+    selected.value = new Set()
+    clearTimeout(timer)
+    timer = setTimeout(loadSites, 250)
+})
+
+watch(page, loadSites)
+
+function toggleSelected(id: string): void {
+    const next = new Set(selected.value)
+
+    next.has(id) ? next.delete(id) : next.add(id)
+    selected.value = next
+}
+
+function selectAllOnPage(): void {
+    selected.value =
+        selected.value.size === sites.value.length
+            ? new Set()
+            : new Set(sites.value.map((site) => site.id))
+}
+
+/**
+ * Hand over everything ticked at once.
+ *
+ * Assigning a district site by site through a paginated table is the kind of
+ * task somebody does once and then stops using the tool for.
+ */
+async function onAssignSelected(): Promise<void> {
+    const userId = assignTo.value === '' ? null : Number(assignTo.value)
+
+    for (const siteId of selected.value) {
+        const done = await act(() => createAssignment({ testing_site_id: siteId, user_id: userId }))
+
+        if (done === null) {
+            break
+        }
+    }
+
+    selected.value = new Set()
+    assignments.value = await listAssignments()
+}
 
 async function onAssign(site: RegistryTestingSite): Promise<void> {
     const userId = assignTo.value === '' ? null : Number(assignTo.value)
@@ -151,7 +205,15 @@ onMounted(load)
         <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4 rounded-card bg-surface p-4">
-            <GeoCascade v-model="geoUnitId" :units="units" />
+            <input
+                v-model="search"
+                type="search"
+                :placeholder="t('sitesAdmin.search')"
+                class="min-w-[220px] flex-1 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+            />
+            <div class="min-w-[240px]">
+                <PlacePicker v-model="geoUnitId" :tree="tree" :placeholder="t('facilities.anywhere')" />
+            </div>
 
             <label class="flex flex-col gap-1">
                 <span class="text-[12px] uppercase tracking-wide text-label-2">
@@ -169,13 +231,36 @@ onMounted(load)
             </label>
         </div>
 
-        <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
+        <div
+            v-if="selected.size > 0"
+            class="mb-3 flex items-center justify-between gap-3 rounded-card bg-accent-soft px-4 py-2.5"
+        >
+            <span class="text-[14px] font-medium text-accent">
+                {{ t('assignments.selected', { count: selected.size }) }}
+            </span>
+            <button
+                type="button"
+                class="rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-white"
+                @click="onAssignSelected"
+            >
+                {{ t('assignments.assignSelected') }}
+            </button>
+        </div>
 
-        <div v-else class="overflow-x-auto rounded-card bg-surface">
+        <div class="overflow-x-auto rounded-card bg-surface">
             <table class="w-full min-w-[640px] text-left">
                 <thead>
                     <tr class="border-b border-hairline text-[12px] uppercase tracking-wide text-label-2">
-                        <th class="px-4 py-2.5 font-semibold">{{ t('registry.testingSites') }}</th>
+                        <th class="px-4 py-2.5 font-semibold">
+                            <input
+                                type="checkbox"
+                                class="mr-2 align-middle"
+                                :checked="selected.size > 0 && selected.size === sites.length"
+                                :aria-label="t('assignments.selectAll')"
+                                @change="selectAllOnPage"
+                            />
+                            {{ t('registry.testingSites') }}
+                        </th>
                         <th class="px-4 py-2.5 font-semibold">{{ t('assignments.coveredBy') }}</th>
                         <th class="px-4 py-2.5 text-right font-semibold">{{ t('admin.actions') }}</th>
                     </tr>
@@ -192,10 +277,21 @@ onMounted(load)
                         class="border-b border-hairline last:border-0"
                     >
                         <td class="px-4 py-3">
-                            <span class="block text-[15px]">{{ site.name }}</span>
-                            <span class="block text-[13px] text-label-2">
-                                {{ facilityName.get(site.facility_id) }}
-                            </span>
+                            <label class="flex items-start gap-2">
+                                <input
+                                    type="checkbox"
+                                    class="mt-1"
+                                    :checked="selected.has(site.id)"
+                                    @change="toggleSelected(site.id)"
+                                />
+                                <span class="min-w-0">
+                                    <span class="block truncate text-[15px]">{{ site.name }}</span>
+                                    <span class="block truncate text-[13px] text-label-2">
+                                        {{ site.facility_name
+                                        }}<template v-if="site.place"> · {{ site.place }}</template>
+                                    </span>
+                                </span>
+                            </label>
                         </td>
                         <td class="px-4 py-3">
                             <span
@@ -233,5 +329,13 @@ onMounted(load)
                 </tbody>
             </table>
         </div>
+
+        <PagedList
+            :total="total"
+            :page="page"
+            :per-page="perPage"
+            :loading="loading"
+            @update:page="page = $event"
+        />
     </AdminShell>
 </template>

@@ -29,7 +29,13 @@ final class RegistryAction
 
     public function geoUnits(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->json($response, 200, ['geo_units' => $this->registry->geoUnits()]);
+        return $this->json($response, 200, [
+            'geo_units' => $this->registry->geoUnits(),
+            // Sent with the tree because every screen that shows a place shows
+            // its full path, and rebuilding that on the client for each row is
+            // the same walk repeated.
+            'paths'     => $this->registry->placePaths(),
+        ]);
     }
 
     public function createGeoUnit(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -59,11 +65,14 @@ final class RegistryAction
 
     public function facilities(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $geoUnit = $request->getQueryParams()['geo_unit'] ?? null;
+        $query = $request->getQueryParams();
 
-        return $this->json($response, 200, [
-            'facilities' => $this->registry->facilities(is_numeric($geoUnit) ? (int) $geoUnit : null),
-        ]);
+        return $this->json($response, 200, $this->registry->facilities(
+            $this->intParam($query, 'geo_unit'),
+            $this->stringParam($query, 'q'),
+            $this->intParam($query, 'page') ?? 1,
+            $this->intParam($query, 'per_page') ?? RegistryService::PAGE_SIZE,
+        ));
     }
 
     public function createFacility(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -93,13 +102,15 @@ final class RegistryAction
 
     public function testingSites(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $facility = $request->getQueryParams()['facility'] ?? null;
+        $query = $request->getQueryParams();
 
-        return $this->json($response, 200, [
-            'testing_sites' => $this->registry->testingSites(
-                is_string($facility) && $facility !== '' ? $facility : null,
-            ),
-        ]);
+        return $this->json($response, 200, $this->registry->testingSites(
+            $this->stringParam($query, 'facility'),
+            $this->intParam($query, 'geo_unit'),
+            $this->stringParam($query, 'q'),
+            $this->intParam($query, 'page') ?? 1,
+            $this->intParam($query, 'per_page') ?? RegistryService::PAGE_SIZE,
+        ));
     }
 
     public function createTestingSite(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -125,6 +136,22 @@ final class RegistryAction
             ],
             $request,
         );
+    }
+
+    /** @param array<string,mixed> $query */
+    private function intParam(array $query, string $key): ?int
+    {
+        $value = $query[$key] ?? null;
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    /** @param array<string,mixed> $query */
+    private function stringParam(array $query, string $key): ?string
+    {
+        $value = $query[$key] ?? null;
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
     /**

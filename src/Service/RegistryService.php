@@ -143,26 +143,105 @@ final class RegistryService
     }
 
     /**
-     * Facilities, optionally under one place.
+     * How many rows a page holds.
      *
-     * @return list<array<string,mixed>>
+     * A national registry runs to thousands of facilities, so nothing here
+     * returns "all of them" — the previous version did, and it worked only
+     * because the demo had four.
      */
-    public function facilities(?int $geoUnitId = null): array
+    public const PAGE_SIZE = 50;
+
+    /**
+     * Every place under this one, including itself.
+     *
+     * Filtering facilities on an exact geo_unit_id was wrong: facilities hang
+     * off districts, so choosing a province matched nothing at all. Somebody
+     * asking for Copperbelt means every facility in it, however many levels
+     * down the tree they sit.
+     *
+     * Walked in memory from the flat tree rather than with a recursive query.
+     * The tree is a few hundred rows and is already loaded for the picker;
+     * a recursive CTE per keystroke would be worse in every way.
+     *
+     * @return list<int>
+     */
+    private function subtree(int $geoUnitId): array
     {
+        $children = [];
+
+        foreach ($this->geoUnits() as $unit) {
+            $children[$unit['parent_id']][] = $unit['id'];
+        }
+
+        $found = [];
+        $queue = [$geoUnitId];
+
+        while ($queue !== []) {
+            $current = array_pop($queue);
+            $found[] = $current;
+
+            foreach ($children[$current] ?? [] as $child) {
+                $queue[] = $child;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * Facilities, narrowed by place or by name.
+     *
+     * Paginated, and the total comes back with the page: "50 of 1,240" is the
+     * difference between a list somebody trusts and one they scroll to the
+     * bottom of hoping it ended.
+     *
+     * @return array{rows: list<array<string,mixed>>, total: int, page: int, per_page: int}
+     */
+    public function facilities(
+        ?int $geoUnitId = null,
+        ?string $search = null,
+        int $page = 1,
+        int $perPage = self::PAGE_SIZE,
+    ): array {
+        $perPage = max(1, min($perPage, 200));
+        $page = max(1, $page);
+
         $query = Facility::query();
 
         if ($geoUnitId !== null) {
-            $query->where('geo_unit_id', $geoUnitId);
+            $query->whereIn('geo_unit_id', $this->subtree($geoUnitId));
         }
 
-        $query->getQuery()->orderBy('name');
+        $term = $search === null ? '' : trim($search);
 
-        $facilities = [];
+        if ($term !== '') {
+            // Escaped, because a name legitimately containing % or _ would
+            // otherwise widen the search rather than narrow it.
+            $escaped = addcslashes($term, '%_\\');
+
+            $query->where(function ($inner) use ($escaped): void {
+                $inner->where('name', 'like', '%' . $escaped . '%')
+                    ->orWhere('code', 'like', $escaped . '%');
+            });
+        }
+
+        $total = (int) $query->count();
+
+        $query->getQuery()->orderBy('name')->forPage($page, $perPage);
+
+        $places = $this->placePaths();
+        $rows = [];
 
         foreach ($query->get() as $facility) {
-            $facilities[] = [
+            $geoUnitId = $facility->geo_unit_id === null ? null : (int) $facility->geo_unit_id;
+
+            $rows[] = [
                 'id'            => (string) $facility->id,
-                'geo_unit_id'   => $facility->geo_unit_id === null ? null : (int) $facility->geo_unit_id,
+                'geo_unit_id'   => $geoUnitId,
+                // The whole point of searching across places: a row has to say
+                // where it is, or two clinics with the same name are the same
+                // row to whoever is reading.
+                'place'         => $geoUnitId === null ? null : ($places[$geoUnitId] ?? null),
                 'name'          => (string) $facility->name,
                 'code'          => $facility->code,
                 'facility_type' => $facility->facility_type,
@@ -175,7 +254,41 @@ final class RegistryService
             ];
         }
 
-        return $facilities;
+        return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+    }
+
+    /**
+     * Every place by id, as a readable path — "Copperbelt › Kitwe".
+     *
+     * @return array<int,string>
+     */
+    public function placePaths(): array
+    {
+        $byId = [];
+
+        foreach ($this->geoUnits() as $unit) {
+            $byId[$unit['id']] = $unit;
+        }
+
+        $paths = [];
+
+        foreach ($byId as $id => $unit) {
+            $parts = [];
+            $current = $unit;
+            $guard = 0;
+
+            // Bounded, because a cycle in the tree would otherwise hang the
+            // request rather than producing a wrong label.
+            while ($current !== null && $guard++ < 20) {
+                array_unshift($parts, $current['name']);
+                $parentId = $current['parent_id'];
+                $current = $parentId === null ? null : ($byId[$parentId] ?? null);
+            }
+
+            $paths[$id] = implode(' › ', $parts);
+        }
+
+        return $paths;
     }
 
     /**
@@ -258,26 +371,70 @@ final class RegistryService
     }
 
     /**
-     * Testing sites, optionally within one facility.
+     * Testing sites, narrowed by facility, by place, or by name.
      *
-     * @return list<array<string,mixed>>
+     * The place filter matters more than it looks. Without it, anything
+     * wanting every site in a district had to fetch the district's facilities
+     * and then ask per facility — which the assignments screen did, at one
+     * request per facility. In a district with two hundred facilities that is
+     * two hundred requests to fill one table.
+     *
+     * @return array{rows: list<array<string,mixed>>, total: int, page: int, per_page: int}
      */
-    public function testingSites(?string $facilityId = null): array
-    {
+    public function testingSites(
+        ?string $facilityId = null,
+        ?int $geoUnitId = null,
+        ?string $search = null,
+        int $page = 1,
+        int $perPage = self::PAGE_SIZE,
+    ): array {
+        $perPage = max(1, min($perPage, 200));
+        $page = max(1, $page);
+
         $query = TestingSite::query();
 
         if ($facilityId !== null) {
             $query->where('facility_id', BinaryUuid::toBytes($facilityId));
         }
 
-        $query->getQuery()->orderBy('name');
+        if ($geoUnitId !== null) {
+            // One subquery rather than a round trip per facility.
+            $query->whereIn(
+                'facility_id',
+                Facility::query()
+                    ->whereIn('geo_unit_id', $this->subtree($geoUnitId))
+                    ->select('facilities.id'),
+            );
+        }
 
-        $sites = [];
+        $term = $search === null ? '' : trim($search);
+
+        if ($term !== '') {
+            $escaped = addcslashes($term, '%_\\');
+
+            $query->where('name', 'like', '%' . $escaped . '%');
+        }
+
+        $total = (int) $query->count();
+
+        $query->getQuery()->orderBy('name')->forPage($page, $perPage);
+
+        $rows = [];
+        $facilities = $this->facilityLabels();
+        $places = $this->placePaths();
 
         foreach ($query->get() as $site) {
-            $sites[] = [
+            $facility = $facilities[(string) $site->facility_id] ?? null;
+
+            $rows[] = [
                 'id'                   => (string) $site->id,
                 'facility_id'          => (string) $site->facility_id,
+                'facility_name'        => $facility['name'] ?? null,
+                // Where it is, spelled out, because a bench called "Lab" tells
+                // nobody anything on its own.
+                'place'                => $facility === null || $facility['geo_unit_id'] === null
+                    ? null
+                    : ($places[$facility['geo_unit_id']] ?? null),
                 'name'                 => (string) $site->name,
                 'location_description' => $site->location_description,
                 'source'               => (string) $site->source,
@@ -285,7 +442,26 @@ final class RegistryService
             ];
         }
 
-        return $sites;
+        return ['rows' => $rows, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+    }
+
+    /**
+     * Facility name and place by id, for labelling rows.
+     *
+     * @return array<string,array{name: string, geo_unit_id: int|null}>
+     */
+    private function facilityLabels(): array
+    {
+        $labels = [];
+
+        foreach (Facility::query()->get() as $facility) {
+            $labels[(string) $facility->id] = [
+                'name'        => (string) $facility->name,
+                'geo_unit_id' => $facility->geo_unit_id === null ? null : (int) $facility->geo_unit_id,
+            ];
+        }
+
+        return $labels;
     }
 
     /**
@@ -369,7 +545,7 @@ final class RegistryService
     /** @return array<string,mixed> */
     private function oneFacility(string $id): array
     {
-        foreach ($this->facilities() as $facility) {
+        foreach ($this->facilities(null, null, 1, 200)['rows'] as $facility) {
             if ($facility['id'] === $id) {
                 return $facility;
             }
@@ -381,7 +557,7 @@ final class RegistryService
     /** @return array<string,mixed> */
     private function oneTestingSite(string $id): array
     {
-        foreach ($this->testingSites() as $site) {
+        foreach ($this->testingSites(null, null, null, 1, 200)['rows'] as $site) {
             if ($site['id'] === $id) {
                 return $site;
             }

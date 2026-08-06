@@ -50,9 +50,21 @@ const routes: RouteRecordRaw[] = [
         meta: { roles: MANAGING },
     },
     {
-        path: '/admin/registry',
-        name: 'admin-registry',
-        component: () => import('@/views/admin/RegistryView.vue'),
+        path: '/admin/places',
+        name: 'admin-places',
+        component: () => import('@/views/admin/PlacesView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/facilities',
+        name: 'admin-facilities',
+        component: () => import('@/views/admin/FacilitiesView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/sites',
+        name: 'admin-sites',
+        component: () => import('@/views/admin/SitesView.vue'),
         meta: { roles: MANAGING },
     },
     {

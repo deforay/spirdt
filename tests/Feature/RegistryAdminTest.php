@@ -175,9 +175,11 @@ final class RegistryAdminTest extends TestCase
 
         $inDistrict = $this->body(
             $this->get('/api/admin/facilities?geo_unit=' . $district['id'], $token),
-        )['facilities'];
+        );
 
-        self::assertCount(1, $inDistrict);
+        self::assertCount(1, $inDistrict['rows']);
+        self::assertSame(1, $inDistrict['total']);
+        self::assertSame('Kitwe', $inDistrict['rows'][0]['place']);
     }
 
     public function testAFacilityCannotBeHungOffAnotherProgrammesPlace(): void
@@ -191,6 +193,94 @@ final class RegistryAdminTest extends TestCase
         ], $this->signIn('boss@example.org'));
 
         self::assertSame(422, $response->getStatusCode());
+    }
+
+    /**
+     * Facilities hang off districts, so filtering on an exact geo_unit_id
+     * matched nothing when a province was chosen — the list simply came back
+     * empty and looked like a country with no facilities in it.
+     */
+    public function testChoosingAProvinceFindsFacilitiesInItsDistricts(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $province = $this->created($this->post('/api/admin/geo-units', [
+            'level' => 'Province', 'name' => 'Copperbelt',
+        ], $token), 'geo_unit');
+
+        $district = $this->created($this->post('/api/admin/geo-units', [
+            'level' => 'District', 'name' => 'Kitwe', 'parent_id' => $province['id'],
+        ], $token), 'geo_unit');
+
+        $this->post('/api/admin/facilities', [
+            'name' => 'Kitwe Central Hospital', 'geo_unit_id' => $district['id'],
+        ], $token);
+
+        $inProvince = $this->body(
+            $this->get('/api/admin/facilities?geo_unit=' . $province['id'], $token),
+        );
+
+        self::assertSame(1, $inProvince['total'], 'a province means everything under it');
+        self::assertSame('Copperbelt › Kitwe', $inProvince['rows'][0]['place']);
+    }
+
+    public function testFacilitiesCanBeSearchedByName(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        foreach (['Kitwe Central Hospital', 'Ndola Teaching Hospital', 'Chingola Clinic'] as $name) {
+            $this->post('/api/admin/facilities', ['name' => $name], $token);
+        }
+
+        $found = $this->body($this->get('/api/admin/facilities?q=hospital', $token));
+
+        self::assertSame(2, $found['total']);
+    }
+
+    /** A national registry is thousands of rows; nothing returns all of them. */
+    public function testFacilitiesArePaginatedAndReportTheTotal(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        foreach (range(1, 7) as $n) {
+            $this->post('/api/admin/facilities', ['name' => 'Facility ' . $n], $token);
+        }
+
+        $page = $this->body($this->get('/api/admin/facilities?per_page=3&page=2', $token));
+
+        self::assertCount(3, $page['rows']);
+        self::assertSame(7, $page['total']);
+        self::assertSame(2, $page['page']);
+    }
+
+    /**
+     * Every site in a district in ONE request. Without this the caller had to
+     * fetch the district's facilities and then ask per facility, which in a
+     * district of two hundred facilities is two hundred requests.
+     */
+    public function testTestingSitesCanBeFetchedForAWholePlaceAtOnce(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $district = $this->created($this->post('/api/admin/geo-units', [
+            'level' => 'District', 'name' => 'Kitwe',
+        ], $token), 'geo_unit');
+
+        foreach (['Kitwe Central Hospital', 'Kitwe Clinic'] as $name) {
+            $facility = $this->created($this->post('/api/admin/facilities', [
+                'name' => $name, 'geo_unit_id' => $district['id'],
+            ], $token), 'facility');
+
+            $this->post('/api/admin/testing-sites', [
+                'name' => 'TB clinic', 'facility_id' => $facility['id'],
+            ], $token);
+        }
+
+        $found = $this->body($this->get('/api/admin/testing-sites?geo_unit=' . $district['id'], $token));
+
+        self::assertSame(2, $found['total']);
+        self::assertSame('Kitwe', $found['rows'][0]['place']);
+        self::assertNotNull($found['rows'][0]['facility_name']);
     }
 
     // ─── the registry is shared inside a programme ───
@@ -210,7 +300,7 @@ final class RegistryAdminTest extends TestCase
         $partner = $this->signIn('partner@example.org');
 
         self::assertCount(1, $this->body($this->get('/api/admin/geo-units', $partner))['geo_units']);
-        self::assertCount(1, $this->body($this->get('/api/admin/facilities', $partner))['facilities']);
+        self::assertCount(1, $this->body($this->get('/api/admin/facilities', $partner))['rows']);
     }
 
     public function testAnotherProgrammeSeesNoneOfIt(): void
