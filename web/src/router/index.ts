@@ -44,6 +44,21 @@ const routes: RouteRecordRaw[] = [
         path: '/admin/users',
         name: 'admin-users',
         component: () => import('@/views/admin/UsersView.vue'),
+        // A viewer cannot administer people; the API refuses them too. Kept in
+        // MANAGING rather than narrowed here so there is one list of roles
+        // that reach management at all, and the API decides the rest.
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/registry',
+        name: 'admin-registry',
+        component: () => import('@/views/admin/RegistryView.vue'),
+        meta: { roles: MANAGING },
+    },
+    {
+        path: '/admin/assignments',
+        name: 'admin-assignments',
+        component: () => import('@/views/admin/AssignmentsView.vue'),
         meta: { roles: MANAGING },
     },
 ]

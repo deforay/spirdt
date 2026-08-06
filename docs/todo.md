@@ -1,26 +1,18 @@
 # What is left
 
-State as of 6 August 2026, at `c3a9e42` plus the review-tooling change. Written
+State as of 6 August 2026. Written
 so work can resume cold.
 
 ## Decided but not built
 
-### Registry screens — the API is done, the views are not
-`RegistryService`, `RegistryAction` and the routes are in and tested
-(`RegistryAdminTest`, 12 cases). What does not exist is the Vue side:
+### Registry screens — done
+Places, facilities and testing sites are managed at `/admin/registry`, and
+`/admin/assignments` covers who visits what. `GeoCascade` renders N levels from
+the tree and takes its labels from `geo_units.level`, so it works for
+Province → District and Region → Zone → Woreda without a change.
 
-- a **depth-agnostic cascade** component — render N levels from the tree and take
-  labels from `geo_units.level`, never from constants. Zambia is Province →
-  District, Ethiopia is Region → Zone → Woreda. Hard-coding two levels means a
-  rewrite for the second country
-- a places screen (tree, add child, rename, deactivate)
-- a facilities screen filtered by the cascade
-- testing sites within a facility
-- an assignments screen — the model, resolution rules and endpoints all exist and
-  nothing but SQL drives them
-
-`GET /admin/geo-units` returns the whole tree flat in one response; the client
-assembles it.
+What is still missing there: renaming a place or facility in place (only add
+and deactivate today), the merge screen for duplicates, and bulk import.
 
 ### Managing the organisations in a programme
 Asked for as "manage the Implementing Partners". **Blocked on one decision: who

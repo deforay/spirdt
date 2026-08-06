@@ -29,9 +29,13 @@ const canAdminister = computed(() =>
 )
 
 const links = computed(() =>
-    [{ to: { name: 'admin-users' }, label: t('admin.users'), show: canAdminister.value }].filter(
-        (link) => link.show,
-    ),
+    [
+        // People is administrators only; the registry and the plan are readable
+        // by a viewer, because the dashboard filters by the same hierarchy.
+        { to: { name: 'admin-users' }, label: t('admin.users'), show: canAdminister.value },
+        { to: { name: 'admin-registry' }, label: t('registry.title'), show: true },
+        { to: { name: 'admin-assignments' }, label: t('assignments.title'), show: true },
+    ].filter((link) => link.show),
 )
 
 async function onSignOut(): Promise<void> {
