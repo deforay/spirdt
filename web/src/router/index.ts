@@ -56,6 +56,13 @@ const routes: RouteRecordRaw[] = [
         meta: { roles: MANAGING },
     },
     {
+        path: '/admin/organizations',
+        name: 'admin-organizations',
+        component: () => import('@/views/admin/OrganizationsView.vue'),
+        // Superadmin only, and the API enforces it again.
+        meta: { roles: ['superadmin'] },
+    },
+    {
         path: '/admin/assignments',
         name: 'admin-assignments',
         component: () => import('@/views/admin/AssignmentsView.vue'),

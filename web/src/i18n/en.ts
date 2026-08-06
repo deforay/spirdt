@@ -230,4 +230,17 @@ export const messages = {
     'review.addAnotherGap': 'Add another gap',
     'urgency.immediate': 'Immediate',
     'urgency.followUp': 'Follow-up',
+
+    'organizations.title': 'Country',
+    'organizations.subtitle': 'The organisations auditing here.',
+    'organizations.add': 'Add an organisation',
+    'organizations.organisation': 'Organisation',
+    'organizations.name': 'Name',
+    'organizations.code': 'Short code',
+    'organizations.adminName': 'Administrator\'s name',
+    'organizations.adminEmail': 'Administrator\'s email',
+    'organizations.createsAdmin': 'Creates the organisation and its first administrator together, and shows their password once.',
+    'organizations.created': '{name} created',
+    'organizations.assessments': 'Assessments',
+    'organizations.noAdmin': 'nobody can administer it',
 }

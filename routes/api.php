@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Action\Admin\AssignmentsAction;
+use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
@@ -99,6 +100,18 @@ return static function (App $app): void {
         $group->delete('/assignments/{id}', [AssignmentsAction::class, 'delete']);
     })
         ->add(new RequireRoleMiddleware('admin', 'superadmin'))
+        ->add(new AuthMiddleware());
+
+    // The programme itself: which organisations audit under it. The only
+    // surface where one tenant's administrator legitimately reaches another
+    // tenant's row, so it is superadmin alone and bounded to their own
+    // programme by the token rather than by a parameter.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->get('/organizations', [OrganizationsAction::class, 'index']);
+        $group->post('/organizations', [OrganizationsAction::class, 'create']);
+        $group->patch('/organizations/{id}', [OrganizationsAction::class, 'update']);
+    })
+        ->add(new RequireRoleMiddleware('superadmin'))
         ->add(new AuthMiddleware());
 
     // Reading the registry and the plan. A viewer is included: the dashboard

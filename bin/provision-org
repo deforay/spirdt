@@ -212,8 +212,15 @@ try {
         )->execute([$organizationId, $key, $label]);
     }
 
+    // Standing up a NEW programme makes this person its owner, so they get
+    // superadmin: somebody has to be able to add the other organisations that
+    // will audit alongside them, and there is otherwise nobody who can.
+    // Joining an existing programme makes them an ordinary tenant
+    // administrator — that programme already has an owner.
+    $firstRole = $programmeCode === '' ? 'superadmin' : 'admin';
+
     $statement = $pdo->prepare('SELECT id FROM roles WHERE organization_id = ? AND `key` = ?');
-    $statement->execute([$organizationId, 'admin']);
+    $statement->execute([$organizationId, $firstRole]);
     $roleId = (int) $statement->fetchColumn();
 
     // must_change_password is set because a password someone else chose should

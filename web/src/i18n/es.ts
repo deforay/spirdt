@@ -227,4 +227,17 @@ export const messages: Messages = {
     'review.addAnotherGap': 'Añadir otra brecha',
     'urgency.immediate': 'Inmediata',
     'urgency.followUp': 'Seguimiento',
+
+    'organizations.title': 'País',
+    'organizations.subtitle': 'Las organizaciones que auditan aquí.',
+    'organizations.add': 'Añadir organización',
+    'organizations.organisation': 'Organización',
+    'organizations.name': 'Nombre',
+    'organizations.code': 'Código corto',
+    'organizations.adminName': 'Nombre del administrador',
+    'organizations.adminEmail': 'Correo del administrador',
+    'organizations.createsAdmin': 'Crea la organización y su primer administrador juntos, y muestra su contraseña una sola vez.',
+    'organizations.created': '{name} creada',
+    'organizations.assessments': 'Evaluaciones',
+    'organizations.noAdmin': 'nadie puede administrarla',
 }

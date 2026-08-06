@@ -14,38 +14,27 @@ Province → District and Region → Zone → Woreda without a change.
 What is still missing there: renaming a place or facility in place (only add
 and deactivate today), the merge screen for duplicates, and bulk import.
 
-### The tenant hierarchy and what to call it — PARKED
-**Waiting on the client. Do not build against a guess.**
+### The tenant hierarchy — basic version in place
+`programmes` → `organizations`, with the registry on the programme and audit
+data on the organisation. That is the shape already asked for: one country,
+several independent organisations, each with its own assessors, auditing the
+same labs or different ones.
 
-The layers exist in the schema today as `programmes` → `organizations`, with
-the registry on the programme and audit data on the organisation. What is not
-settled is whether that is the right *shape* or the right *vocabulary*. Names
-floated so far, none chosen:
+**Naming: `programme` in code, "Country" on screen.** Agreed as the cheap and
+extensible choice — renaming the schema reaches both tenancy traits, the token
+claim, the tests and the docs, and if a country ever runs two programmes
+separately it would have to be renamed back. A label is one string.
 
-- `organization` renamed to **country**, with a country admin
-- `organization` renamed to **instance**, with an instance admin
-- keep **organisation**, add a level above it for the country or programme
-- "implementing partner" — raised, and already doubted by the person who raised
-  it; my advice against it stands, because it implies a funding relationship and
-  makes a ministry's own team sound like an outsider
+A `superadmin` owns the programme and manages the organisations in it at
+`/admin/organizations` — the only surface where one tenant's administrator
+legitimately reaches another tenant's row, bounded to their own programme by
+the token. `bin/provision-org` makes the first user of a NEW programme a
+superadmin and of a joining organisation an ordinary admin.
 
-Whatever is chosen has to answer three things at once, which is why it is worth
-waiting for rather than guessing: who owns the **site registry**, who may
-**manage the organisations** beneath them, and who may **read assessments
-across** them.
-
-**Blocked on this:**
-
-- managing the organisations in a programme — there is no role for it, and
-  inventing one before the hierarchy is named means renaming it afterwards
-- the "may A see B's score on a shared site" question, which shapes the
-  dashboard
-- any rename of `organizations`, which reaches every scoped table, both tenancy
-  traits, the token claims and the CLI tools
-
-**Not blocked on this:** findings v2, reports, photographs, the responsive
-layout, and the remaining registry gaps. Those are the places to spend time
-while it is open.
+Still open, and deliberately left until the shape is clearer: whether a country
+needs its own settings screen, whether organisations need types (ministry
+versus partner), and **whether organisation A may see organisation B's score on
+a site they both audit** — today, no.
 
 ### Stable question ids — decided, waiting on the hierarchy pass
 `code` (`1.1`, `4.23`) is unique within a template and enforced, so referencing

@@ -28,6 +28,9 @@ const canAdminister = computed(() =>
     ['admin', 'superadmin'].includes(user.value?.role ?? ''),
 )
 
+/** Managing the other organisations in this country is the superadmin's job. */
+const ownsProgramme = computed(() => user.value?.role === 'superadmin')
+
 const links = computed(() =>
     [
         // People is administrators only; the registry and the plan are readable
@@ -35,6 +38,7 @@ const links = computed(() =>
         { to: { name: 'admin-users' }, label: t('admin.users'), show: canAdminister.value },
         { to: { name: 'admin-registry' }, label: t('registry.title'), show: true },
         { to: { name: 'admin-assignments' }, label: t('assignments.title'), show: true },
+        { to: { name: 'admin-organizations' }, label: t('organizations.title'), show: ownsProgramme.value },
     ].filter((link) => link.show),
 )
 
