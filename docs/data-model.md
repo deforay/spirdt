@@ -1,6 +1,6 @@
 # Data Model
 
-26 tables across eight migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
+27 tables across twelve migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
 
 | Migration | Covers |
 |---|---|
@@ -13,6 +13,9 @@
 | `0.1.6-attachment-signer` | Who a signature claims to be |
 | `0.1.7-programmes` | A level above organisations, sharing the registry |
 | `0.1.8-site-assignments` | Who covers which site, and when |
+| `0.1.9-finding-urgency` | When a finding must be acted on, alongside whose job it is |
+| `0.1.10-facility-contacts` | How to reach a facility |
+| `0.1.11-registry-provenance` | Keeps the shared registry when an organisation is deleted |
 
 Each migration file opens with a comment explaining *why*, not just what. Read them in order — later files carry foreign keys into earlier ones.
 
