@@ -5,7 +5,7 @@ import { flushWrites, loadAnswers, loadFindings, markBlocked, markSynced } from 
 import { assessmentsWithPendingAttachments, countPendingAttachments } from '../db/attachments'
 import { db } from '../db/database'
 import { pushAttachments } from './attachments'
-import { acknowledged, buildPayload, NotSendable } from './payload'
+import { acknowledged, acknowledgedFindings, buildPayload, NotSendable } from './payload'
 
 /**
  * Getting assessments off the device.
@@ -101,7 +101,7 @@ export async function syncAssessment(assessmentId: string): Promise<SyncOutcome>
         await markSynced(
             assessmentId,
             acknowledged(assessmentId, built.sent, result.accepted ?? []),
-            acknowledged(assessmentId, built.sentFindings, result.accepted_findings ?? []),
+            acknowledgedFindings(built.sentFindings, result.accepted_findings ?? []),
         )
 
         return 'synced'

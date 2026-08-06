@@ -83,16 +83,65 @@ trait MakesTenants
      * throws on it, which is the correct behaviour and a confusing way for a
      * test to fail. Real tokens always carry it, because AuthService reads it
      * from the organisation at sign-in.
+     *
+     * The account is created to match, for the same reason. AuthMiddleware
+     * reads the role and the active flag from the row on every request rather
+     * than believing the token, so a token naming a user who does not exist is
+     * refused — correctly, and as a 401 that tells a test nothing about what it
+     * was actually checking. A token in a test now stands for an account in the
+     * same way one in the wild does.
      */
     private function tokenFor(int $organizationId, string $role = 'assessor', int $userId = 1): string
     {
+        $this->makeAccount($organizationId, $userId, $role);
+
         return (new TokenService())->issue(
             $userId,
             $organizationId,
             $role,
-            false,
+            in_array($role, ['admin', 'superadmin'], true),
             false,
             $this->programmeFor($organizationId),
         );
+    }
+
+    /** The user a token names, with the role it claims. Idempotent on the id. */
+    private function makeAccount(int $organizationId, int $userId, string $role): void
+    {
+        $roleId = Capsule::table('roles')
+            ->where('organization_id', $organizationId)
+            ->where('key', $role)
+            ->value('id');
+
+        if ($roleId === null) {
+            $roleId = Capsule::table('roles')->insertGetId([
+                'organization_id' => $organizationId,
+                'key'             => $role,
+                'name'            => ucfirst($role),
+                'is_system'       => 1,
+            ]);
+        }
+
+        $attributes = [
+            'organization_id'      => $organizationId,
+            'role_id'              => (int) $roleId,
+            'full_name'            => 'Fixture ' . $userId,
+            'is_active'            => 1,
+            'must_change_password' => 0,
+        ];
+
+        $existing = Capsule::table('users')->where('id', $userId)->first();
+
+        if ($existing !== null) {
+            Capsule::table('users')->where('id', $userId)->update($attributes);
+
+            return;
+        }
+
+        Capsule::table('users')->insert($attributes + [
+            'id'            => $userId,
+            'email'         => 'fixture-' . $userId . '@example.test',
+            'password_hash' => password_hash('fixture-password', PASSWORD_DEFAULT),
+        ]);
     }
 }

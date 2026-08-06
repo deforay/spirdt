@@ -160,9 +160,12 @@ final class RegistryService
      * The tree is a few hundred rows and is already loaded for the picker;
      * a recursive CTE per keystroke would be worse in every way.
      *
+     * Public because reporting filters on a place the same way, and for the
+     * same reason — a province has to mean everything under it there too.
+     *
      * @return list<int>
      */
-    private function subtree(int $geoUnitId): array
+    public function subtree(int $geoUnitId): array
     {
         $children = [];
 

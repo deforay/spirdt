@@ -135,13 +135,14 @@ export function buildPayload(
 }
 
 /**
- * Narrow what was sent down to what the server confirmed storing.
+ * Narrow the ANSWERS that were sent down to what the server confirmed storing.
  *
  * The server answers with `question_code|pathogen` entries, which is the local
- * natural key with the assessment id removed. Anything absent stays dirty —
- * the server skips an answer naming a pathogen the payload never declared, and
- * that answer has to keep being offered rather than being marked clean because
- * the request as a whole succeeded.
+ * natural key with the assessment id removed, so the id goes back on before
+ * comparing. Anything absent stays dirty — the server skips an answer naming a
+ * pathogen the payload never declared, and that answer has to keep being
+ * offered rather than being marked clean because the request as a whole
+ * succeeded.
  */
 export function acknowledged(
     assessmentId: string,
@@ -149,6 +150,32 @@ export function acknowledged(
     accepted: string[],
 ): AcknowledgedAnswer[] {
     const confirmed = new Set(accepted.map((entry) => `${assessmentId}|${entry}`))
+
+    return sent.filter((entry) => confirmed.has(entry.key))
+}
+
+/**
+ * The same, for FINDINGS, which are keyed differently on purpose.
+ *
+ * A finding carries its own id. The device mints it, sends it, and the server
+ * upserts on it and echoes it back unchanged — so both sides already agree and
+ * there is nothing to reconstruct. An answer has no id of its own and is
+ * identified by question and pathogen, which is why that one needs the
+ * assessment putting back.
+ *
+ * Kept as a separate function rather than a flag on the one above. The two
+ * rules look interchangeable and are not: running findings through the answer
+ * rule prefixes an id that already matched, so NOTHING is ever acknowledged,
+ * every finding stays dirty, and the assessment re-uploads on every sync
+ * forever. It costs no bandwidth anyone notices and it never stops, which is
+ * why it needs a name of its own rather than a parameter someone can pass
+ * wrongly.
+ */
+export function acknowledgedFindings(
+    sent: AcknowledgedAnswer[],
+    accepted: string[],
+): AcknowledgedAnswer[] {
+    const confirmed = new Set(accepted)
 
     return sent.filter((entry) => confirmed.has(entry.key))
 }

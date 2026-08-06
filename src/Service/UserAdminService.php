@@ -38,6 +38,15 @@ use InvalidArgumentException;
  * Only a superadmin may create another superadmin. An administrator who could
  * mint one holds the role in all but name, and the distinction stops meaning
  * anything.
+ *
+ * AND NOBODY MAY ACT ON SOMEBODY WHO OUTRANKS THEM. Guarding which role may be
+ * handed out looked like the whole of that rule and is only half of it: the
+ * three ways an administrator could have taken a superadmin's place hand out
+ * no role at all. Resetting their password takes the account directly, since
+ * the new one comes back in the response. Demoting or deactivating them takes
+ * the organisation by removing the only person above the actor — the same end
+ * reached from the other side. So the guard is on the TARGET, and it covers
+ * every mutation rather than only the ones that name a role.
  */
 final class UserAdminService
 {
@@ -48,6 +57,19 @@ final class UserAdminService
 
     /** The roles that can administer an organisation, for the last-one-out guard. */
     private const ADMINISTRATIVE = ['admin', 'superadmin'];
+
+    /**
+     * Who may act on whom. Higher acts on equal or lower, never on higher.
+     *
+     * Equal ranks administer each other on purpose: two administrators
+     * covering for one another over a weekend is the ordinary case, and a rule
+     * that stopped it would send them to bin/recover-access instead.
+     *
+     * A role missing from this map ranks below everything, which is the safe
+     * direction — a role added later and forgotten here can be administered
+     * but cannot administer.
+     */
+    private const RANK = ['superadmin' => 2, 'admin' => 1];
 
     /** @var array{byId: array<int,string>, byKey: array<string,int>}|null */
     private ?array $roleCache = null;
@@ -147,6 +169,8 @@ final class UserAdminService
             throw new InvalidArgumentException('No such user in this organisation.');
         }
 
+        $this->requireOutranks($actorRole, $user);
+
         $attributes = [];
 
         if (array_key_exists('full_name', $input)) {
@@ -191,13 +215,15 @@ final class UserAdminService
      *
      * @return array{user: array<string,mixed>, password: string}
      */
-    public function resetPassword(int $userId): array
+    public function resetPassword(int $userId, string $actorRole): array
     {
         $user = User::query()->where('users.id', $userId)->first();
 
         if (!$user instanceof User) {
             throw new InvalidArgumentException('No such user in this organisation.');
         }
+
+        $this->requireOutranks($actorRole, $user);
 
         $password = rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');
 
@@ -251,6 +277,26 @@ final class UserAdminService
     }
 
     /** @throws InvalidArgumentException */
+    /**
+     * The actor has to stand at least as high as the person they are changing.
+     *
+     * Read off the TARGET'S CURRENT role, never off what the request asks for.
+     * A demotion asks for a lower role, so checking the requested one would
+     * wave through exactly the call this exists to stop.
+     *
+     * @throws InvalidArgumentException
+     */
+    private function requireOutranks(string $actorRole, User $target): void
+    {
+        $targetRole = $this->rolesByIdAndKey()['byId'][(int) $target->role_id] ?? '';
+
+        if ((self::RANK[$actorRole] ?? 0) < (self::RANK[$targetRole] ?? 0)) {
+            throw new InvalidArgumentException(
+                'Only a ' . $targetRole . ' can change another ' . $targetRole . "'s account.",
+            );
+        }
+    }
+
     private function resolveAssignableRole(string $roleKey, string $actorRole): int
     {
         if ($roleKey === self::SUPERADMIN && $actorRole !== self::SUPERADMIN) {

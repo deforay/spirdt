@@ -81,7 +81,10 @@ final class UsersAction
         array $args,
     ): ResponseInterface {
         try {
-            $result = $this->users->resetPassword((int) ($args['id'] ?? 0));
+            $result = $this->users->resetPassword(
+                (int) ($args['id'] ?? 0),
+                (string) $request->getAttribute('role'),
+            );
         } catch (InvalidArgumentException $e) {
             return $this->json($response, 422, ['error' => ['message' => $e->getMessage()]]);
         }

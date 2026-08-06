@@ -5,7 +5,7 @@ import { saveSession } from '../../auth/session'
 import { createAssessment, loadAnswers, saveAnswer } from '../../db/assessments'
 import { db } from '../../db/database'
 import { syncAssessment } from '../engine'
-import { acknowledged, buildPayload, NotSendable } from '../payload'
+import { acknowledged, acknowledgedFindings, buildPayload, NotSendable } from '../payload'
 
 /**
  * The sync, from the device's side.
@@ -228,5 +228,30 @@ describe('building the payload', () => {
         ]
 
         expect(acknowledged('a', sent, ['3.1|'])).toEqual([{ key: 'a|3.1|', revision: 1 }])
+    })
+
+    /**
+     * A finding is keyed by its own id on both sides — the server upserts on
+     * it and echoes it back unchanged. Answers are not: their local key
+     * carries the assessment id and the server's does not, so it has to be
+     * put back. Running findings through the answer rule prefixes an id that
+     * already matches, nothing is ever acknowledged, and the assessment stays
+     * dirty and re-uploads on every sync for the rest of its life.
+     */
+    it('acknowledges findings by their own id', () => {
+        const sent = [
+            { key: '019fd300-0000-7000-8000-00000000aaaa', revision: 1 },
+            { key: '019fd300-0000-7000-8000-00000000bbbb', revision: 1 },
+        ]
+
+        expect(
+            acknowledgedFindings(sent, ['019fd300-0000-7000-8000-00000000aaaa']),
+        ).toEqual([{ key: '019fd300-0000-7000-8000-00000000aaaa', revision: 1 }])
+    })
+
+    it('leaves a finding the server did not confirm dirty', () => {
+        const sent = [{ key: '019fd300-0000-7000-8000-00000000aaaa', revision: 1 }]
+
+        expect(acknowledgedFindings(sent, [])).toEqual([])
     })
 })

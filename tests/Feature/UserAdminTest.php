@@ -252,6 +252,143 @@ final class UserAdminTest extends TestCase
         self::assertSame(401, $refresh->getStatusCode());
     }
 
+    // ─── an administrator may not outrank themselves ───
+
+    /**
+     * The three ways an admin could have taken a superadmin's place.
+     *
+     * resolveAssignableRole() guarded which role may be HANDED OUT, and that
+     * looked like the whole rule. It is not: every one of these hands out
+     * nothing at all. Resetting the password takes the account directly.
+     * Demoting and deactivating take the organisation by removing the only
+     * person who outranks the actor, which is the same end reached backwards.
+     */
+    public function testAnAdministratorCannotResetASuperadminsPassword(): void
+    {
+        $superadmin = $this->makeUser('sa@example.org', 'superadmin');
+
+        $response = $this->request(
+            'POST',
+            '/api/admin/users/' . $superadmin . '/password',
+            token: $this->signIn('boss@example.org'),
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+
+        // The password is untouched, so the account is not now shared.
+        self::assertSame(200, $this->login('sa@example.org', self::PASSWORD)->getStatusCode());
+    }
+
+    public function testAnAdministratorCannotDemoteASuperadmin(): void
+    {
+        $superadmin = $this->makeUser('sa@example.org', 'superadmin');
+
+        $response = $this->request('PATCH', '/api/admin/users/' . $superadmin, [
+            'role' => 'assessor',
+        ], $this->signIn('boss@example.org'));
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame('superadmin', $this->roleOf($superadmin));
+    }
+
+    public function testAnAdministratorCannotDeactivateASuperadmin(): void
+    {
+        $superadmin = $this->makeUser('sa@example.org', 'superadmin');
+
+        $response = $this->request('PATCH', '/api/admin/users/' . $superadmin, [
+            'is_active' => false,
+        ], $this->signIn('boss@example.org'));
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(200, $this->login('sa@example.org', self::PASSWORD)->getStatusCode());
+    }
+
+    /** A superadmin outranks an admin, so the same operations are theirs to make. */
+    public function testASuperadminCanResetAnAdministratorsPassword(): void
+    {
+        $this->makeUser('sa@example.org', 'superadmin');
+
+        $response = $this->request(
+            'POST',
+            '/api/admin/users/' . $this->boss . '/password',
+            token: $this->signIn('sa@example.org'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    /** Two admins are peers, and peers administer each other. */
+    public function testAnAdministratorCanResetAnotherAdministratorsPassword(): void
+    {
+        $second = $this->makeUser('second@example.org', 'admin');
+
+        $response = $this->request(
+            'POST',
+            '/api/admin/users/' . $second . '/password',
+            token: $this->signIn('boss@example.org'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    // ─── a token stops being a licence the moment the account changes ───
+
+    /**
+     * The access token carries the role, and it was believed on its own. So an
+     * administrator demoted while holding one could spend the rest of its life
+     * — a quarter of an hour — using it to put themselves back, and the
+     * demotion had no effect at all.
+     */
+    public function testADemotedAdministratorCannotUseTheTokenTheyAlreadyHad(): void
+    {
+        $second = $this->makeUser('second@example.org', 'admin');
+        $theirToken = $this->signIn('second@example.org');
+
+        $this->request('PATCH', '/api/admin/users/' . $second, [
+            'role' => 'assessor',
+        ], $this->signIn('boss@example.org'));
+
+        $response = $this->request('PATCH', '/api/admin/users/' . $second, [
+            'role' => 'admin',
+        ], $theirToken);
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertSame('assessor', $this->roleOf($second));
+    }
+
+    public function testADeactivatedUserCannotUseTheTokenTheyAlreadyHad(): void
+    {
+        $theirToken = $this->signIn('joseph@example.org');
+
+        $this->request('PATCH', '/api/admin/users/' . $this->assessor, [
+            'is_active' => false,
+        ], $this->signIn('boss@example.org'));
+
+        self::assertSame(401, $this->request('GET', '/api/sites', token: $theirToken)->getStatusCode());
+    }
+
+    /**
+     * A reset exists to take an account away from whoever has its password.
+     * Revoking the refresh token alone left the access token they were already
+     * holding good for another fifteen minutes — which is exactly the window
+     * the reset was called to close.
+     */
+    public function testAResetEndsTheAccessTokenAsWellAsTheRefreshToken(): void
+    {
+        $stolen = $this->signIn('joseph@example.org');
+
+        $this->request(
+            'POST',
+            '/api/admin/users/' . $this->assessor . '/password',
+            token: $this->signIn('boss@example.org'),
+        );
+
+        $response = $this->request('GET', '/api/sites', token: $stolen);
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertSame('password_change_required', $this->body($response)['error']['code']);
+    }
+
     // ─── tenancy ───
 
     public function testAnAdministratorCannotTouchAnotherOrganisationsUser(): void
@@ -292,6 +429,13 @@ final class UserAdminTest extends TestCase
             $otherOrg,
             (int) Capsule::table('users')->where('id', $outsider)->value('organization_id'),
         );
+    }
+
+    private function roleOf(int $userId): string
+    {
+        return (string) Capsule::table('roles')
+            ->where('id', (int) Capsule::table('users')->where('id', $userId)->value('role_id'))
+            ->value('key');
     }
 
     // ─── fixtures ───
