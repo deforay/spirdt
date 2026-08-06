@@ -554,6 +554,132 @@ final class RegistryAdminTest extends TestCase
         self::assertSame(0, (int) Capsule::table('site_assignments')->value('is_active'));
     }
 
+    // ─── scope on the things an assignment names ───
+
+    /**
+     * The foreign keys are global, so they accept any id that exists anywhere.
+     * A site from another PROGRAMME therefore lands happily on a plan that
+     * cannot reach it.
+     */
+    public function testASiteFromAnotherProgrammeCannotBeAssigned(): void
+    {
+        $foreignFacility = $this->created($this->post('/api/admin/facilities', [
+            'name' => 'Elsewhere Hospital',
+        ], $this->signIn('foreign@example.org')), 'facility');
+
+        $foreignSite = $this->created($this->post('/api/admin/testing-sites', [
+            'name' => 'Elsewhere lab', 'facility_id' => $foreignFacility['id'],
+        ], $this->signIn('foreign@example.org')), 'testing_site');
+
+        $response = $this->post('/api/admin/assignments', [
+            'testing_site_id' => $foreignSite['id'],
+        ], $this->signIn('boss@example.org'));
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(0, Capsule::table('site_assignments')->count());
+    }
+
+    /**
+     * An assessor in another organisation can never receive the work, so the
+     * assignment is an instruction addressed to nobody.
+     */
+    public function testAnAssessorFromAnotherOrganisationCannotBeAssignedTo(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $facility = $this->created($this->post('/api/admin/facilities', ['name' => 'Kitwe'], $token), 'facility');
+        $site = $this->created($this->post('/api/admin/testing-sites', [
+            'name' => 'TB clinic', 'facility_id' => $facility['id'],
+        ], $token), 'testing_site');
+
+        $outsider = (int) Capsule::table('users')->where('email', 'foreign@example.org')->value('id');
+
+        $response = $this->post('/api/admin/assignments', [
+            'testing_site_id' => $site['id'],
+            'user_id'         => $outsider,
+        ], $token);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(0, Capsule::table('site_assignments')->count());
+    }
+
+    /**
+     * campaign_id is ON DELETE CASCADE, so accepting another organisation's
+     * round means their closing it silently deletes this plan.
+     */
+    public function testACampaignFromAnotherOrganisationCannotBeAssignedTo(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $facility = $this->created($this->post('/api/admin/facilities', ['name' => 'Kitwe'], $token), 'facility');
+        $site = $this->created($this->post('/api/admin/testing-sites', [
+            'name' => 'TB clinic', 'facility_id' => $facility['id'],
+        ], $token), 'testing_site');
+
+        $templateId = (int) Capsule::table('templates')->value('id');
+        $foreignCampaign = (int) Capsule::table('campaigns')->insertGetId([
+            'organization_id' => $this->foreignOrgId,
+            'template_id'     => $templateId,
+            'name'            => 'Their round',
+            'status'          => 'active',
+        ]);
+
+        $response = $this->post('/api/admin/assignments', [
+            'testing_site_id' => $site['id'],
+            'campaign_id'     => $foreignCampaign,
+        ], $token);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(0, Capsule::table('site_assignments')->count());
+    }
+
+    /**
+     * createGeoUnit calls two districts with one name under one parent a typo.
+     * The update path has to agree, or the rule depends on which screen the
+     * name was typed on.
+     */
+    public function testRenamingAPlaceOntoASiblingsNameIsRefused(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $province = $this->created($this->post('/api/admin/geo-units', [
+            'level' => 'Province', 'name' => 'Copperbelt',
+        ], $token), 'geo_unit');
+
+        $this->post('/api/admin/geo-units', [
+            'level' => 'District', 'name' => 'Kitwe', 'parent_id' => $province['id'],
+        ], $token);
+
+        $ndola = $this->created($this->post('/api/admin/geo-units', [
+            'level' => 'District', 'name' => 'Ndola', 'parent_id' => $province['id'],
+        ], $token), 'geo_unit');
+
+        $response = $this->request('PATCH', '/api/admin/geo-units/' . $ndola['id'], [
+            'name' => 'Kitwe',
+        ], $token);
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    /** Renaming to something new stays possible, and so does saving unchanged. */
+    public function testAnOrdinaryRenameStillWorks(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        $district = $this->created($this->post('/api/admin/geo-units', [
+            'level' => 'District', 'name' => 'Kitwe',
+        ], $token), 'geo_unit');
+
+        self::assertSame(200, $this->request('PATCH', '/api/admin/geo-units/' . $district['id'], [
+            'name' => 'Kitwe City',
+        ], $token)->getStatusCode());
+
+        // Saving a form without touching the name must not collide with itself.
+        self::assertSame(200, $this->request('PATCH', '/api/admin/geo-units/' . $district['id'], [
+            'name' => 'Kitwe City', 'level' => 'District',
+        ], $token)->getStatusCode());
+    }
+
     // ─── fixtures ───
 
     private function makeUser(int $organizationId, string $email, string $roleKey): int

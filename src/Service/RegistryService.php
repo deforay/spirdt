@@ -79,21 +79,7 @@ final class RegistryService
             throw new InvalidArgumentException('That parent is not in this programme.');
         }
 
-        // A place cannot be its own parent's sibling twice over. Checked on
-        // (parent, name) rather than name alone: two districts called Central
-        // in different provinces are ordinary, two in the same one are a typo.
-        $duplicate = GeoUnit::query()
-            ->where('name', $name)
-            ->where(
-                fn ($query) => $parentId === null
-                    ? $query->whereNull('parent_id')
-                    : $query->where('parent_id', $parentId),
-            )
-            ->first();
-
-        if ($duplicate !== null) {
-            throw new InvalidArgumentException($name . ' is already there.');
-        }
+        $this->requireNameFreeAmongSiblings($name, $parentId, null);
 
         $unit = new GeoUnit();
         $unit->fill([
@@ -123,7 +109,15 @@ final class RegistryService
         $attributes = [];
 
         if (array_key_exists('name', $input)) {
-            $attributes['name'] = $this->requireText($input, 'name');
+            $name = $this->requireText($input, 'name');
+
+            // The same rule creating one applies, or whether two districts may
+            // share a name under one parent depends on which screen it was
+            // typed on. Itself excluded, so saving a form unchanged is not a
+            // collision with the row being saved.
+            $this->requireNameFreeAmongSiblings($name, $unit->parent_id === null ? null : (int) $unit->parent_id, $id);
+
+            $attributes['name'] = $name;
         }
 
         if (array_key_exists('level', $input)) {
@@ -189,6 +183,36 @@ final class RegistryService
         }
 
         return $found;
+    }
+
+    /**
+     * No two places under one parent may share a name.
+     *
+     * Checked on (parent, name) rather than name alone: two districts called
+     * Central in different provinces are ordinary, two in the same one are a
+     * typo. Enforced on create AND on rename, so the rule does not depend on
+     * which screen the name arrived from.
+     *
+     * @param  int|null                 $exceptId the row being edited, so saving it unchanged is not a collision with itself
+     * @throws InvalidArgumentException
+     */
+    private function requireNameFreeAmongSiblings(string $name, ?int $parentId, ?int $exceptId): void
+    {
+        $query = GeoUnit::query()
+            ->where('name', $name)
+            ->where(
+                fn ($inner) => $parentId === null
+                    ? $inner->whereNull('parent_id')
+                    : $inner->where('parent_id', $parentId),
+            );
+
+        if ($exceptId !== null) {
+            $query->where('geo_units.id', '!=', $exceptId);
+        }
+
+        if ($query->first() !== null) {
+            throw new InvalidArgumentException($name . ' is already there.');
+        }
     }
 
     /**

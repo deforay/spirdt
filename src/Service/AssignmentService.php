@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Models\SiteAssignment;
+use App\Models\TestingSite;
+use App\Models\User;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use InvalidArgumentException;
 
 /**
  * Working out which sites somebody is supposed to visit.
@@ -83,6 +87,60 @@ final class AssignmentService
     }
 
     /**
+     * Everything an assignment names has to be reachable by the caller.
+     *
+     * The foreign keys underneath are global: they check a row exists SOMEWHERE,
+     * not that it exists here. Without this, an id from another tenant is
+     * accepted and the result is an instruction addressed to nobody — a site
+     * this organisation's assessors cannot see, or an assessor who will never
+     * be shown it.
+     *
+     * The campaign is the one with teeth. `campaign_id` is ON DELETE CASCADE,
+     * so an assignment pointing at another organisation's round disappears
+     * silently the day they close it, taking a piece of this organisation's
+     * plan with it and leaving nothing behind to explain why.
+     *
+     * Scoped queries do the work: a row belonging elsewhere resolves to null.
+     * The site is checked against the PROGRAMME, because the registry is
+     * deliberately shared there, and the other two against the ORGANISATION,
+     * because people and rounds are not.
+     *
+     * @throws InvalidArgumentException
+     */
+    private function requireReachable(
+        string $siteId,
+        int $organizationId,
+        ?int $userId,
+        ?int $campaignId,
+    ): void {
+        if (TestingSite::query()->where('testing_sites.id', BinaryUuid::toBytes($siteId))->first() === null) {
+            throw new InvalidArgumentException('That testing site is not in this programme.');
+        }
+
+        if ($userId !== null) {
+            $reachable = User::query()
+                ->where('users.id', $userId)
+                ->where('users.organization_id', $organizationId)
+                ->first();
+
+            if ($reachable === null) {
+                throw new InvalidArgumentException('That person is not in this organisation.');
+            }
+        }
+
+        if ($campaignId !== null) {
+            $reachable = Capsule::table('campaigns')
+                ->where('id', $campaignId)
+                ->where('organization_id', $organizationId)
+                ->first();
+
+            if ($reachable === null) {
+                throw new InvalidArgumentException('That round is not this organisation\'s.');
+            }
+        }
+    }
+
+    /**
      * The rows that decide this site, for this round.
      *
      * @param  list<object> $assignments every assignment for one site
@@ -125,6 +183,8 @@ final class AssignmentService
         ?int $campaignId = null,
         ?string $dueOn = null,
     ): SiteAssignment {
+        $this->requireReachable($siteId, $organizationId, $userId, $campaignId);
+
         $existing = SiteAssignment::query()
             ->where('testing_site_id', BinaryUuid::toBytes($siteId))
             ->where('organization_id', $organizationId)
