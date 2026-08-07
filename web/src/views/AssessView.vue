@@ -208,7 +208,7 @@ async function onSubmit() {
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
         v-else-if="stage === 'setup'"
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground"
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[960px] md:px-6"
     >
         <StorageNotice
             :storage="assessment.storage.value"
@@ -216,7 +216,7 @@ async function onSubmit() {
             :save-error="assessment.saveError.value"
         />
 
-        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
             <div>
                 <span class="text-[13px] text-accent">
                     {{ assessment.assessment.value?.siteName }}
@@ -229,30 +229,42 @@ async function onSubmit() {
             <div class="mt-1"><LocaleSwitcher /></div>
         </header>
 
-        <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
-            <h2 class="px-1 pb-2 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                {{ t('setup.pathogensHeading') }}
-            </h2>
-            <PathogenSetup
-                v-model="draftPathogens"
-                :repeating-section="repeating.number"
-                :questions-per-pathogen="repeating.questions"
-            />
+        <!--
+            Stacked on a phone, side by side once there is room. The two halves
+            are independent — naming the pathogens and answering Part A — so
+            putting them level means the second is visible while the first is
+            being filled in, rather than a scroll away.
+        -->
+        <main
+            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:grid md:grid-cols-2 md:items-start md:gap-6 md:px-0"
+        >
+            <section>
+                <h2 class="eyebrow px-1 pb-2 text-label-2">
+                    {{ t('setup.pathogensHeading') }}
+                </h2>
+                <PathogenSetup
+                    v-model="draftPathogens"
+                    :repeating-section="repeating.number"
+                    :questions-per-pathogen="repeating.questions"
+                />
+            </section>
 
-            <h2 class="px-1 pb-2 pt-6 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                {{ t('setup.contextHeading') }}
-            </h2>
-            <ContextForm
-                v-model="draftContext"
-                :fields="template.context_fields ?? []"
-                :applicability-fields="applicabilityFields"
-            />
+            <section>
+                <h2 class="eyebrow px-1 pb-2 pt-6 text-label-2 md:pt-0">
+                    {{ t('setup.contextHeading') }}
+                </h2>
+                <ContextForm
+                    v-model="draftContext"
+                    :fields="template.context_fields ?? []"
+                    :applicability-fields="applicabilityFields"
+                />
+            </section>
         </main>
 
-        <footer class="border-t border-hairline bg-surface px-4 pb-4 pt-3">
+        <footer class="border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6">
             <button
                 type="button"
-                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40"
+                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40 md:mx-auto md:block md:w-auto md:px-16"
                 :disabled="!setupReady"
                 @click="startChecklist"
             >
@@ -286,14 +298,22 @@ async function onSubmit() {
         @submit="onSubmit"
     />
 
-    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
+    <!--
+        One column on a phone, two from 768px up.
+
+        The section list is a horizontal pill row when there is no width for
+        anything else, and a rail down the side when there is. Both are the
+        same list; only one is in the accessibility tree at a time, because two
+        copies of the same navigation is two things to tab through.
+    -->
+    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1040px] md:px-6">
         <StorageNotice
             :storage="assessment.storage.value"
             :save-state="assessment.saveState.value"
             :save-error="assessment.saveError.value"
         />
 
-        <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3">
+        <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3 md:px-0 md:pt-6">
             <div class="flex items-center justify-between gap-2">
                 <span class="flex-1 truncate text-[13px] text-accent">
                     {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
@@ -315,8 +335,9 @@ async function onSubmit() {
             </p>
         </header>
 
+        <!-- Numbers only, because a phone has room for numbers only. -->
         <nav
-            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2"
+            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2 md:hidden"
             :aria-label="t('checklist.sections')"
         >
             <button
@@ -336,59 +357,103 @@ async function onSubmit() {
             </button>
         </nav>
 
-        <!-- Section 4 is answered once per pathogen, so it gets its own row of
-             tabs. Without them the section silently shows one pathogen's
-             answers and the other's look unanswered. -->
-        <nav
-            v-if="section.scope === 'pathogen'"
-            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-3"
-            :aria-label="t('checklist.pathogens')"
-        >
-            <button
-                v-for="pathogen in assessment.assessment.value?.pathogens ?? []"
-                :key="pathogen.key"
-                type="button"
-                :aria-current="pathogen.name === activePathogen ? 'true' : undefined"
-                :class="[
-                    'shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors',
-                    pathogen.name === activePathogen
-                        ? 'bg-label text-ground'
-                        : 'bg-surface text-label-2',
-                ]"
-                @click="activePathogen = pathogen.name"
+        <div class="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[13rem_minmax(0,1fr)] md:gap-6">
+            <!--
+                The same navigation with the titles restored. A number alone is
+                a thing to count through; a title is a thing to choose. The
+                width exists here, so it is spent on saying what the sections
+                are.
+            -->
+            <nav
+                class="scroll-thin hidden md:block md:overflow-y-auto md:pb-6"
+                :aria-label="t('checklist.sections')"
             >
-                {{ pathogen.name }}
-            </button>
-        </nav>
-
-        <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
-            <div class="overflow-hidden rounded-card bg-surface">
-                <div v-for="(question, index) in section.questions" :key="question.code">
-                    <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
-                    <QuestionRow
-                        :question="question"
-                        :response="assessment.responseFor(question.code, instance) as ResponseCode | null"
-                        :comment="assessment.commentFor(question.code, instance)"
-                        @update:response="
-                            assessment.setResponse(question.code, instance, $event as StoredResponse | null)
-                        "
-                        @update:comment="assessment.setComment(question.code, instance, $event)"
-                    />
-                </div>
-
-                <div
-                    class="flex justify-between border-t border-hairline px-3.5 py-3 text-[13px] text-label-2"
+                <button
+                    v-for="item in visibleSections"
+                    :key="item.code"
+                    type="button"
+                    :aria-current="item.code === activeSection ? 'true' : undefined"
+                    :class="[
+                        'flex w-full items-baseline gap-2.5 rounded-card px-3 py-2.5 text-left',
+                        'text-[14px] transition-colors',
+                        item.code === activeSection
+                            ? 'bg-accent-soft font-semibold text-accent'
+                            : 'text-label-2 hover:bg-surface hover:text-label',
+                    ]"
+                    @click="activeSection = item.code"
                 >
-                    <span>{{ t('checklist.sectionScore') }}</span>
-                    <strong class="tnum font-semibold text-label">
-                        {{ sectionTally?.score ?? 0 }} / {{ sectionTally?.possible ?? 0 }}
-                    </strong>
-                </div>
-            </div>
-        </main>
+                    <span class="tnum shrink-0 font-semibold">{{ item.number }}</span>
+                    <span class="min-w-0 flex-1">{{ text(item.title) }}</span>
+                </button>
+            </nav>
 
+            <div class="flex min-h-0 flex-1 flex-col">
+                <!-- Section 4 is answered once per pathogen, so it gets its own
+                     row of tabs. Without them the section silently shows one
+                     pathogen's answers and the other's look unanswered. -->
+                <nav
+                    v-if="section.scope === 'pathogen'"
+                    class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-3 md:px-0"
+                    :aria-label="t('checklist.pathogens')"
+                >
+                    <button
+                        v-for="pathogen in assessment.assessment.value?.pathogens ?? []"
+                        :key="pathogen.key"
+                        type="button"
+                        :aria-current="pathogen.name === activePathogen ? 'true' : undefined"
+                        :class="[
+                            'shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors',
+                            pathogen.name === activePathogen
+                                ? 'bg-label text-ground'
+                                : 'bg-surface text-label-2',
+                        ]"
+                        @click="activePathogen = pathogen.name"
+                    >
+                        {{ pathogen.name }}
+                    </button>
+                </nav>
+
+                <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:px-0">
+                    <div class="overflow-hidden rounded-card bg-surface md:rounded-surface md:shadow-surface">
+                        <div v-for="(question, index) in section.questions" :key="question.code">
+                            <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
+                            <QuestionRow
+                                :question="question"
+                                :response="
+                                    assessment.responseFor(question.code, instance) as ResponseCode | null
+                                "
+                                :comment="assessment.commentFor(question.code, instance)"
+                                @update:response="
+                                    assessment.setResponse(
+                                        question.code,
+                                        instance,
+                                        $event as StoredResponse | null,
+                                    )
+                                "
+                                @update:comment="
+                                    assessment.setComment(question.code, instance, $event)
+                                "
+                            />
+                        </div>
+
+                        <div
+                            class="flex justify-between border-t border-hairline px-3.5 py-3 text-[13px] text-label-2"
+                        >
+                            <span>{{ t('checklist.sectionScore') }}</span>
+                            <strong class="tnum font-semibold text-label">
+                                {{ sectionTally?.score ?? 0 }} / {{ sectionTally?.possible ?? 0 }}
+                            </strong>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Full width under both columns. The running score and the level are
+             about the whole visit, not the section on screen, so pinning them
+             to the content column would say otherwise. -->
         <footer
-            class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3"
+            class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6"
         >
             <div>
                 <div class="tnum text-[22px] font-bold tracking-tight">

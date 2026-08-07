@@ -68,7 +68,16 @@ in exports, reports and findings, so they should read as identifiers.
 
 ## Layout
 
-Radius 11px. Hairline separators. Shadows you have to look for.
+Two radii, and which one to use follows from what the thing is.
+
+| | Radius | What |
+|---|---|---|
+| Control | 11px | Segmented controls, inputs, badges, buttons — anything a thumb lands on |
+| Surface | 20px | Cards, sheets, panels — anything that *contains* controls |
+
+A control and the panel around it sharing one radius makes the control read as a slot cut into the panel rather than a thing resting on it. On a phone the surface radius is held back to 11px, because at 430px wide the panel is the screen and rounding it says nothing.
+
+Hairline separators. Shadows you have to look for — and on the dark ground, less than that: depth there comes from the surface being lighter than what is behind it, not from a shadow nobody can see.
 
 Scrollbars are thin, set in CSS. No scrollbar plugin: they break momentum
 scrolling on iOS and hide the scroll area from assistive technology. Thin, but
@@ -77,6 +86,34 @@ more below.
 
 Bento tiles are welcome on the dashboard when tile size means importance. A
 grid of four identical cards means nothing.
+
+## Wider than a phone
+
+The app is designed for a phone in one hand and then allowed to grow. Assessors
+also use tablets and laptops, and a 430px column stranded in the middle of a
+1440px screen reads as an unfinished port rather than a considered choice.
+
+| Width | What changes |
+|---|---|
+| ≥640px | Surfaces take the 20px radius and a shadow. The site list widens to 620px |
+| ≥768px | The section pill row becomes a rail down the left with the section **titles** restored. Setup splits into two columns |
+| ≥900px | Review splits: score and unanswered on the left, sticky; gaps and signatures on the right |
+
+Three rules hold across all of it.
+
+**Touch targets never shrink.** A mouse tolerates a large target; a finger does not tolerate a small one, and the same build serves both. Width buys more information, never denser controls.
+
+**One navigation in the accessibility tree at a time.** The pill row and the rail are the same list. Both being present is two things to tab through and two places to announce the current section, so the one that is not shown is not rendered.
+
+**Reading order does not change with width.** The review screen splits along a seam that already existed in its order, so the phone reads exactly as it did. A layout that reorders content when it widens is a layout that reads differently to a screen reader than to an eye.
+
+## Icons
+
+[Phosphor](https://phosphoricons.com), as Vue components rather than the icon font. Only the icons actually imported reach the bundle, which is the whole argument on a bench connection — the font ships every glyph and three weights to draw four marks.
+
+Icons accompany words, they do not replace them. The response control is the case that matters: Yes, Partial, No and Not applicable differ by colour, and colour alone is not a distinction — roughly one man in twelve cannot rely on the green/amber difference carrying most of the meaning. A check, a dash, a cross and a circle-slash carry it for everyone.
+
+Decorative icons are `aria-hidden`. "Check Yes" is worse than "Yes".
 
 ## The answering screen
 
@@ -125,6 +162,8 @@ prints the fix.
 
 - No gradients, frosted glass or glow.
 - No emoji standing in for icons.
-- No corner larger than 11px.
+- No corner larger than 20px, and never above 11px on a control.
 - No colour that means nothing.
+- No colour carrying a meaning on its own, without a word or a shape beside it.
 - No animation that does not explain a change of state.
+- No downloaded typeface. The system stack is the look we want and it costs nothing on a bench connection.

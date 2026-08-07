@@ -213,22 +213,52 @@ function save(): void {
     }, 'image/png')
 }
 
+/**
+ * Watch the ELEMENT, not the window.
+ *
+ * The pad fills its container, and the container can change width without the
+ * window doing anything — the review screen becomes two columns at 900px, and
+ * a sheet or a details block can open beside it. A window listener misses all
+ * of that, and the miss is not cosmetic: the backing bitmap keeps the old
+ * width, so the pointer coordinates and the pixels stop agreeing and the mark
+ * lands offset from the finger drawing it.
+ */
+let observer: ResizeObserver | null = null
+
 onMounted(() => {
     fit()
-    window.addEventListener('resize', fit)
+
+    if (typeof ResizeObserver === 'undefined') {
+        window.addEventListener('resize', fit)
+
+        return
+    }
+
+    observer = new ResizeObserver(() => fit())
+
+    if (canvasRef.value !== null) {
+        observer.observe(canvasRef.value)
+    }
 })
 
 onBeforeUnmount(() => {
+    observer?.disconnect()
+    observer = null
     window.removeEventListener('resize', fit)
 })
 </script>
 
 <template>
     <div class="flex flex-col gap-2">
-        <div class="overflow-hidden rounded-card bg-white">
+        <!-- White in both themes, and the two greys below are raw rather than
+             tokens for the same reason: this is a document, not a surface. It
+             is what gets filed against somebody's name, and a signature that
+             changes colour with the reader's theme is not evidence of
+             anything. -->
+        <div class="overflow-hidden rounded-card bg-white sm:rounded-surface">
             <canvas
                 ref="canvas"
-                class="block h-[180px] w-full touch-none"
+                class="block h-[180px] w-full touch-none sm:h-[220px]"
                 :aria-label="t('signature.canvasLabel')"
                 @pointerdown.prevent="onPointerDown"
                 @pointermove.prevent="onPointerMove"

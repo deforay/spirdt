@@ -121,7 +121,18 @@
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
+    /* Two radii, and the distinction is deliberate.
+     *
+     * Controls stay tight: a segmented control, an input, a badge. These sit
+     * against the assessor's thumb and a soft corner on something small reads
+     * as imprecision.
+     *
+     * Surfaces — the cards, sheets and panels that CONTAIN controls — are
+     * rounder. A control and the panel around it sharing one radius makes the
+     * control look like a slot cut into the panel rather than a thing resting
+     * on it, and that reads as unfinished at any size above a phone. */
     --radius-card: 11px;
+    --radius-surface: 20px;
 }
 
 @layer base {
@@ -148,6 +159,26 @@
 }
 
 @layer utilities {
+    /* A shadow you have to look for. Sized for a surface rather than a
+       control, and deliberately weak: on the dark ground it is almost nothing,
+       which is correct — depth there comes from the surface being lighter than
+       what is behind it, not from a shadow nobody can see anyway. */
+    .shadow-surface {
+        box-shadow:
+            0 10px 28px -12px rgb(0 0 0 / 0.14),
+            0 2px 6px -3px rgb(0 0 0 / 0.08);
+    }
+
+    /* The caption above a heading — "SECTION 3" over "Safety and waste". Wide
+       tracking is what stops it reading as a heading in its own right, which
+       matters because it is never the thing being named. */
+    .eyebrow {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
     .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--c-scrollbar) transparent; }
     .scroll-thin::-webkit-scrollbar { width: 7px; height: 7px; }
     .scroll-thin::-webkit-scrollbar-track { background: transparent; }

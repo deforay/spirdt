@@ -66,7 +66,7 @@ async function submit() {
         </header>
 
         <form class="flex flex-col gap-3" @submit.prevent="submit">
-            <div class="overflow-hidden rounded-card bg-surface">
+            <div class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
                 <label class="flex items-center gap-3 px-3.5 py-3">
                     <span class="w-[76px] shrink-0 text-[15px] text-label-2">
                         {{ t('signIn.email') }}

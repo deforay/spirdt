@@ -171,8 +171,19 @@ function summaryOf(gap: Gap): string {
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
-        <header class="px-4 pb-3 pt-4">
+    <!--
+        Two columns from 900px, and the split follows the existing order rather
+        than rearranging it: what is already at the top goes left, the rest goes
+        right. So the phone reads exactly as it did.
+
+        The left column is sticky. Describing a gap changes the score, and on a
+        long list that feedback is otherwise several screens away from the thing
+        causing it.
+    -->
+    <div
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground min-[900px]:max-w-[1100px] min-[900px]:px-6"
+    >
+        <header class="px-4 pb-3 pt-4 min-[900px]:px-0 min-[900px]:pt-6">
             <button type="button" class="mb-2 text-[15px] text-accent" @click="emit('back')">
                 {{ t('review.back') }}
             </button>
@@ -180,9 +191,14 @@ function summaryOf(gap: Gap): string {
             <p class="mt-0.5 text-[13px] text-label-2">{{ siteName }}</p>
         </header>
 
-        <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
+        <main
+            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 min-[900px]:grid min-[900px]:grid-cols-[19rem_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6 min-[900px]:px-0"
+        >
+          <div class="min-[900px]:sticky min-[900px]:top-0">
             <!-- The score, stated once and plainly. -->
-            <div class="mb-4 flex items-end justify-between rounded-card bg-surface px-4 py-4">
+            <div
+                class="mb-4 flex items-end justify-between rounded-card bg-surface px-4 py-4 min-[900px]:rounded-surface min-[900px]:shadow-surface"
+            >
                 <div>
                     <div class="tnum text-[34px] font-bold leading-none tracking-tight">
                         {{
@@ -246,7 +262,9 @@ function summaryOf(gap: Gap): string {
                     {{ t('review.unansweredNote') }}
                 </p>
             </section>
+          </div>
 
+          <div>
             <!-- Gaps: every Partial and No, described for the site. -->
             <section class="mb-4">
                 <h2
@@ -479,16 +497,19 @@ function summaryOf(gap: Gap): string {
                     </div>
                 </div>
             </section>
+          </div>
         </main>
 
-        <footer class="border-t border-hairline bg-surface px-4 pb-4 pt-3">
+        <footer
+            class="border-t border-hairline bg-surface px-4 pb-4 pt-3 min-[900px]:rounded-t-surface min-[900px]:border-x min-[900px]:px-6"
+        >
             <p v-if="submitError !== ''" class="pb-2 text-[13px] font-medium text-no">
                 {{ submitError }}
             </p>
 
             <button
                 type="button"
-                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40"
+                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40 min-[900px]:mx-auto min-[900px]:block min-[900px]:w-auto min-[900px]:px-16"
                 :disabled="!result.isComplete || submitting"
                 @click="emit('submit')"
             >

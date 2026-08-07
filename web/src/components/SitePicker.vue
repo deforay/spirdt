@@ -62,8 +62,8 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground">
-        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
+    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[620px] sm:px-4">
+        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 sm:px-0 sm:pt-6">
             <div>
                 <h1 class="text-[30px] font-bold tracking-tight">{{ t('sites.title') }}</h1>
                 <p class="mt-0.5 text-[13px] text-label-2">{{ t('sites.subtitle') }}</p>
@@ -71,7 +71,7 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
             <div class="mt-1.5"><LocaleSwitcher /></div>
         </header>
 
-        <div class="px-4 pb-3">
+        <div class="px-4 pb-3 sm:px-0">
             <input
                 v-model="filter"
                 type="search"
@@ -80,8 +80,8 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
             />
         </div>
 
-        <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6">
-            <div v-if="shown.length > 0" class="overflow-hidden rounded-card bg-surface">
+        <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 sm:px-0">
+            <div v-if="shown.length > 0" class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
                 <button
                     v-for="(site, index) in shown"
                     :key="site.id"

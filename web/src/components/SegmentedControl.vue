@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PhCheck, PhMinus, PhProhibit, PhX } from '@phosphor-icons/vue'
+import type { Component } from 'vue'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 
 import { t } from '@/i18n'
@@ -44,6 +46,27 @@ const LABELS: Record<ResponseCode, 'response.Y' | 'response.P' | 'response.N' | 
     NA: 'response.NA',
 }
 
+/**
+ * A mark beside the word, not instead of it.
+ *
+ * The four responses already differ by colour, and colour alone is not a
+ * distinction — roughly one man in twelve cannot rely on the green/amber
+ * difference that carries most of the meaning here. A shape carries it for
+ * everyone.
+ *
+ * They stay small and they never appear alone. The word is what the assessor
+ * reads; the icon is what they recognise on the second pass through a section,
+ * when they are scanning rather than reading.
+ */
+const ICONS: Record<ResponseCode, Component> = {
+    Y: PhCheck,
+    P: PhMinus,
+    N: PhX,
+    // A circle-slash rather than a dash. Partial already owns the dash, and
+    // the two are adjacent in the control.
+    NA: PhProhibit,
+}
+
 const TONES: Record<ResponseCode, string> = {
     Y: 'data-[state=checked]:bg-yes-soft data-[state=checked]:text-yes',
     P: 'data-[state=checked]:bg-partial-soft data-[state=checked]:text-partial',
@@ -71,7 +94,8 @@ function choose(value: ResponseCode): void {
             :key="value"
             :value="value"
             :class="[
-                'cursor-pointer rounded-[7px] px-1 py-1.5 text-[13px] font-medium text-label-2',
+                'flex cursor-pointer items-center justify-center gap-1 rounded-[7px]',
+                'px-1 py-1.5 text-[13px] font-medium text-label-2',
                 'transition-colors duration-150 hover:text-label',
                 'data-[state=checked]:font-semibold data-[state=checked]:shadow-sm',
                 'disabled:cursor-not-allowed disabled:opacity-50',
@@ -79,6 +103,15 @@ function choose(value: ResponseCode): void {
             ]"
             @click="choose(value)"
         >
+            <!-- Decorative: the label beside it already says this, and an
+                 announced "check Yes" is worse than "Yes". -->
+            <component
+                :is="ICONS[value]"
+                :size="14"
+                weight="bold"
+                aria-hidden="true"
+                class="shrink-0"
+            />
             {{ t(LABELS[value]) }}
         </RadioGroupItem>
     </RadioGroupRoot>
