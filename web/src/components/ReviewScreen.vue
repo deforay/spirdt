@@ -44,6 +44,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     back: []
+    /** Open Part A, so a wrong facility detail can be corrected from here too. */
+    editSetup: []
     jump: [sectionCode: string, pathogen: string | null]
     /** Edit one finding, by its own id. */
     finding: [key: string, patch: Partial<Omit<StoredFinding, 'key' | 'assessmentId'>>]
@@ -248,9 +250,21 @@ function summaryOf(gap: Gap): string {
         class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground min-[900px]:max-w-[1100px] min-[900px]:px-6"
     >
         <header class="px-4 pb-3 pt-4 min-[900px]:px-0 min-[900px]:pt-6">
-            <button type="button" class="mb-2 text-[15px] text-accent" @click="emit('back')">
-                {{ t('review.back') }}
-            </button>
+            <div class="mb-2 flex items-center gap-3">
+                <button type="button" class="text-[15px] text-accent" @click="emit('back')">
+                    {{ t('review.back') }}
+                </button>
+                <!-- Part A is reachable from here as well. A wrong interviewee
+                     name is noticed while reading the review, which is the one
+                     screen that shows the visit as a whole. -->
+                <button
+                    type="button"
+                    class="text-[15px] text-accent"
+                    @click="emit('editSetup')"
+                >
+                    {{ t('checklist.editSetup') }}
+                </button>
+            </div>
             <h1 class="text-[30px] font-bold tracking-tight">{{ t('review.title') }}</h1>
             <p class="mt-0.5 text-[13px] text-label-2">{{ siteName }}</p>
         </header>

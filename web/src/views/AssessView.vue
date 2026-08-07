@@ -62,6 +62,16 @@ const draftContext = ref<Context>({})
 const draftPathogens = ref<StoredPathogen[]>([])
 
 /**
+ * Whether setup is being revisited rather than filled in for the first time.
+ *
+ * It changes two things. The button says where it goes back to instead of
+ * offering to start something already started, and the checklist is left on
+ * the section the assessor was working — sending them back to Section 1 after
+ * correcting a phone number is its own small insult.
+ */
+const revisitingSetup = ref(false)
+
+/**
  * Visits begun and not submitted.
  *
  * The device writes every answer as it is given, so a draft survives a
@@ -224,6 +234,7 @@ async function onSiteChosen(site: Site) {
 
     draftContext.value = { assessment_date: new Date().toISOString().slice(0, 10) }
     draftPathogens.value = []
+    revisitingSetup.value = false
     stage.value = 'setup'
 }
 
@@ -270,8 +281,17 @@ async function startChecklist() {
     await assessment.updateContext(draftContext.value)
     await assessment.updatePathogens(draftPathogens.value)
 
-    activePathogen.value = draftPathogens.value[0]?.name ?? null
-    activeSection.value = template.sections[0]?.code ?? '1'
+    // Returning from a correction keeps the assessor where they were. Only a
+    // visit being set up for the first time starts at the beginning.
+    if (!revisitingSetup.value) {
+        activePathogen.value = draftPathogens.value[0]?.name ?? null
+        activeSection.value = template.sections[0]?.code ?? '1'
+    } else if (!draftPathogens.value.some((entry) => entry.name === activePathogen.value)) {
+        // Unless the pathogen they were on has just been removed.
+        activePathogen.value = draftPathogens.value[0]?.name ?? null
+    }
+
+    revisitingSetup.value = false
     stage.value = 'checklist'
 }
 
@@ -462,6 +482,7 @@ function editSetup() {
 
     draftContext.value = { ...current.context }
     draftPathogens.value = [...current.pathogens]
+    revisitingSetup.value = true
     stage.value = 'setup'
 }
 
@@ -516,7 +537,9 @@ async function onSubmit() {
                 <span class="text-[13px] text-accent">
                     {{ assessment.assessment.value?.siteName }}
                 </span>
-                <h1 class="text-[30px] font-bold tracking-tight">{{ t('setup.title') }}</h1>
+                <h1 class="text-[30px] font-bold tracking-tight">
+                    {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
+                </h1>
                 <p v-if="instrumentUntranslated" class="mt-1 text-[12px] leading-snug text-label-2">
                     {{ t('locale.instrumentNote') }}
                 </p>
@@ -564,7 +587,7 @@ async function onSubmit() {
                 :disabled="!setupReady"
                 @click="startChecklist"
             >
-                {{ t('setup.start') }}
+                {{ revisitingSetup ? t('setup.backToChecklist') : t('setup.start') }}
             </button>
             <p v-if="draftPathogens.length === 0" class="pt-2 text-center text-[13px] text-label-2">
                 {{ t('setup.needPathogen') }}
@@ -594,6 +617,7 @@ async function onSubmit() {
         :submitting="submitting"
         :submit-error="submitError"
         @back="stage = 'checklist'"
+        @edit-setup="editSetup"
         @jump="jumpTo"
         @finding="(key, patch) => assessment.setFinding(key, patch)"
         @add-finding="(code, pathogen) => assessment.newFinding(code, pathogen)"
@@ -636,7 +660,7 @@ async function onSubmit() {
                 </button>
                 <button
                     type="button"
-                    class="shrink-0 rounded-full px-2.5 py-1.5 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
+                    class="shrink-0 rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-accent transition-opacity hover:opacity-80"
                     @click="editSetup"
                 >
                     {{ t('checklist.editSetup') }}

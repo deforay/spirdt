@@ -103,6 +103,7 @@ export const messages: Messages = {
     'setup.pathogensHeading': 'Tests réalisés ici',
     'setup.contextHeading': 'À propos du site',
     'setup.start': 'Commencer la liste',
+    'setup.backToChecklist': 'Retour à la liste',
     'setup.needPathogen': 'Ajoutez au moins un test réalisé sur ce site.',
     'setup.missingFields': {
         one: '{count} champ obligatoire reste à remplir.',
@@ -118,7 +119,7 @@ export const messages: Messages = {
     'checklist.sections': 'Sections',
     'checklist.pathogens': 'Pathogènes',
     'checklist.sectionScore': 'Score de la section',
-    'checklist.editSetup': 'Partie A',
+    'checklist.editSetup': 'Détails du site',
     'checklist.review': 'Vérifier',
     'checklist.answeredLabel': 'renseignées',
     'checklist.previousSection': 'Précédent',

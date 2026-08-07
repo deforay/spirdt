@@ -100,6 +100,7 @@ export const messages: Messages = {
     'setup.pathogensHeading': 'Testes realizados aqui',
     'setup.contextHeading': 'Sobre o local',
     'setup.start': 'Começar a lista',
+    'setup.backToChecklist': 'Voltar à lista',
     'setup.needPathogen': 'Adicione pelo menos um teste realizado neste local.',
     'setup.missingFields': {
         one: '{count} campo obrigatório por preencher.',
@@ -115,7 +116,7 @@ export const messages: Messages = {
     'checklist.sections': 'Secções',
     'checklist.pathogens': 'Agentes patogénicos',
     'checklist.sectionScore': 'Pontuação da secção',
-    'checklist.editSetup': 'Parte A',
+    'checklist.editSetup': 'Dados do local',
     'checklist.review': 'Rever',
     'checklist.answeredLabel': 'respondidas',
     'checklist.previousSection': 'Anterior',
