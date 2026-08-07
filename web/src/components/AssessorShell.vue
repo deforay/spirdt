@@ -5,7 +5,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { signOut } from '@/auth/login'
 import { session } from '@/auth/session'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
+import StorageNotice from '@/components/StorageNotice.vue'
 import SyncBadge from '@/components/SyncBadge.vue'
+import type { SaveState } from '@/composables/useAssessment'
+import type { StorageReport } from '@/db/storage'
 import { t } from '@/i18n'
 import { syncAll } from '@/sync/engine'
 
@@ -31,6 +34,20 @@ import { syncAll } from '@/sync/engine'
  * They were repeated on three of them and absent from the fourth, which is
  * what a shell is for.
  */
+
+/**
+ * The storage notice belongs to the frame, not to a screen.
+ *
+ * It was rendered twice inside the view below and floated between the top bar
+ * and the page heading, attached to neither. What it says is true of the
+ * device rather than of whatever screen happens to be open, so it sits under
+ * the bar, in the same column as everything else, and is written once.
+ */
+defineProps<{
+    storage?: StorageReport | null
+    saveState?: SaveState
+    saveError?: string
+}>()
 
 const emit = defineEmits<{ changePassword: [] }>()
 
@@ -123,6 +140,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                 </div>
             </div>
         </header>
+
+        <div class="mx-auto w-full max-w-[1280px] px-4 sm:px-6">
+            <StorageNotice
+                :storage="storage ?? null"
+                :save-state="saveState ?? 'idle'"
+                :save-error="saveError ?? ''"
+            />
+        </div>
 
         <div class="flex min-h-0 flex-1 flex-col">
             <slot />

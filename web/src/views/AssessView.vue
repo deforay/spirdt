@@ -13,7 +13,6 @@ import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
 import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
-import StorageNotice from '@/components/StorageNotice.vue'
 import { useAssessment } from '@/composables/useAssessment'
 import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
@@ -134,23 +133,91 @@ async function loadDrafts() {
 const route = useRoute()
 const router = useRouter()
 
-function rememberPosition() {
+/**
+ * True while the URL is being applied TO the state.
+ *
+ * The two watchers below point in opposite directions, so without this the
+ * first would trigger the second and a Back press would immediately push the
+ * entry it had just left.
+ */
+const followingRoute = ref(false)
+
+function queryFor(): Record<string, string> {
     const current = assessment.assessment.value
 
-    const query =
-        current === null || stage.value === 'site'
-            ? {}
-            : {
-                  visit: current.id,
-                  stage: stage.value,
-                  ...(stage.value === 'checklist' ? { section: activeSection.value } : {}),
-                  ...(activePathogen.value === null ? {} : { pathogen: activePathogen.value }),
-              }
+    if (current === null || stage.value === 'site') {
+        return {}
+    }
 
-    void router.replace({ query })
+    return {
+        visit: current.id,
+        stage: stage.value,
+        ...(stage.value === 'checklist' ? { section: activeSection.value } : {}),
+        ...(activePathogen.value === null ? {} : { pathogen: activePathogen.value }),
+    }
+}
+
+function sameAsRoute(query: Record<string, string>): boolean {
+    const keys = new Set([...Object.keys(query), ...Object.keys(route.query)])
+
+    return [...keys].every((key) => (route.query[key] ?? '') === (query[key] ?? ''))
+}
+
+/**
+ * State to URL, as a history entry.
+ *
+ * push rather than replace, so Back means what it means everywhere else on the
+ * web: the screen before this one. Moving between sections, opening Site
+ * details and going to review are all deliberate steps somebody took, and a
+ * step you cannot take back is not a step.
+ *
+ * The cost is that leaving the app takes as many presses as steps taken. That
+ * is the ordinary bargain of a browser, and the app has its own way out — the
+ * site name in the header — for anyone who wants to leave in one.
+ */
+function rememberPosition() {
+    if (followingRoute.value) {
+        return
+    }
+
+    const query = queryFor()
+
+    if (!sameAsRoute(query)) {
+        void router.push({ query })
+    }
 }
 
 watch([stage, activeSection, activePathogen], rememberPosition)
+
+/**
+ * URL to state, which is what makes Back and Forward do anything.
+ *
+ * Without this the address changed and the screen did not, which is worse than
+ * Back leaving the app: the app would claim to be somewhere it was not.
+ */
+watch(
+    () => route.query,
+    async (query) => {
+        if (sameAsRoute(queryFor())) {
+            return
+        }
+
+        followingRoute.value = true
+
+        try {
+            const restored = await restorePosition()
+
+            // Back past the first step of a visit lands on the site list,
+            // which is where that visit began.
+            if (!restored && typeof query.visit !== 'string') {
+                stage.value = 'site'
+                await loadDrafts()
+            }
+        } finally {
+            followingRoute.value = false
+        }
+    },
+)
 
 async function restorePosition(): Promise<boolean> {
     const id = typeof route.query.visit === 'string' ? route.query.visit : ''
@@ -168,7 +235,12 @@ async function restorePosition(): Promise<boolean> {
         return false
     }
 
-    await assessment.resume(existing)
+    // Already the open visit, which is every Back press within one assessment.
+    // Re-reading it from the database each time would be wasted work and would
+    // discard answers written since it was loaded.
+    if (assessment.assessment.value?.id !== existing.id) {
+        await assessment.resume(existing)
+    }
 
     const section = typeof route.query.section === 'string' ? route.query.section : ''
     const pathogen = typeof route.query.pathogen === 'string' ? route.query.pathogen : ''
@@ -528,7 +600,12 @@ async function onSubmit() {
 </script>
 
 <template>
-  <AssessorShell @change-password="changingPassword = true">
+  <AssessorShell
+    :storage="assessment.storage.value"
+    :save-state="assessment.saveState.value"
+    :save-error="assessment.saveError.value"
+    @change-password="changingPassword = true"
+  >
     <ChangePassword v-if="changingPassword" @changed="changingPassword = false" />
 
     <SitePicker v-else-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
@@ -538,11 +615,6 @@ async function onSubmit() {
         v-else-if="stage === 'setup'"
         class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1120px] md:px-6"
     >
-        <StorageNotice
-            :storage="assessment.storage.value"
-            :save-state="assessment.saveState.value"
-            :save-error="assessment.saveError.value"
-        />
 
         <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
             <div>
@@ -645,11 +717,6 @@ async function onSubmit() {
         copies of the same navigation is two things to tab through.
     -->
     <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1280px] md:px-6">
-        <StorageNotice
-            :storage="assessment.storage.value"
-            :save-state="assessment.saveState.value"
-            :save-error="assessment.saveError.value"
-        />
 
         <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3 md:px-0 md:pt-6">
             <div class="flex items-center justify-between gap-2">
