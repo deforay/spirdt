@@ -1,144 +1,64 @@
-# Apache vhost for SPI-RDT, with mod_php.
+# Apache vhost for SPI-RDT.
 #
-# Copy, replace the four placeholders, and include it from httpd.conf:
+# Copy, replace the three placeholders, and enable it:
 #
 #   {{ROOT}}        absolute path to the checkout, no trailing slash
 #   {{SERVER_NAME}} the hostname you will type, e.g. spirdt.test
-#   {{PORT}}        80, or 8080 for a Homebrew httpd running unprivileged
-#   {{PHP_PREFIX}}  where PHP lives, e.g. $(brew --prefix)/opt/php@8.4
+#   {{PORT}}        usually 80
 #
-# Checked with: httpd -t
+#   sudo cp deploy/apache/spirdt.conf.example /etc/apache2/sites-available/spirdt.conf
+#   sudo a2ensite spirdt && sudo apache2ctl configtest && sudo systemctl reload apache2
 #
-# The nginx equivalent is docker/nginx/default.conf. They do the same three
-# things: serve the built app, alias the API beneath it, and pass Authorization
-# through.
-
-# mod_php. Comment both out and use the FilesMatch block further down if you
-# are running php-fpm instead. Nothing in the application depends on the SAPI.
-LoadModule php_module {{PHP_PREFIX}}/lib/httpd/modules/libphp.so
-<FilesMatch "\.php$">
-    SetHandler application/x-httpd-php
-</FilesMatch>
+# There is nothing here but a document root, and that is the point. Both halves
+# of the application are served from public/ — the API through index.php, the
+# built app through index.html — and public/.htaccess decides which. Keeping the
+# rules there rather than here means the deployed artefact carries its own
+# routing, so shared hosting works, and a vhost cannot disagree with it.
+#
+# PHP is not loaded here. A module belongs to the server, not to one site:
+# a2enmod php8.4 on Ubuntu, or LoadModule in httpd.conf on macOS. Nothing in
+# the application depends on the SAPI, so php-fpm behind mod_proxy_fcgi works
+# unchanged.
+#
+# Checked with apache2ctl configtest (httpd -t on macOS).
+# The nginx equivalent is docker/nginx/default.conf.
 
 <VirtualHost *:{{PORT}}>
     ServerName {{SERVER_NAME}}
 
-    # The BUILT app is the document root, not the checkout. web/dist is
-    # committed, so it exists in a fresh clone — there is no build step to
-    # forget. Pointing this at the checkout root instead is the single most
-    # common mistake here, and section "If every URL loops" below is what it
-    # looks like when you make it.
-    DocumentRoot {{ROOT}}/web/dist
+    DocumentRoot "{{ROOT}}/public"
+    DirectoryIndex index.html index.php
 
-    # Same origin for both halves, so the app can call /api relatively. That
-    # is why CORS_ALLOWED_ORIGINS is empty for this setup: nothing the browser
-    # sends is cross-origin, so there is nothing to allow.
-    Alias /api {{ROOT}}/public
+    ErrorLog  "/var/log/apache2/spirdt-error.log"
+    CustomLog "/var/log/apache2/spirdt-access.log" combined
 
-    <Directory {{ROOT}}/public>
-        Options -Indexes
-        # None, deliberately. public/.htaccess carries the same rules for
-        # shared hosting where a vhost cannot be edited. Letting both apply
-        # means maintaining the pair in step for no gain.
-        AllowOverride None
+    <Directory "{{ROOT}}/public">
+        # FileInfo would be enough. All is what a stock Ubuntu vhost uses, and
+        # matching it means one fewer thing that differs from every other site
+        # on the box.
+        AllowOverride All
         Require all granted
+        Options -Indexes +FollowSymLinks
 
-        # Every route but sign-in is a Bearer token, so this decides whether
-        # the application works at all. mod_php exposes the header through
-        # apache_request_headers(); CGI and FastCGI drop it. The symptom of
-        # getting it wrong is that signing in works and every later call
-        # returns 401 — which reads as an auth bug, not a server one.
+        # Every route but sign-in carries a Bearer token, so this line decides
+        # whether the application works at all. mod_php exposes the header
+        # through apache_request_headers(); CGI and FastCGI drop it. The symptom
+        # of getting it wrong is that signing in works and every later call
+        # returns 401 — which reads as an authentication bug, not a server one.
         CGIPassAuth On
-
-        RewriteEngine On
-        RewriteBase /api
-
-        RewriteCond %{HTTP:Authorization} .
-        RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^ index.php [QSA,L]
     </Directory>
-
-    <Directory {{ROOT}}/web/dist>
-        Options -Indexes
-        AllowOverride None
-        Require all granted
-
-        # An unknown path is a screen in the app, not a missing file. Without
-        # this, reloading on any screen but the first returns 404 — and a
-        # reload is exactly what somebody does when a screen looks wrong.
-        RewriteEngine On
-
-        # This condition is what stops the rule feeding itself. The !-f test
-        # below is only a terminator while /index.html resolves to a real
-        # file; the moment it does not — a mistyped DocumentRoot is enough —
-        # the rewrite target matches the rule again and Apache gives up after
-        # ten passes with "Request exceeded the limit of 10 internal
-        # redirects". With this line the same mistake is a plain 404 that
-        # says which file is missing.
-        RewriteCond %{REQUEST_URI} !^/index\.html$
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^ /index.html [L]
-    </Directory>
-
-    # Fingerprinted filenames: a changed file is a changed URL, so this is
-    # safe for as long as the build keeps hashing.
-    <LocationMatch "^/assets/">
-        Header set Cache-Control "public, max-age=31536000, immutable"
-    </LocationMatch>
 
     # Security headers come from SecurityHeadersMiddleware and from nowhere
     # else. Setting them here as well sends each one twice.
-
-    ErrorLog  {{ROOT}}/var/log/apache-error.log
-    CustomLog {{ROOT}}/var/log/apache-access.log combined
 </VirtualHost>
-
-# ─────────────────────────────────────────────
-# php-fpm instead of mod_php
-# ─────────────────────────────────────────────
-#
-# Drop the LoadModule and SetHandler at the top, enable proxy_fcgi, and put
-# this inside the public directory block:
-#
-#   <FilesMatch "\.php$">
-#       SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
-#   </FilesMatch>
-#
-# Debian and Ubuntu now treat mod_php as the legacy path, so this is the
-# better-supported option there. It needs no change to the application.
-
-# ─────────────────────────────────────────────
-# If every URL loops
-# ─────────────────────────────────────────────
-#
-# "Request exceeded the limit of 10 internal redirects" means a rewrite target
-# re-entered the rule that produced it. Turn on tracing and the log names the
-# rule:
-#
-#   LogLevel alert rewrite:trace3
-#
-# The usual cause is DocumentRoot not pointing at web/dist, so /index.html
-# resolves to nothing.
 
 # ─────────────────────────────────────────────
 # Permissions
 # ─────────────────────────────────────────────
 #
-# Apache writes logs, caches and uploads under var/. It runs as the User in
-# httpd.conf — _www on macOS, www-data on Debian — which is NOT the user that
-# ran composer setup. So var/ is owned by one account and written by another,
-# and the failure reads as an application fault rather than a permissions one.
+# Apache writes logs, caches and uploads under var/, running as www-data — not
+# the account that cloned the repository. Skipping this produces an application
+# error with nothing in it pointing at permissions:
 #
-# On a development machine, the simplest fix is to run httpd as yourself:
-#
-#   User  <you>
-#   Group staff
-#
-# On a server, give the group write and put the web server user in it:
-#
-#   chown -R <you>:www-data {{ROOT}}/var
-#   chmod -R g+w {{ROOT}}/var
+#   sudo chown -R "$USER":www-data {{ROOT}}/var
+#   sudo chmod -R g+w {{ROOT}}/var

@@ -1,60 +1,91 @@
-# Apache configuration for the API.
+# The web root. Both halves of the application are served from here.
 #
-# Only needed on Apache. The Docker stack uses nginx, which does all of this
-# in docker/nginx/default.conf and ignores this file entirely.
+#   /api/*          index.php, the Slim front controller
+#   /assets/*       the built app's fingerprinted JS and CSS
+#   everything else index.html, because an unknown path is a screen in the app
 #
-# A vhost is the better place for these rules — Apache re-reads .htaccess on
-# every request and a vhost is parsed once. This file exists anyway so that a
-# deployment onto shared hosting, or one where AllowOverride was left at None
-# and then turned on later, works without anyone having to work out why every
-# URL returns 404. See docs/deployment.md for the vhost form.
+# One document root, which is where a PHP developer expects to find one. The
+# earlier arrangement served the built app from web/dist and aliased this
+# directory in beneath it, and two roots that have to be kept in step produced a
+# rewrite loop twice in one afternoon.
+#
+# Same origin is what makes it worth doing rather than merely conventional: the
+# app calls /api relatively, so there is no CORS to configure and no second
+# certificate to keep alive. That is why CORS_ALLOWED_ORIGINS is empty.
+#
+# A vhost is the better place for rules — Apache re-reads .htaccess on every
+# request and a vhost is parsed once — but this file is what makes the app work
+# on shared hosting, and what keeps deploy/apache/spirdt.conf.example short
+# enough to read. It takes effect wherever AllowOverride is at least FileInfo.
 
-# Directory listings would expose the tree if the rewrite ever stopped
-# matching. There is nothing in here worth listing.
 Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-
-    # RewriteBase is set because this directory is normally reached through an
-    # Alias rather than as the DocumentRoot. Without it, Apache resolves the
-    # substitution against the URL path instead of the alias and rewrites
-    # /api/health to /index.php, which does not exist.
-    RewriteBase /api
+    RewriteBase /
 
     # The Authorization header decides whether anything works at all: every
     # route but sign-in is a Bearer token. mod_php exposes it through
-    # apache_request_headers(), but CGI and FastCGI drop it unless it is
-    # copied into the environment, and the symptom is that signing in works
-    # while every subsequent call returns 401.
+    # apache_request_headers(), but CGI and FastCGI drop it unless it is copied
+    # into the environment. The symptom of getting this wrong is that signing in
+    # works and every subsequent call returns 401 — which reads as an
+    # authentication bug rather than a server one.
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Anything that is not a real file goes to the front controller.
+    # The API. Slim calls setBasePath('/api'), so the prefix is not decorative
+    # and must survive as far as PHP.
+    RewriteRule ^api(/.*)?$ index.php [QSA,L]
+
+    # Everything else is the app. Without this, reloading on any screen but the
+    # first returns 404 — and a reload is exactly what somebody does when a
+    # screen looks wrong.
+    #
+    # The first condition stops the rule feeding itself. The file test below is
+    # only a terminator while index.html exists, and a document root pointing
+    # somewhere else is enough to break that: the target matches the rule again
+    # and Apache gives up after ten passes with "Request exceeded the limit of
+    # 10 internal redirects", naming no rule and no file. With this line the
+    # same mistake is a plain 404 that says what is missing.
+    RewriteCond %{REQUEST_URI} !^/index\.html$
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^ index.php [QSA,L]
+    RewriteRule ^ index.html [L]
 </IfModule>
 
 <IfModule !mod_rewrite.c>
-    # Fail loudly rather than serving a 404 for every route and leaving
-    # someone to guess that a module is missing.
+    # Fail loudly rather than serving a 404 for every route and leaving somebody
+    # to guess that a module is missing.
     <IfModule mod_headers.c>
         Header set X-Spirdt-Error "mod_rewrite is not enabled"
     </IfModule>
 </IfModule>
 
-# CGIPassAuth is the supported way to pass Authorization through on 2.4.13
-# and later, and it covers the SAPIs the rewrite above cannot reach.
+# CGIPassAuth is the supported way to pass Authorization through on 2.4.13 and
+# later, and it covers the SAPIs the rewrite above cannot reach.
 <IfModule mod_authz_core.c>
     <Files "index.php">
         CGIPassAuth On
     </Files>
 </IfModule>
 
+<IfModule mod_headers.c>
+    # Fingerprinted filenames: a changed file is a changed URL, so a year is
+    # safe for as long as the build keeps hashing.
+    <FilesMatch "\.(js|css|woff2?|png|svg|jpg|jpeg|webp)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    # index.html is the one file whose name never changes and whose contents
+    # always do. Caching it is how a device keeps running last week's app.
+    <FilesMatch "^index\.html$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>
+
 # Belt and braces. These should never be under the document root, but a
-# misconfigured DocumentRoot pointing at the repository root is a real
-# mistake and this makes it a denial rather than a download.
+# misconfigured DocumentRoot pointing at the repository root is a real mistake
+# and this makes it a denial rather than a download.
 <FilesMatch "^\.env|composer\.(json|lock)$">
     Require all denied
 </FilesMatch>

@@ -10,12 +10,12 @@ The split is the same whichever web server you use:
 | Path | Served from | Notes |
 |---|---|---|
 | `/api/*` | `public/index.php` | Slim calls `setBasePath('/api')`, so the prefix is not decorative |
-| `/assets/*` | `web/dist/assets` | Fingerprinted by the build, cacheable for a year |
-| everything else | `web/dist/index.html` | Unmatched paths are routes inside the app |
+| `/assets/*` | `public/assets` | Fingerprinted by the build, cacheable for a year |
+| everything else | `public/index.html` | Unmatched paths are routes inside the app |
 
 ## The app arrives built
 
-`web/dist` is committed. A checkout is deployable as it stands: Apache or nginx,
+`public/` is committed. A checkout is deployable as it stands: Apache or nginx,
 PHP, a database, and nothing else. Node is a development dependency, not a
 deployment one.
 
@@ -30,8 +30,8 @@ calls `/api` relatively, so one artefact is correct on every host. Setting
 is why nothing sets it.
 
 The cost is that source and build have to move together. A commit that changes
-`web/src` without a rebuilt `web/dist` leaves the server running the previous
-version of the app, with nothing on screen to say so. The pre-commit hook
+`web/src` without rebuilding into `public/` leaves the server running the
+previous version of the app, with nothing on screen to say so. The pre-commit hook
 refuses that commit; `.gitattributes` keeps the bundle out of diffs and out of
 merges, since a conflict inside a minified chunk has no resolution but a
 rebuild.
@@ -44,7 +44,7 @@ npm ci
 npm run build
 ```
 
-and commit `web/dist` alongside the source.
+and commit `public/` alongside the source.
 
 ## nginx
 
@@ -53,99 +53,54 @@ mounts. Nothing to do beyond building the app and restarting nginx.
 
 ## Apache
 
-The application runs on Apache with `mod_php` or with `php-fpm` behind
-`mod_proxy_fcgi`. Nothing in the code depends on the SAPI.
+Runs with `mod_php` or with `php-fpm` behind `mod_proxy_fcgi`. Nothing in the
+code depends on the SAPI.
 
-**PHP 8.4 is a hard floor.** `composer.json` requires `^8.4`. On Debian and
-Ubuntu that means the ondrej PPA — distribution repositories do not carry it.
-Note that Debian and Ubuntu now treat `mod_php` as the legacy path; `php8.4-fpm`
-with `mod_proxy_fcgi` is better supported and needs no change to the
-application.
-
-Enable `rewrite`, and `proxy_fcgi` if you are using FPM:
+**PHP 8.4 is a hard floor** — `composer.json` requires `^8.4`. On Debian and
+Ubuntu that means the ondrej PPA, and both now treat `mod_php` as the legacy
+path, so `php8.4-fpm` is the better-supported choice there.
 
 ```
-a2enmod rewrite
+sudo a2enmod rewrite headers php8.4     # or proxy_fcgi, for FPM
 ```
 
 ### Virtual host
 
-Preferred over `.htaccess`: Apache re-reads `.htaccess` on every request, and a
-vhost is parsed once at start-up.
-
 A ready copy with placeholders lives at `deploy/apache/spirdt.conf.example`,
-annotated with the reason for each block. The listing below is the same file
-with the commentary stripped.
+annotated with the reason for each line. Stripped of commentary it is this:
 
 ```apache
 <VirtualHost *:80>
     ServerName spirdt.example.org
 
-    # The built app is the document root. The API is aliased in beneath it,
-    # so both are same-origin and the app can call /api relatively.
-    DocumentRoot /var/www/spirdt/web/dist
+    DocumentRoot "/var/www/spirdt/public"
+    DirectoryIndex index.html index.php
 
-    Alias /api /var/www/spirdt/public
-
-    <Directory /var/www/spirdt/public>
-        Options -Indexes
-        AllowOverride None
+    <Directory "/var/www/spirdt/public">
+        AllowOverride All
         Require all granted
-
-        # Every route but sign-in is a Bearer token, so this line decides
-        # whether the application works at all. mod_php exposes the header
-        # through apache_request_headers(); CGI and FastCGI drop it, and the
-        # symptom is that signing in works and every later call returns 401.
+        Options -Indexes +FollowSymLinks
         CGIPassAuth On
-
-        RewriteEngine On
-        RewriteBase /api
-
-        RewriteCond %{HTTP:Authorization} .
-        RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^ index.php [QSA,L]
     </Directory>
-
-    <Directory /var/www/spirdt/web/dist>
-        Options -Indexes
-        AllowOverride None
-        Require all granted
-
-        # An unknown path is a screen in the app, not a missing file. Without
-        # this, reloading on any screen but the first returns 404 — and a
-        # reload is exactly what someone does when a screen looks wrong.
-        RewriteEngine On
-
-        # The first condition is what stops the rule feeding itself. The !-f
-        # test is only a terminator while /index.html resolves to a real file,
-        # and a DocumentRoot pointing anywhere but web/dist is enough to break
-        # that — at which point the target matches the rule again and Apache
-        # gives up after ten passes. With this line the same mistake is a 404
-        # naming the missing file.
-        RewriteCond %{REQUEST_URI} !^/index\.html$
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^ /index.html [L]
-    </Directory>
-
-    # Fingerprinted filenames: a changed file is a changed URL.
-    <LocationMatch "^/assets/">
-        Header set Cache-Control "public, max-age=31536000, immutable"
-    </LocationMatch>
-
-    # Security headers come from SecurityHeadersMiddleware and from nowhere
-    # else. Setting them here as well sends each one twice.
-
-    ErrorLog  ${APACHE_LOG_DIR}/spirdt-error.log
-    CustomLog ${APACHE_LOG_DIR}/spirdt-access.log combined
 </VirtualHost>
 ```
 
-With `php-fpm` instead of `mod_php`, add this inside the `public` directory
-block:
+That is the whole thing, and it is short for a reason. `public/` is the
+document root: it holds the API's front controller, the built app, and the
+`.htaccess` that decides which of the two answers a request. There is no second
+root to keep in step and no `Alias` to get wrong.
+
+`CGIPassAuth` is the one line that is not obvious. Every route but sign-in
+carries a Bearer token; `mod_php` exposes the header through
+`apache_request_headers()` and CGI and FastCGI drop it. Getting it wrong looks
+like an authentication bug — signing in works, and every call after it returns
+401.
+
+`AllowOverride All` is what lets `public/.htaccess` apply. `FileInfo` would be
+enough, but `All` is what a stock Ubuntu vhost uses and matching it means one
+fewer thing that differs from every other site on the box.
+
+For `php-fpm`, add this inside the directory block:
 
 ```apache
 <FilesMatch "\.php$">
@@ -155,19 +110,18 @@ block:
 
 ### Shared hosting
 
-Where a vhost cannot be edited, `public/.htaccess` carries the same rewrite and
-`Authorization` handling, and takes effect as long as `AllowOverride` is at
-least `FileInfo`. The app itself still has to be served from somewhere — point
-the document root at `web/dist` and alias `/api`, or place the two on separate
-hosts and set `VITE_API_BASE` at build time.
+Point the document root at `public/` and there is nothing else to do — the
+`.htaccess` shipped there carries the routing, the `Authorization` handling and
+the cache headers, and takes effect wherever `AllowOverride` is at least
+`FileInfo`.
 
 ### What must never be reachable
 
-The document root is `web/dist` and `public/`, never the repository root.
-Serving the repository root exposes `.env`, and with it the database password
-and `JWT_SECRET` — and a leaked `JWT_SECRET` lets anyone mint a token for any
+The document root is `public/`, never the repository root. Serving the
+repository root exposes `.env`, and with it the database password and
+`JWT_SECRET` — and a leaked `JWT_SECRET` lets anyone mint a token for any
 organisation. `public/.htaccess` denies `.env` and the composer files as a
-second line, but the arrangement is the real protection.
+second line, but the document root is the real protection.
 
 Check it after any change — and check the **body**, not the status. The
 single-page fallback answers every unmatched path with the app's HTML, so
@@ -180,6 +134,7 @@ curl -s https://your-host/.env | head -c 40
 
 `<!doctype html>` is correct. Anything containing `DB_PASS` or `JWT_SECRET`
 means the document root is wrong, and both secrets should be rotated.
+
 
 ## After deploying
 

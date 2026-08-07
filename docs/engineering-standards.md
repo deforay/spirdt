@@ -67,6 +67,6 @@ cd web && npm run typecheck && npm test && npm run build
 Static analysis findings are fixed at the cause. Suppressions, baselines and
 inline overrides are not how this codebase gets to green.
 
-The build is a gate rather than a formality here, because `web/dist` is
-committed and deployed as it stands. Stage it with the source it came from —
-see [Deployment](deployment.md).
+The build is a gate rather than a formality here, because the app is built into
+`public/` — the document root — and deployed as it stands. Stage it with the
+source it came from; see [Deployment](deployment.md).

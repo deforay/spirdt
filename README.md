@@ -2,229 +2,100 @@
 
 Site assessment platform for the **Stepwise Process for Improving the Quality of Rapid Diagnostic Testing (SPI-RDT)** — a quality audit instrument for point-of-care rapid diagnostic testing sites, scoring each site toward a national certification level.
 
-Replaces a paper/Word checklist and supersedes the older ODK-based SPI-RRT tool.
+Replaces a paper checklist and supersedes the older ODK-based SPI-RRT tool.
 
-> **Documentation:** <https://deforay.github.io/spirdt/>
->
-> **Start here:** [`docs/design-brief.md`](docs/design-brief.md) is the authoritative brief — the domain, the scoring rules, the architecture decisions, and the conventions this codebase follows.
+## Documentation
 
----
+**<https://deforay.github.io/spirdt/>** — everything below the surface lives there, and this file deliberately does not repeat it. Two copies of an instruction drift, and the copy nobody publishes is the one that goes stale.
+
+| If you want to | Read |
+|---|---|
+| Set this up on a machine | [Installation](https://deforay.github.io/spirdt/getting-started/) |
+| Know why it is built this way | [Design brief](https://deforay.github.io/spirdt/design-brief/) |
+| Understand the scoring | [Scoring](https://deforay.github.io/spirdt/scoring/) |
+| Change the schema | [Data model](https://deforay.github.io/spirdt/data-model/) |
+| Put it on a server | [Deployment](https://deforay.github.io/spirdt/deployment/) |
+| Run a backup or an upgrade | [Operations](https://deforay.github.io/spirdt/operations/) |
+| Work on the front end | [Design](https://deforay.github.io/spirdt/design/) |
+| Know what is left | [What is left](https://deforay.github.io/spirdt/todo/) |
+
+The sources are in `docs/`, published to GitHub Pages on push to `main`.
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | Backend | Slim 4, PHP 8.4, MySQL 8.4 |
-| Frontend | Vue 3 + Vite + TypeScript *(not yet scaffolded)* |
-| Assessor app | Offline-first PWA *(not yet scaffolded)* |
-| Runtime | Docker Compose, or native PHP + MySQL |
+| Assessor app | Vue 3, Vite, TypeScript. Offline-first, Dexie over IndexedDB |
+| Styling | Tailwind v4, Reka UI primitives, Phosphor icons |
+| Runtime | Apache with mod_php, nginx, Docker Compose, or PHP's own server |
 | Backups | `amitdugar/db-tools` (zstd) |
-
----
 
 ## Getting started
 
-Two supported paths. **Both are first-class** — the application only reads
-`DB_HOST`/`DB_PORT` from `.env` and neither knows nor cares whether MySQL is a
-Compose service or a local install. Switching between them is a `.env` change,
-never a code change.
+Three supported paths, all first-class. The application reads `DB_HOST` and `DB_PORT` from `.env` and neither knows nor cares which one it is running under.
 
-Common to both:
+| Path | Use it when |
+|---|---|
+| Docker | You want the whole stack in one command |
+| Native, PHP's own server | Working on the code. Fastest loop, no web server to configure |
+| Apache and mod_php | You want the machine to run what a server runs |
 
-```bash
-cp .env.example .env
+Each is written out step by step in [Installation](https://deforay.github.io/spirdt/getting-started/). Three things there are worth knowing before you start, because none of them are guessable:
 
-# JWT_SECRET must be set; boot fails fast without it.
-php -r "echo bin2hex(random_bytes(32));"     # paste into .env
-# no PHP on the host? use:  openssl rand -hex 32
-```
+- The **test database is migrated separately** — `DB_NAME=spirdt_test php bin/migrate`. Nothing does it for you, and skipping it fails the integration suite on a missing column.
+- The app user needs a **global `PROCESS` grant**. Without it `mysqldump` errors and still exits `0`, so every backup is empty and reports success.
+- **`bin/setup` is for provisioning a server**, not for a development machine. It is safe to run, and it does not finish the job.
 
-### Option A — Docker
-
-Requires only Docker and Docker Compose.
-
-```bash
-docker compose up -d --build
-docker compose exec php composer install
-docker compose exec php composer preflight
-docker compose exec php composer migrate
-
-curl http://localhost:8080/api/health
-```
-
-Keep the shipped defaults in `.env`: `DB_HOST=mysql`, `DB_PORT=3306`.
-
-| Service | Host port | Override |
-|---|---|---|
-| nginx | 8080 | `HTTP_PORT` |
-| MySQL | 3307 | `DB_EXPOSED_PORT` |
-
-MySQL is exposed on 3307 so it doesn't collide with a MySQL you already run
-locally. If 3307 is taken too — another Compose project, typically — set
-`DB_EXPOSED_PORT` to anything free.
-
-### Option B — native, no Docker
-
-Requires PHP 8.4 with `pdo_mysql`, `intl`, `zip`, `mbstring`, `bcmath`, plus a
-MySQL 8 you can reach and Composer.
-
-```bash
-# One-time: create the databases and a user
-mysql -uroot <<'SQL'
-CREATE DATABASE IF NOT EXISTS spirdt      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS spirdt_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'spirdt'@'127.0.0.1' IDENTIFIED BY 'spirdt';
-GRANT ALL PRIVILEGES ON spirdt.*      TO 'spirdt'@'127.0.0.1';
-GRANT ALL PRIVILEGES ON spirdt_test.* TO 'spirdt'@'127.0.0.1';
-FLUSH PRIVILEGES;
-SQL
-
-# Point .env at it: DB_HOST=127.0.0.1, DB_PORT=3306, DB_USER/DB_PASS to match
-
-composer install
-composer preflight
-composer migrate
-composer serve                  # http://127.0.0.1:8080
-
-curl http://127.0.0.1:8080/api/health
-```
-
-Use `127.0.0.1`, not `localhost` — `localhost` makes PHP try a unix socket,
-which fails confusingly when the socket path differs from what `php.ini`
-expects.
-
-`composer serve` runs PHP's built-in server, which is **development only** —
-single-threaded and not for real traffic. `bin/serve 0.0.0.0:8080` binds all
-interfaces, which is how you reach it from a phone or tablet on the same
-network when testing the PWA.
-
-### Verifying either path
-
-```json
-{"status":"ok","app":"SPI-RDT Assessment Platform","version":"0.1.0","time":"..."}
-```
-
-`composer preflight` is the first thing to run when something looks wrong. It
-checks the PHP version, extensions, `.env`, writable paths, and database
-reachability — and it names which target you are pointed at, since being
-pointed at the wrong one is the most common reason the app appears broken.
-
----
+The app is built into `public/`, the document root, and committed — so a fresh clone serves it with no build step. Change anything under `web/src` and you must rebuild and stage `public/` with it. A pre-commit hook refuses the commit otherwise, and that hook is installed by `composer install`.
 
 ## Common commands
 
-Native, run directly. Under Docker, prefix with `docker compose exec php`.
+Run directly. Under Docker, prefix with `docker compose exec php`.
 
 | Command | What it does |
 |---|---|
-| `composer setup` | First-run setup. Idempotent — safe to re-run |
-| `composer setup -- --reset` | Drop every table and rebuild (refuses on production) |
-| `composer app:upgrade` | Backup, sync code, migrate, verify |
-| `composer db:backup` | Backup via db-tools |
-| `composer refresh` | Pull latest, then install/migrate only if needed |
-| `composer refresh -- --status` | Local vs remote state, changes nothing |
 | `composer preflight` | Check this machine can run the app |
-| `composer serve` | Built-in server on 8080 (native path, dev only) |
+| `composer serve` | Built-in server on 8080. Development only |
 | `composer migrate` | Apply pending migrations |
-| `composer migrate -- --status` | Current version and what's pending |
-| `composer migrate -- --dry-run` | Show what would run, execute nothing |
+| `composer refresh` | Pull, then install and migrate only if the diff needs it |
 | `composer test` | Full PHPUnit suite |
-| `composer test:unit` | Unit suite — no DB, fast |
+| `composer test:unit` | Unit suite — no database, fast |
 | `composer phpstan` | Static analysis |
-| `composer cs:check` | Report style drift |
 | `composer cs:fix` | Apply style fixes |
+| `composer db:backup` | Backup via db-tools |
+| `composer app:upgrade` | Backup, sync code, migrate, verify. The production path |
+| `npm --prefix web test` | Device-side suite |
+| `npm --prefix web run build` | Rebuild the app into `public/` |
 
-`composer run-script --list` prints every script with a description. Every
-`bin/` script takes `--help` and prints its own docblock.
-
-### Setup, upgrade and backup
-
-`bin/setup` takes a fresh clone to a running application: prerequisites, `.env`
-(generating `JWT_SECRET`), dependencies, database creation, migrations, then
-verification. It is **idempotent** — every step checks before acting, so when
-it fails halfway on a real machine the fix is to run it again.
-
-`bin/upgrade` is the production path: it takes a **database backup first** and
-aborts if that fails, syncs code via `bin/refresh`, then runs migrations
-*unconditionally* — never gated on the diff, because a previously failed run
-can leave pending work this pull knows nothing about.
-
-Backups use [`amitdugar/db-tools`](https://github.com/amitdugar/db-tools), the
-same tool as the other house projects, configured in `db-tools.php`. It also
-provides restore, verify and PITR — see `vendor/bin/db-tools list`.
-
-> **The php image ships MySQL's own client, not the distro package.** On both
-> Alpine and Debian, `mysql-client` is MariaDB's client, and it cannot talk to a
-> default MySQL 8.4 server at all: it rejects the server's self-signed TLS
-> certificate, and it has no `caching_sha2_password` plugin. The Dockerfile
-> copies the real client from the `mysql:8.4` image. See the comment there.
-
-> **Backups are currently unencrypted.** db-tools encrypts by default, but
-> supplying an encryption password produces no archive at all, so `--no-encrypt`
-> is passed explicitly — a backup step that silently writes nothing is worse
-> than an unencrypted one. Revisit alongside a key-management story.
-
-### Staying up to date
-
-```bash
-composer refresh
-```
-
-Fetches, fast-forwards, and then gates the expensive work on what the diff
-actually contains — `composer install` runs only when `composer.lock` changed,
-and migrations only when something under `migrations/` changed. If the checkout
-is already at the target commit the whole thing is a fast no-op.
-
-It figures out for itself whether to run those follow-up commands natively or
-inside the Compose container, so it is the same command on both paths.
-
-A dirty working tree **aborts** rather than stashing — silently setting aside
-work in progress is a nasty surprise. Pass `--stash` to opt in. Pulls are
-`--ff-only`: a diverged branch is something a human should look at, not
-something a refresh script should quietly resolve.
-
----
+`composer run-script --list` prints every script with a description, and every `bin/` script takes `--help` and prints its own docblock. The full reference is in [CLI](https://deforay.github.io/spirdt/cli/).
 
 ## Layout
 
 ```
-bin/            CLI scripts. Each carries a docblock; --help prints it.
-db/seeds/       production-bootstrap.sql + demo fixtures
+bin/            CLI scripts. Each carries a docblock; --help prints it
+deploy/apache/  vhost template, annotated
 docker/         Dockerfile, php.ini, nginx conf
-docs/           mkdocs site sources — published to GitHub Pages
-resources/      source/ (the two source checklist documents)
+docs/           mkdocs sources — published to GitHub Pages
 migrations/     Plain SQL, semver-ordered, idempotent
-public/         Web root — front controller only
+public/         Web root. API front controller + the built app, committed
+resources/      Instrument templates and their JSON schema
 routes/         api.php + api/*.php, split by audience
 src/            PSR-4 App\
-tasks/          Crunz schedules
-tests/          Unit/, Integration/, Feature/
+tests/          Unit/, Integration/, Feature/, fixtures/
 var/            log/, cache/, exports/, backups/, uploads/
+web/            Vue app sources. Builds into public/
 ```
 
----
+## Two hard limits
 
-## Conventions
+- **Tenant isolation is the top security concern.** The tenant is resolved from the authenticated user in middleware, never from a request parameter.
+- **Maintainability over clever code.** If a junior developer cannot follow it in a year, it is wrong.
 
-Carried over from earlier projects in the same house style, and worth following rather than inventing alternatives.
-
-**Migrations** are plain SQL, named `<semver>-<slug>.sql`, applied in semver order by `bin/migrate` and tracked in `system_config.app_version`. Common DDL is routed through idempotent helpers that check `information_schema` first, so a retried deploy is safe. Every migration opens with a comment explaining *why*, not just what.
-
-**Logging** goes through Monolog with a `UidProcessor`, so every line emitted while handling one request shares a UID. Services that don't take a `LoggerInterface` use the `App\Helper\Log` static gateway. **`error_log()` is banned everywhere except `src/Helper/Log.php`** — the pre-commit hook enforces it.
-
-**Errors** always leave as the same JSON envelope, whatever threw. Detail is exposed only when `APP_DEBUG` is on; in production a 5xx returns a reference ID and the real message goes to the log under the request UID.
-
-**Housekeeping** will live in one idempotent `bin/housekeeping` sweep with retention policy in a single array. Audit-bearing tables — assessments, answers, findings, scores, raw submissions, audit log — are never pruned.
-
-### Two hard limits
-
-- Tenant isolation is the top security concern. Tenant is resolved from the authenticated user in middleware, never from a request parameter. See `docs/design-brief.md` §5.
-- Maintainability over smart code. If a junior developer can't follow it in a year, it's wrong.
-
----
+Both are expanded, with the reasoning, in the [design brief](https://deforay.github.io/spirdt/design-brief/).
 
 ## Status
 
-Scaffolding stage. Working on both the Docker and native paths: Slim bootstrap with DI and middleware, migration runner, preflight doctor, `/api/health`, test harness, static analysis, pre-commit hook.
+In development, and usable end to end: an assessor can sign in offline, work a visit through all five sections, record findings, sign, and sync. The server scores what arrives, snapshots the result and refuses an incomplete or invalid submission.
 
-Next, in order: the remaining baseline migrations, the template JSON schema, the seeded base SPI-RDT template, and the scoring engine. Phase 1 scope and its definition of done are in `docs/design-brief.md` §10.
+Not built yet: the report and certificate, the dashboard, photograph capture, and bulk registry import. [What is left](https://deforay.github.io/spirdt/todo/) is kept current and says why for each.

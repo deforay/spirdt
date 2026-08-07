@@ -137,14 +137,14 @@ if ($groupClosed !== []) {
 
 // ─── 4b. The built app ───
 //
-// web/dist is committed, so this is present in a fresh clone and absent only
-// when somebody has cleaned it. It is what a web server serves, so a missing
-// build is a blank site rather than a degraded one.
-$indexPath = $root . '/web/dist/index.html';
+// The app is built into public/, which is the document root, and committed —
+// so this is present in a fresh clone and absent only when somebody has
+// cleaned it. A missing build is a blank site rather than a degraded one.
+$indexPath = $root . '/public/index.html';
 check(
-    'web/dist built',
+    'app built into public/',
     is_file($indexPath) ? PF_OK : PF_FAIL,
-    is_file($indexPath) ? '' : 'run: cd web && npm run build',
+    is_file($indexPath) ? '' : 'run: npm --prefix web run build',
 );
 
 // ─── 5. Database ───
