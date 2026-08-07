@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhCheck, PhMinus, PhProhibit, PhX } from '@phosphor-icons/vue'
+import { PhCheck, PhCircleHalf, PhProhibit, PhX } from '@phosphor-icons/vue'
 import type { Component } from 'vue'
 import { RadioGroupItem, RadioGroupRoot } from 'reka-ui'
 
@@ -60,10 +60,14 @@ const LABELS: Record<ResponseCode, 'response.Y' | 'response.P' | 'response.N' | 
  */
 const ICONS: Record<ResponseCode, Component> = {
     Y: PhCheck,
-    P: PhMinus,
+    // A half-filled circle, not a dash. A dash is the conventional mark for
+    // "not applicable" in any table, which makes it the closest thing on
+    // screen to the response sitting next to it — the one distinction these
+    // icons exist to draw. Half-filled says partly met, and says it in
+    // monochrome, which is the point: the icons are here because the
+    // green/amber difference is not one roughly a twelfth of men can rely on.
+    P: PhCircleHalf,
     N: PhX,
-    // A circle-slash rather than a dash. Partial already owns the dash, and
-    // the two are adjacent in the control.
     NA: PhProhibit,
 }
 
@@ -94,8 +98,8 @@ function choose(value: ResponseCode): void {
             :key="value"
             :value="value"
             :class="[
-                'flex cursor-pointer items-center justify-center gap-1 rounded-[7px]',
-                'px-1 py-1.5 text-[13px] font-medium text-label-2',
+                'flex min-h-11 cursor-pointer items-center justify-center gap-1 rounded-[7px]',
+                'px-1 text-[13px] font-medium text-label-2',
                 'transition-colors duration-150 hover:text-label',
                 'data-[state=checked]:font-semibold data-[state=checked]:shadow-sm',
                 'disabled:cursor-not-allowed disabled:opacity-50',
