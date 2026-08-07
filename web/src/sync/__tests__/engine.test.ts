@@ -2,7 +2,14 @@ import 'fake-indexeddb/auto'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { saveSession } from '../../auth/session'
-import { createAssessment, loadAnswers, saveAnswer } from '../../db/assessments'
+import {
+    addFinding,
+    createAssessment,
+    loadAnswers,
+    loadFindings,
+    saveAnswer,
+    saveFinding,
+} from '../../db/assessments'
 import { db } from '../../db/database'
 import { syncAssessment } from '../engine'
 import { acknowledged, acknowledgedFindings, buildPayload, NotSendable } from '../payload'
@@ -253,5 +260,37 @@ describe('building the payload', () => {
         const sent = [{ key: '019fd300-0000-7000-8000-00000000aaaa', revision: 1 }]
 
         expect(acknowledgedFindings(sent, [])).toEqual([])
+    })
+
+    /**
+     * A finding the version 5 upgrade re-keyed may already be on the server
+     * under an id this device was never told. The old key is the only thing
+     * both sides still recognise, so it goes with it — and it goes with
+     * nothing else, because the server treats it as permission to match an
+     * existing row and a finding raised since must not be matched to anything.
+     */
+    it('declares the old key of a re-keyed finding, and only that one', async () => {
+        const assessment = await newAssessment()
+
+        const carried = await addFinding(assessment.id, '3.2', null, 'N')
+        await saveFinding(carried.key, { gap: 'No exposure SOP on site.' })
+        await db.findings.update(carried.key, {
+            legacyKey: `${assessment.id}|3.2|`,
+        })
+
+        const raised = await addFinding(assessment.id, '3.2', null, 'N')
+        await saveFinding(raised.key, { gap: 'Staff have not been trained on it.' })
+
+        const built = buildPayload(
+            assessment,
+            await loadAnswers(assessment.id),
+            'device-1',
+            await loadFindings(assessment.id),
+        )
+
+        const byId = new Map(built.payload.findings.map((row) => [row.id, row]))
+
+        expect(byId.get(carried.key)?.previous_key).toBe(`${assessment.id}|3.2|`)
+        expect(byId.get(raised.key)).not.toHaveProperty('previous_key')
     })
 })

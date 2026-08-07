@@ -104,6 +104,15 @@ own device-minted id rather than the answer's natural key, and a payload
 without one is dropped rather than inserted fresh on every retry. Correcting an
 answer away from P/N discards *all* of that question's findings.
 
+Changing the key left a device that had already synced holding rows under ids
+the server had never seen, which would have been stored a second time. The
+version 5 upgrade now carries the key each row used to have, the payload sends
+it as `previous_key`, and the server matches on it. `findings.id_origin` records
+which side minted the id, so only a row the old server keyed can be matched —
+without that, a second gap raised on a question could land on top of the first.
+`0.1.12` adds the column. All of it is a bridge, and worth deleting once no
+device can still be on version 4.
+
 ### Responsive layout
 Every screen is `max-w-[430px]` — right for a phone in one hand, wrong on the
 laptops and tablets assessors also use. Deferred deliberately ("form design is
@@ -171,12 +180,9 @@ targets** — mouse users tolerate large ones, fingers do not tolerate small one
 - **A finding keeps the response it was created under.** Raise a finding while
   the answer is Partial, change the answer to No, and the finding still says
   Partial. `FindingPatch` has no way to correct it afterwards either.
-- **A v4 device with an already-synced finding would duplicate it.** Findings
-  were keyed server-side on (assessment, question, pathogen) and given a
-  server-minted id; they are keyed on a device-minted id now. The v5 upgrade
-  assigns a fresh id to a legacy row, so the server cannot recognise it and
-  inserts a second one. No database has a finding in it yet and nothing is
-  deployed, so the affected population is currently empty — but the window
-  closes the moment it is not, and reconciling after the fact means matching on
-  the natural key without hijacking the second finding on a question, which
-  findings v2 explicitly allows.
+- **A finding keeps its `status` through a re-key it should not survive.**
+  Adoption preserves `status` and the closure note, which is the point — but it
+  preserves them against the *gap the payload carries*, not the gap the row had.
+  A device that edits a finding's text and then syncs across the upgrade moves
+  a closure onto wording nobody closed. One row either way, so nothing is lost;
+  it is the audit trail that is slightly off.

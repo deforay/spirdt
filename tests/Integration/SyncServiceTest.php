@@ -28,9 +28,14 @@ final class SyncServiceTest extends TestCase
 {
     use MakesTenants;
 
+    private const ASSESSMENT_ID = '019fd200-0000-7000-8000-000000000001';
+
     /** Device-minted, because the finding's own id is the upsert key now. */
     private const FINDING_ID = '019fd600-0000-7000-8000-00000000000a';
     private const SECOND_FINDING_ID = '019fd600-0000-7000-8000-00000000000b';
+
+    /** Server-minted, standing in for a finding stored before the key changed. */
+    private const LEGACY_FINDING_ID = '019fd600-0000-7000-8000-00000000000c';
 
     private int $orgA;
     private int $orgB;
@@ -186,6 +191,156 @@ final class SyncServiceTest extends TestCase
         $sync->accept($payload);
 
         self::assertSame(2, Finding::query()->count());
+    }
+
+    /**
+     * The upgrade window.
+     *
+     * A device that synced before findings were keyed on their own id is
+     * holding rows the server already has, under ids the server minted and
+     * never told it. Version 5 re-keys those rows and sends the key they used
+     * to have. Without that, the finding arrives looking new and the site's
+     * action list gets the same gap twice.
+     */
+    public function testAReKeyedFindingIsAdoptedRatherThanDuplicated(): void
+    {
+        $sync = new SyncService();
+        $sync->accept($this->payload());
+
+        $this->makeServerKeyedFinding(self::LEGACY_FINDING_ID, '3.2', 'No exposure SOP on site.');
+
+        // Somebody has already started on it. Adoption has to keep that, which
+        // is most of the reason not to just let the duplicate through.
+        Finding::query()->update(['status' => 'in_progress']);
+
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'id'            => self::FINDING_ID,
+                'previous_key'  => self::ASSESSMENT_ID . '|3.2|',
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'No exposure SOP on site.',
+            ],
+        ];
+
+        $result = $sync->accept($payload);
+
+        self::assertSame(1, Finding::query()->count(), 'the same gap, not a second one');
+        self::assertSame([self::FINDING_ID], $result['accepted_findings']);
+
+        $finding = Finding::query()->first();
+        self::assertNotNull($finding);
+        self::assertSame(self::FINDING_ID, (string) $finding->id, 'it answers to the device id now');
+        self::assertSame('in_progress', $finding->status, 'the work already done on it survives');
+
+        // And once only. The second sync finds it by id and never looks for
+        // anything to adopt.
+        $sync->accept($payload);
+        self::assertSame(1, Finding::query()->count());
+    }
+
+    /**
+     * The case adoption must not break.
+     *
+     * One question may carry several findings, and the device sends only what
+     * is dirty — so the second gap raised on a question arrives alone, with an
+     * id the server has never seen, against a question that already has a
+     * finding. That is a new row. It says nothing about a previous key, and
+     * that silence is what distinguishes it.
+     */
+    public function testASecondGapOnAQuestionIsNotMistakenForAReKeyedOne(): void
+    {
+        $sync = new SyncService();
+        $sync->accept($this->payload());
+
+        $this->makeServerKeyedFinding(self::LEGACY_FINDING_ID, '3.2', 'No exposure SOP on site.');
+
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'id'            => self::SECOND_FINDING_ID,
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'Staff have not been trained on exposure response.',
+            ],
+        ];
+
+        $sync->accept($payload);
+
+        self::assertSame(2, Finding::query()->count(), 'two gaps on one question are two findings');
+
+        $legacy = Finding::query()
+            ->where('findings.id', BinaryUuid::toBytes(self::LEGACY_FINDING_ID))
+            ->first();
+
+        self::assertNotNull($legacy, 'the finding already stored is untouched');
+        self::assertSame('No exposure SOP on site.', $legacy->gap);
+    }
+
+    /**
+     * A previous key is checked against the finding it arrives with, because
+     * one describing another question would move a gap onto that question.
+     */
+    public function testAPreviousKeyForAnotherQuestionIsIgnored(): void
+    {
+        $sync = new SyncService();
+        $sync->accept($this->payload());
+
+        $this->makeServerKeyedFinding(self::LEGACY_FINDING_ID, '3.2', 'No exposure SOP on site.');
+
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'id'            => self::FINDING_ID,
+                'previous_key'  => self::ASSESSMENT_ID . '|3.1|',
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'No exposure SOP on site.',
+            ],
+        ];
+
+        $sync->accept($payload);
+
+        self::assertSame(2, Finding::query()->count(), 'stored as new rather than adopted on a bad key');
+    }
+
+    /**
+     * Only the OLD server's rows can be adopted. Once a device has claimed a
+     * finding, a replayed or forged previous key cannot reach it — otherwise
+     * the guard above could be walked around by sending the key twice.
+     */
+    public function testAPreviousKeyCannotTakeOverAFindingADeviceAlreadyKeyed(): void
+    {
+        $sync = new SyncService();
+
+        $payload = $this->payload();
+        $payload['findings'] = [
+            [
+                'id'            => self::FINDING_ID,
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'No exposure SOP on site.',
+            ],
+        ];
+        $sync->accept($payload);
+
+        $payload['findings'] = [
+            [
+                'id'            => self::SECOND_FINDING_ID,
+                'previous_key'  => self::ASSESSMENT_ID . '|3.2|',
+                'question_code' => '3.2',
+                'response'      => 'N',
+                'gap'           => 'Staff have not been trained on exposure response.',
+            ],
+        ];
+        $sync->accept($payload);
+
+        self::assertSame(2, Finding::query()->count());
+
+        $first = Finding::query()->where('findings.id', BinaryUuid::toBytes(self::FINDING_ID))->first();
+        self::assertNotNull($first);
+        self::assertSame('No exposure SOP on site.', $first->gap, 'the first finding is not overwritten');
     }
 
     /**
@@ -413,7 +568,7 @@ final class SyncServiceTest extends TestCase
     private function payload(): array
     {
         return [
-            'id'               => '019fd200-0000-7000-8000-000000000001',
+            'id'               => self::ASSESSMENT_ID,
             'testing_site_id'  => $this->siteId,
             'facility_id'      => $this->facilityId,
             'template_code'    => 'spi-rdt',
@@ -431,6 +586,23 @@ final class SyncServiceTest extends TestCase
                 ['question_code' => '4.1', 'pathogen' => 'hiv', 'response' => 'Y'],
             ],
         ];
+    }
+
+    /**
+     * A finding as the old server would have stored it: an id it minted
+     * itself, against the natural key it upserted on.
+     */
+    private function makeServerKeyedFinding(string $id, string $questionCode, string $gap): void
+    {
+        Capsule::table('findings')->insert([
+            'id'              => BinaryUuid::toBytes($id),
+            'id_origin'       => 'server',
+            'organization_id' => $this->orgA,
+            'assessment_id'   => BinaryUuid::toBytes(self::ASSESSMENT_ID),
+            'question_code'   => $questionCode,
+            'response'        => 'N',
+            'gap'             => $gap,
+        ]);
     }
 
     /**

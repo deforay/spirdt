@@ -36,6 +36,8 @@ export interface SyncPayload {
     }>
     findings: Array<{
         id: string
+        /** Only ever set on a finding re-keyed by the version 5 upgrade. */
+        previous_key?: string
         question_code: string
         pathogen?: string
         response: string
@@ -113,6 +115,14 @@ export function buildPayload(
                 // The finding's own id, which is what the server upserts on
                 // now that one question may carry several.
                 id: finding.key,
+                // And, for a finding that predates that id, the key it used to
+                // have. The server minted its own id for those and this device
+                // was never told it, so this is the only thing both sides still
+                // recognise. Sent rather than assumed: without it the server
+                // cannot tell a re-keyed finding from a genuinely new one, and
+                // guessing would let a second gap raised on a question land on
+                // top of the first.
+                ...(finding.legacyKey === null ? {} : { previous_key: finding.legacyKey }),
                 question_code: finding.questionCode,
                 ...(finding.pathogen === null ? {} : { pathogen: finding.pathogen }),
                 response: finding.response,

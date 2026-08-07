@@ -261,6 +261,9 @@ export async function addFinding(
         db.transaction('rw', db.findings, db.assessments, db.journal, async () => {
             const row: StoredFinding = {
                 key,
+                // Raised here, so the server has never seen it under any other
+                // name. Only the version 5 upgrade sets this.
+                legacyKey: null,
                 assessmentId,
                 questionKey: questionGroupKey(questionCode, pathogen),
                 questionCode,

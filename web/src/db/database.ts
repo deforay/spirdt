@@ -111,6 +111,16 @@ export interface StoredFinding {
      * own recommendation, owner and date.
      */
     key: string
+    /**
+     * The key this finding had before version 5 re-keyed it, or null.
+     *
+     * Set only by that upgrade, and only on rows that already existed. It is
+     * how the server recognises a finding it has already stored under an id
+     * the device can no longer reproduce — see the version 5 comment below.
+     * Anything raised since is a finding the server has never seen, which is
+     * exactly what null says.
+     */
+    legacyKey: string | null
     assessmentId: string
     /** `${questionCode}|${pathogen ?? ''}` — what groups several findings under one answer. */
     questionKey: string
@@ -300,6 +310,14 @@ export class SpirdtDatabase extends Dexie {
         // anything that is not a UUID, so a finding carried through with its
         // old composite key would be dropped on every sync — silently, with
         // the gap still on screen.
+        //
+        // Re-keying does mean the server can no longer recognise a finding it
+        // has already stored: it minted its own id for those, which this
+        // device was never told, so the next sync would offer a known finding
+        // under an unknown id and get a second copy of it. `legacyKey` is the
+        // one thing that identifies them, and this upgrade is the last moment
+        // it exists — after it, the old key is gone. It is carried so the sync
+        // can hand it back and the server can match on it.
         this.version(5)
             .stores({
                 assessments: 'id, status, syncState, syncedAt, updatedAt',
@@ -322,6 +340,7 @@ export class SpirdtDatabase extends Dexie {
                     existing.map((row) => ({
                         ...row,
                         key: uuidv7(),
+                        legacyKey: String(row.key),
                         questionKey: `${String(row.questionCode)}|${row.pathogen ?? ''}`,
                         urgency: null,
                         // The server has never seen this id, so it has to go

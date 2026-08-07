@@ -1,6 +1,6 @@
 # Data Model
 
-27 tables across twelve migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
+27 tables across thirteen migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
 
 | Migration | Covers |
 |---|---|
@@ -16,6 +16,7 @@
 | `0.1.9-finding-urgency` | When a finding must be acted on, alongside whose job it is |
 | `0.1.10-facility-contacts` | How to reach a facility |
 | `0.1.11-registry-provenance` | Keeps the shared registry when an organisation is deleted |
+| `0.1.12-finding-identity` | Which side minted a finding's id, so a re-keyed one is not stored twice |
 
 Each migration file opens with a comment explaining *why*, not just what. Read them in order — later files carry foreign keys into earlier ones.
 
@@ -165,6 +166,8 @@ than a server-side mode it cannot re-ask for.
 Every *Partial* or *No* becomes a finding with a gap, recommendation, `responsibility_level` (site / facility / district / regional / national), owner, due date and status.
 
 On paper this is Part D — a table filled in after the visit that nobody follows up. Here it is a tracked item, which is the main thing the platform offers over the paper form.
+
+A finding is identified by the id the device mints for it, not by its question — one *No* can hide two problems and each needs its own owner and date. `id_origin` records which side minted the id. It exists for the devices that synced before that was true: the sync can adopt a row the old server keyed, and must never touch one a device already keyed.
 
 ### Scores
 

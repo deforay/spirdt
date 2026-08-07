@@ -30,6 +30,7 @@ use RuntimeException;
  *   assessments           by the device-minted id
  *   assessment_pathogens  by (assessment, sequence)
  *   answers               by (assessment, question code, pathogen)
+ *   findings              by the device-minted id
  *   assessment_scores     by assessment
  *
  * All of it in one transaction. A half-synced assessment scores against
@@ -269,6 +270,11 @@ final class SyncService
      * matter more here than anywhere else, because findings become a site's
      * action list and the same gap three times is three things to chase.
      *
+     * An id the server has never seen is not always a new finding. A device
+     * that synced before the key changed is holding rows it has since re-keyed
+     * locally, and it sends the key it used to use with them so those match
+     * back to what is already stored instead of arriving twice.
+     *
      * Only a Partial or a No may carry one. Anything else is dropped rather
      * than stored, because a finding against a Yes has nothing to describe and
      * would sit in the action list with no shortfall behind it.
@@ -335,6 +341,17 @@ final class SyncService
                 ->where('findings.id', BinaryUuid::toBytes($findingId))
                 ->first();
 
+            // An id the server has never seen is usually a new finding. It is
+            // the same finding under a new name only when the device says so.
+            // See adoptServerKeyedFinding.
+            if ($existing === null && $this->declaresPreviousKey($row, $assessmentId, $questionCode, $pathogenKey)) {
+                $existing = $this->adoptServerKeyedFinding($assessmentId, $questionCode, $pathogenId);
+
+                if ($existing !== null) {
+                    $existing->id = $findingId;
+                }
+            }
+
             if ($existing === null) {
                 $existing = new Finding();
                 $existing->id = $findingId;
@@ -348,6 +365,10 @@ final class SyncService
             }
 
             $existing->organization_id = $organizationId;
+            // Set on every path, so that a row adopted above stops being
+            // adoptable the moment it is claimed — including by the next
+            // finding in this same payload.
+            $existing->id_origin = 'device';
             $existing->question_code = $questionCode;
             $existing->pathogen_id = $pathogenId;
             $existing->response = $response;
@@ -367,6 +388,88 @@ final class SyncService
         }
 
         return $accepted;
+    }
+
+    /**
+     * Whether this finding claims to be one the server already has.
+     *
+     * The device sends `previous_key` only on a row its version 5 upgrade
+     * re-keyed, and that key is the one the old server itself keyed on:
+     * assessment, question code, pathogen, joined by pipes. So it is
+     * reconstructible here, and it is checked rather than trusted — a value
+     * that does not match the finding it arrived with describes some other
+     * row, and adopting on it would move a gap onto the wrong question.
+     *
+     * A mismatch means no adoption, so the finding is stored as new. That is
+     * the safe direction: a duplicate is visible and can be closed, whereas a
+     * finding written over another one is gone.
+     *
+     * @param array<string,mixed> $row
+     */
+    private function declaresPreviousKey(
+        array $row,
+        string $assessmentId,
+        string $questionCode,
+        mixed $pathogenKey,
+    ): bool {
+        $declared = $row['previous_key'] ?? null;
+
+        if (!is_string($declared) || $declared === '') {
+            return false;
+        }
+
+        $pathogen = is_string($pathogenKey) ? $pathogenKey : '';
+
+        return $declared === "{$assessmentId}|{$questionCode}|{$pathogen}";
+    }
+
+    /**
+     * The same finding under a name the server already knows it by.
+     *
+     * Findings used to be identified by (assessment, question, pathogen) and
+     * given a server-minted id. They are identified by the device's own id
+     * now, and the device's version 5 upgrade re-keys everything it holds —
+     * it has to, because the old composite key is not a UUID and is refused.
+     * It cannot reuse the server's id, having never been told it. So the first
+     * sync after that upgrade presents a finding the server already stored,
+     * under an id it has never seen.
+     *
+     * Left alone that inserts a second copy, and findings are the one place
+     * where a duplicate really hurts: they become the site's action list, and
+     * the same gap twice is two things to chase and two people chasing them.
+     *
+     * Two things keep this from being a guess. The caller has already checked
+     * that the device declared the old key, so a finding raised after the
+     * upgrade never reaches here — which is what stops the second gap on a
+     * question from landing on top of the first, the case findings v2 exists
+     * to allow. And `id_origin` means only a row the old server keyed can be
+     * taken, so a replayed payload cannot reach a row a device has since
+     * claimed. The old key was unique, so there is at most one candidate.
+     *
+     * Unordered because of that: with at most one row to find there is nothing
+     * to order, and orderBy reaches Eloquent through __call, which degrades the
+     * builder's type and leaves the return unverifiable.
+     *
+     * Delete this once no device can still be on version 4. It is a bridge,
+     * and a bridge that outlives its crossing is just a way in.
+     */
+    private function adoptServerKeyedFinding(
+        string $assessmentId,
+        string $questionCode,
+        ?string $pathogenId,
+    ): ?Finding {
+        $query = Finding::query()
+            ->where('findings.assessment_id', BinaryUuid::toBytes($assessmentId))
+            ->where('findings.question_code', $questionCode)
+            ->where('findings.id_origin', 'server');
+
+        if ($pathogenId === null) {
+            $query->whereNull('findings.pathogen_id');
+        } else {
+            $query->where('findings.pathogen_id', BinaryUuid::toBytes($pathogenId));
+        }
+
+        return $query->first();
     }
 
     /**
