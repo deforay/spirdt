@@ -618,9 +618,27 @@ async function onSubmit() {
 
         <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
             <div>
-                <span class="text-[13px] text-accent">
-                    {{ assessment.assessment.value?.siteName }}
-                </span>
+                <!--
+                    A way out at the top, because this form is long and the
+                    only other one was the button past the end of it. Where it
+                    goes depends on how the assessor got here: back to the
+                    checklist when they came to correct something, back to the
+                    site list when the visit has not started.
+                -->
+                <button
+                    type="button"
+                    class="-ml-1 flex min-h-11 items-center gap-1 pr-1 text-left text-[13px] text-accent"
+                    @click="revisitingSetup ? startChecklist() : leaveVisit()"
+                >
+                    <PhArrowLeft :size="14" class="shrink-0" aria-hidden="true" />
+                    <span class="truncate">
+                        {{
+                            revisitingSetup
+                                ? t('setup.backToChecklist')
+                                : (assessment.assessment.value?.siteName ?? '')
+                        }}
+                    </span>
+                </button>
                 <h1 class="text-[30px] font-bold tracking-tight">
                     {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
                 </h1>

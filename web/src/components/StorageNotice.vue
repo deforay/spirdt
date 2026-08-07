@@ -121,7 +121,7 @@ const message = computed(() => {
             'flex items-start gap-2.5 leading-snug',
             alerting
                 ? '-mx-4 px-4 py-3 text-[13px] sm:-mx-6 sm:px-6'
-                : 'mb-1 mt-3 max-w-prose rounded-card bg-surface px-3 py-2.5 text-[12px]',
+                : 'mb-1 mt-3 rounded-card bg-surface px-3 py-2.5 text-[12px]',
             tone === 'error' ? 'bg-no-soft text-no' : '',
             tone === 'warn' ? 'bg-partial-soft text-partial' : '',
             tone === 'note' ? 'text-label-2' : '',
