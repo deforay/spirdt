@@ -26,6 +26,7 @@ export const PERMISSION = {
     assignmentsWrite: 'assignments.write',
     reportsRead: 'reports.read',
     usersManage: 'users.manage',
+    rolesManage: 'roles.manage',
     organizationsManage: 'organizations.manage',
 } as const
 
@@ -61,6 +62,7 @@ export function canManage(): boolean {
         PERMISSION.reportsRead,
         PERMISSION.registryRead,
         PERMISSION.usersManage,
+        PERMISSION.rolesManage,
         PERMISSION.organizationsManage,
     )
 }

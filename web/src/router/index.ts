@@ -91,6 +91,12 @@ const routes: RouteRecordRaw[] = [
         meta: { permission: PERMISSION.registryRead },
     },
     {
+        path: '/admin/roles',
+        name: 'admin-roles',
+        component: () => import('@/views/admin/RolesView.vue'),
+        meta: { permission: PERMISSION.rolesManage },
+    },
+    {
         path: '/admin/organizations',
         name: 'admin-organizations',
         component: () => import('@/views/admin/OrganizationsView.vue'),
@@ -167,7 +173,9 @@ const routes: RouteRecordRaw[] = [
     // except knowing another URL.
     {
         path: '/admin',
-        redirect: { name: 'admin-reports' },
+        // The same decision "/" makes. Fixed at reports it sent an account
+        // without reports.read to a screen that immediately bounced it.
+        redirect: () => ({ name: landing() }),
     },
 
     /**
@@ -226,6 +234,10 @@ function landing(): string {
 
     if (can(PERMISSION.usersManage)) {
         return 'admin-users'
+    }
+
+    if (can(PERMISSION.rolesManage)) {
+        return 'admin-roles'
     }
 
     if (can(PERMISSION.organizationsManage)) {

@@ -44,6 +44,15 @@ final class Permission
     /** Create accounts, change roles, reset passwords, deactivate. */
     public const USERS_MANAGE = 'users.manage';
 
+    /**
+     * Change what a role may do.
+     *
+     * Kept apart from `users.manage`, which is the right to decide who holds a
+     * role. This is the right to decide what holding it means, and it is the
+     * one permission that can be used to obtain the others.
+     */
+    public const ROLES_MANAGE = 'roles.manage';
+
     /** Add organisations to the programme. Reaches across tenants. */
     public const ORGANIZATIONS_MANAGE = 'organizations.manage';
 
@@ -65,6 +74,7 @@ final class Permission
             self::ASSIGNMENTS_WRITE,
             self::REPORTS_READ,
             self::USERS_MANAGE,
+            self::ROLES_MANAGE,
             self::ORGANIZATIONS_MANAGE,
         ];
     }

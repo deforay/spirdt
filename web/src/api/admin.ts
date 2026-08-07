@@ -30,6 +30,42 @@ export async function listUsers(): Promise<AdminUser[]> {
     return body.users
 }
 
+export interface AdminRole {
+    id: number
+    key: string
+    name: string
+    is_system: boolean
+    permissions: string[]
+    user_count: number
+    /** False for a role that outranks the caller. The API refuses those too. */
+    editable: boolean
+}
+
+export interface RoleCatalogue {
+    roles: AdminRole[]
+    /** Every permission this version knows, so a new one needs no rebuild here. */
+    catalogue: string[]
+    /** What the caller may hand out, which is exactly what they hold. */
+    grantable: string[]
+}
+
+export async function listRoles(): Promise<RoleCatalogue> {
+    return apiRequest<RoleCatalogue>('/admin/roles', { method: 'GET' })
+}
+
+/** The whole set, not the difference — see RoleAdminService for why. */
+export async function updateRolePermissions(
+    id: number,
+    permissions: string[],
+): Promise<AdminRole> {
+    const body = await apiRequest<{ role: AdminRole }>(`/admin/roles/${id}/permissions`, {
+        method: 'PATCH',
+        body: { permissions },
+    })
+
+    return body.role
+}
+
 export interface NewUser {
     email: string
     full_name: string

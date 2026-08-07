@@ -11,8 +11,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * The two copies of the grant map have to agree.
  *
- * There are exactly two, and they cannot be collapsed into one. The migration
- * is SQL because that is what bin/migrate runs, and it is frozen because a
+ * There are exactly two, and they cannot be collapsed into one. The migrations
+ * are SQL because that is what bin/migrate runs, and they are frozen because a
  * migration that changes after it has been applied is a migration nobody can
  * reason about. App\Auth\Roles is PHP because it applies to organisations
  * created from now on.
@@ -27,14 +27,14 @@ use PHPUnit\Framework\TestCase;
  */
 final class GrantsMatchTheMigrationTest extends TestCase
 {
-    private const MIGRATION = __DIR__ . '/../../../migrations/0.1.15-role-permissions.sql';
+    private const MIGRATIONS = __DIR__ . '/../../../migrations/*.sql';
 
-    public function testTheMigrationSeedsExactlyWhatNewRolesGet(): void
+    public function testTheMigrationsSeedExactlyWhatNewRolesGet(): void
     {
         self::assertSame(
             $this->normalise(Roles::GRANTS),
-            $this->normalise($this->fromMigration()),
-            'migrations/0.1.15-role-permissions.sql and App\Auth\Roles disagree',
+            $this->normalise($this->fromMigrations()),
+            'the migrations and App\Auth\Roles disagree about what a role is created holding',
         );
     }
 
@@ -60,43 +60,64 @@ final class GrantsMatchTheMigrationTest extends TestCase
     }
 
     /**
-     * Read back out of the SQL.
+     * Read back out of the SQL, across every migration.
      *
-     * Matches the shape the file is written in — one INSERT per permission,
-     * naming the roles that hold it. Deliberately strict: a statement written
-     * some other way fails to match and the counts come out wrong, which is a
-     * better outcome than a lenient parser quietly reading half the file.
+     * All of them rather than the one that introduced the table, because a
+     * permission added later arrives in a migration of its own — and an
+     * existing installation ends up with the union of them, which is what this
+     * has to compare against.
+     *
+     * Matches the shape the files are written in: one INSERT per permission,
+     * naming the roles that hold it. Deliberately strict, so a statement
+     * written some other way fails to match and the count comes out wrong.
+     * That is a better outcome than a lenient parser quietly reading half of
+     * them.
      *
      * @return array<string,list<string>>
      */
-    private function fromMigration(): array
+    private function fromMigrations(): array
     {
-        $sql = (string) file_get_contents(self::MIGRATION);
-
-        $matched = preg_match_all(
-            "/INSERT IGNORE INTO role_permissions[^;]*?SELECT id, '([a-z.]+)' FROM roles WHERE `key` (?:IN \(([^)]*)\)|= '([a-z_]+)')/i",
-            $sql,
-            $matches,
-            PREG_SET_ORDER,
-        );
-
-        self::assertNotFalse($matched);
-        self::assertCount(
-            count(Permission::all()),
-            $matches,
-            'the migration should seed every permission in the catalogue, once each',
-        );
-
+        $seen = [];
         $grants = [];
 
-        foreach ($matches as $match) {
-            $permission = $match[1];
-            $roleList = $match[2] === '' ? $match[3] : $match[2];
+        foreach (glob(self::MIGRATIONS) ?: [] as $file) {
+            $matched = preg_match_all(
+                "/INSERT IGNORE INTO role_permissions[^;]*?SELECT id, '([a-z.]+)' FROM roles WHERE `key` (?:IN \(([^)]*)\)|= '([a-z_]+)')/i",
+                (string) file_get_contents($file),
+                $matches,
+                PREG_SET_ORDER,
+            );
 
-            foreach (explode(',', $roleList) as $roleKey) {
-                $grants[trim($roleKey, " '")][] = $permission;
+            self::assertNotFalse($matched);
+
+            foreach ($matches as $match) {
+                $permission = $match[1];
+
+                // Seeded twice means two migrations disagree about who holds
+                // it, and the one that ran second silently wins.
+                self::assertNotContains(
+                    $permission,
+                    $seen,
+                    $permission . ' is seeded by more than one migration',
+                );
+
+                $seen[] = $permission;
+
+                foreach (explode(',', $match[2] === '' ? $match[3] : $match[2]) as $roleKey) {
+                    $grants[trim($roleKey, " '")][] = $permission;
+                }
             }
         }
+
+        sort($seen);
+        $catalogue = Permission::all();
+        sort($catalogue);
+
+        self::assertSame(
+            $catalogue,
+            $seen,
+            'every permission in the catalogue is seeded by exactly one migration, and no others are',
+        );
 
         return $grants;
     }

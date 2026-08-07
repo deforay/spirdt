@@ -6,6 +6,7 @@ use App\Http\Action\Admin\AssignmentsAction;
 use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\ReportsAction;
+use App\Http\Action\Admin\RolesAction;
 use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\ChangePasswordAction;
@@ -92,6 +93,15 @@ return static function (App $app): void {
         $group->post('/users/{id}/password', [UsersAction::class, 'resetPassword']);
     })
         ->add(new RequirePermissionMiddleware(Permission::USERS_MANAGE))
+        ->add(new AuthMiddleware());
+
+    // What a role may do, as opposed to who holds it. A separate permission
+    // because this is the one screen that can be used to obtain the others.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->get('/roles', [RolesAction::class, 'index']);
+        $group->patch('/roles/{id}/permissions', [RolesAction::class, 'updatePermissions']);
+    })
+        ->add(new RequirePermissionMiddleware(Permission::ROLES_MANAGE))
         ->add(new AuthMiddleware());
 
     // The registry: places, facilities, the benches inside them.

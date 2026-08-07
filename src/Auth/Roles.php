@@ -63,6 +63,7 @@ final class Roles
             Permission::ASSIGNMENTS_WRITE,
             Permission::REPORTS_READ,
             Permission::USERS_MANAGE,
+            Permission::ROLES_MANAGE,
             Permission::ORGANIZATIONS_MANAGE,
         ],
         'admin' => [
@@ -72,6 +73,7 @@ final class Roles
             Permission::ASSIGNMENTS_WRITE,
             Permission::REPORTS_READ,
             Permission::USERS_MANAGE,
+            Permission::ROLES_MANAGE,
         ],
         'assessor' => [
             Permission::ASSESSMENTS_SUBMIT,
