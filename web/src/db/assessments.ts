@@ -7,6 +7,7 @@ import {
     type StoredPathogen,
     type StoredResponse,
 } from './database'
+import { plain } from './plain'
 import { uuidv7 } from './uuid'
 
 /**
@@ -123,6 +124,9 @@ export async function saveAnswer(
     pathogen: string | null,
     patch: AnswerPatch,
 ): Promise<StoredAnswer> {
+    // The patch carries what the assessor typed, so it arrives reactive.
+    patch = plain(patch)
+
     const key = answerKey(assessmentId, questionCode, pathogen)
 
     return chain(key, async () => {
@@ -170,8 +174,12 @@ export async function saveAnswer(
 
 export async function saveContext(
     assessmentId: string,
-    context: Record<string, unknown>,
+    input: Record<string, unknown>,
 ): Promise<void> {
+    // Everything the assessor types reaches here through a ref. IndexedDB
+    // cannot clone a Proxy, so this is where reactivity stops. See plain().
+    const context = plain(input)
+
     await chain(`context:${assessmentId}`, async () => {
         const now = new Date().toISOString()
 
@@ -204,8 +212,10 @@ export async function saveContext(
  */
 export async function savePathogens(
     assessmentId: string,
-    pathogens: StoredPathogen[],
+    input: StoredPathogen[],
 ): Promise<void> {
+    const pathogens = plain(input)
+
     await chain(`pathogens:${assessmentId}`, async () => {
         const now = new Date().toISOString()
 
@@ -306,6 +316,8 @@ export async function addFinding(
  * visit the site is debriefed on, and it is typed at the end of a long day.
  */
 export async function saveFinding(key: string, patch: FindingPatch): Promise<StoredFinding | null> {
+    patch = plain(patch)
+
     return chain(`finding:${key}`, async () => {
         const now = new Date().toISOString()
 
