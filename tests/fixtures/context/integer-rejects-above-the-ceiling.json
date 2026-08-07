@@ -1,0 +1,17 @@
+{
+    "name": "integer-rejects-above-the-ceiling",
+    "template": "spi-rdt-1.0.0",
+    "why": "A ceiling catches a digit typed twice. 9999 sites in one facility is a slip, not a national programme.",
+    "context": {
+        "poc_site_count": "9999"
+    },
+    "expect": [
+        {
+            "field": "poc_site_count",
+            "reason": "above_max",
+            "params": {
+                "max": 999
+            }
+        }
+    ]
+}

@@ -81,6 +81,11 @@ export const messages: Messages = {
     'question.noteLabel': 'Nota para a pergunta {code}',
 
     'context.changesChecklist': 'Altera a lista',
+    'invalid.not_an_integer': 'Introduza um número inteiro.',
+    'invalid.below_min': 'Não pode ser inferior a {min}.',
+    'invalid.above_max': 'Não pode ser superior a {max}.',
+    'invalid.not_a_date': 'Introduza uma data válida.',
+    'invalid.in_the_future': 'Não pode ser uma data futura.',
     'context.specify': 'Especifique',
     'context.add': 'Adicionar {label}',
 
@@ -99,6 +104,10 @@ export const messages: Messages = {
     'setup.missingFields': {
         one: '{count} campo obrigatório por preencher.',
         other: '{count} campos obrigatórios por preencher.',
+    },
+    'setup.invalidFields': {
+        one: '{count} resposta a corrigir.',
+        other: '{count} respostas a corrigir.',
     },
 
     'checklist.loading': 'A carregar',

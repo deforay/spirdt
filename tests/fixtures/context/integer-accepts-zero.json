@@ -1,0 +1,9 @@
+{
+    "name": "integer-accepts-zero",
+    "template": "spi-rdt-1.0.0",
+    "why": "Zero is a real answer — this is the only POC site in the facility — and must not be confused with the field being blank.",
+    "context": {
+        "poc_site_count": "0"
+    },
+    "expect": []
+}

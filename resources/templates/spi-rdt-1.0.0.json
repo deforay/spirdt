@@ -109,7 +109,10 @@
             "label": {
                 "en": "Date of assessment"
             },
-            "required": true
+            "required": true,
+            "constraints": {
+                "not_future": true
+            }
         },
         {
             "code": "assessment_time",
@@ -131,7 +134,10 @@
             "hint": {
                 "en": "Leave blank for a new site with no previous assessment."
             },
-            "required": false
+            "required": false,
+            "constraints": {
+                "not_future": true
+            }
         },
         {
             "code": "poc_site_count",
@@ -142,7 +148,11 @@
             "hint": {
                 "en": "Contextual and planning information only, including sites not assessed during this visit. It does not imply a facility-level assessment."
             },
-            "required": false
+            "required": false,
+            "constraints": {
+                "min": 0,
+                "max": 999
+            }
         },
         {
             "code": "poc_tests_list",

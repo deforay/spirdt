@@ -3,6 +3,7 @@ import { computed, reactive, watch } from 'vue'
 
 import { t, text } from '@/i18n'
 import type { Context, ContextField } from '@/scoring/types'
+import type { Problem } from '@/validation/context'
 
 /**
  * Part A — everything asked before the checklist starts.
@@ -23,6 +24,16 @@ const props = defineProps<{
     modelValue: Context
     /** Codes of fields whose value changes which sections apply. */
     applicabilityFields?: string[]
+    /**
+     * What is wrong with what has been typed, from the template's own limits.
+     *
+     * Passed in rather than worked out here, because the same answers are
+     * checked again on the server and the two must not be able to disagree.
+     * The one thing this component decides is where to put the message: beside
+     * the field it is about, not gathered at the foot of the form, because a
+     * list at the bottom is a list somebody has to map back onto the boxes.
+     */
+    problems?: Problem[]
 }>()
 
 const emit = defineEmits<{ 'update:modelValue': [value: Context] }>()
@@ -36,6 +47,17 @@ watch(
 
 function commit() {
     emit('update:modelValue', { ...draft })
+}
+
+/** The wording lives here; the validator only names a reason and a limit. */
+function problemFor(code: string): string {
+    const problem = (props.problems ?? []).find((entry) => entry.field === code)
+
+    if (problem === undefined) {
+        return ''
+    }
+
+    return t(`invalid.${problem.reason}` as Parameters<typeof t>[0], problem.params)
 }
 
 /** "Other" and the like need a free-text companion, stored as `<code>_other`. */
@@ -198,10 +220,16 @@ const inputClass =
                 ></textarea>
             </div>
 
-            <div v-else class="overflow-hidden rounded-card bg-surface">
+            <div
+                v-else
+                class="overflow-hidden rounded-card bg-surface"
+                :class="problemFor(field.code) !== '' ? 'ring-1 ring-no' : ''"
+            >
                 <input
                     :id="field.code"
                     :value="(draft[field.code] as string) ?? ''"
+                    :aria-invalid="problemFor(field.code) !== '' ? 'true' : undefined"
+                    :aria-describedby="problemFor(field.code) !== '' ? `${field.code}-problem` : undefined"
                     :type="
                         field.type === 'date'
                             ? 'date'
@@ -219,6 +247,17 @@ const inputClass =
                     "
                 />
             </div>
+
+            <!-- Beneath the box it is about. Said once, in the reader's
+                 language, naming the limit rather than restating the value —
+                 which is already on screen above it. -->
+            <p
+                v-if="problemFor(field.code) !== ''"
+                :id="`${field.code}-problem`"
+                class="px-1 pt-1 text-[13px] font-medium text-no"
+            >
+                {{ problemFor(field.code) }}
+            </p>
         </div>
     </div>
 </template>

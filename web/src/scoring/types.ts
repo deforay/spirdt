@@ -79,6 +79,20 @@ export interface ContextField {
     options?: ContextOption[]
     /** For `repeat`: the fields making up one row. */
     fields?: ContextField[]
+    /**
+     * Limits on the answer, checked here as it is typed and again on the server
+     * when the visit is synced. Declared in the template because they are facts
+     * about the instrument: a country customising the form changes them without
+     * a deploy. See `@/validation/context`.
+     */
+    constraints?: {
+        /** Smallest permitted value, for an integer field. */
+        min?: number
+        /** Largest permitted value, for an integer field. */
+        max?: number
+        /** For a date field: the answer may not be later than today. */
+        not_future?: boolean
+    }
 }
 
 export interface Template {

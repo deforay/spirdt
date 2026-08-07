@@ -1,0 +1,10 @@
+{
+    "name": "unconstrained-fields-are-left-alone",
+    "template": "spi-rdt-1.0.0",
+    "why": "The validator checks what the template declares and nothing else. A field with no constraints block is not the validator's business.",
+    "context": {
+        "interviewee_name": "Grace Phiri",
+        "poc_tests_list": "HIV, syphilis"
+    },
+    "expect": []
+}

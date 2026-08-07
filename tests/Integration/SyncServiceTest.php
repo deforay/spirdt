@@ -13,6 +13,7 @@ use App\Service\SyncService;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\MakesTenants;
@@ -527,6 +528,52 @@ final class SyncServiceTest extends TestCase
             $result['score']['total_possible'],
             'NA narrows the denominator; an unanswered question does not',
         );
+    }
+
+    /**
+     * The device checks Part A from the same template before it sends, so this
+     * should never fire against the app as shipped. That is what it is for: a
+     * build from before the constraint existed, a replayed payload, a client
+     * somebody wrote themselves.
+     */
+    public function testPartAOutsideTheInstrumentsLimitsIsRefused(): void
+    {
+        $payload = $this->payload();
+        $payload['context']['previous_assessment_date'] = '2099-01-01';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/previous_assessment_date/');
+
+        (new SyncService())->accept($payload);
+    }
+
+    /** Refused whole, so nothing is half-stored to be reconciled later. */
+    public function testARefusedContextStoresNothing(): void
+    {
+        $payload = $this->payload();
+        $payload['context']['poc_site_count'] = '-4';
+
+        try {
+            (new SyncService())->accept($payload);
+            self::fail('the payload should have been refused');
+        } catch (InvalidArgumentException) {
+            // Expected.
+        }
+
+        self::assertSame(0, Assessment::query()->count());
+        self::assertSame(0, Answer::query()->count());
+    }
+
+    /** The ordinary case, so the check cannot be tightened into refusing everything. */
+    public function testValidPartAIsAccepted(): void
+    {
+        $payload = $this->payload();
+        $payload['context']['previous_assessment_date'] = '2025-01-15';
+        $payload['context']['poc_site_count'] = '3';
+
+        $result = (new SyncService())->accept($payload);
+
+        self::assertSame(3, count($result['accepted']));
     }
 
     public function testAnotherOrganizationCannotSeeTheAssessment(): void

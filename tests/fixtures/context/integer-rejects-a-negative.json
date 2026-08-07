@@ -1,0 +1,17 @@
+{
+    "name": "integer-rejects-a-negative",
+    "template": "spi-rdt-1.0.0",
+    "why": "There cannot be minus two testing sites. The floor is declared in the template as min 0, not assumed by either implementation.",
+    "context": {
+        "poc_site_count": "-2"
+    },
+    "expect": [
+        {
+            "field": "poc_site_count",
+            "reason": "below_min",
+            "params": {
+                "min": 0
+            }
+        }
+    ]
+}

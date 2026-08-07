@@ -1,0 +1,9 @@
+{
+    "name": "date-accepts-the-past",
+    "template": "spi-rdt-1.0.0",
+    "why": "The ordinary case, pinned so a future-date rule cannot be tightened into refusing every date.",
+    "context": {
+        "previous_assessment_date": "2020-06-30"
+    },
+    "expect": []
+}

@@ -84,6 +84,11 @@ export const messages: Messages = {
     'question.noteLabel': 'Note pour la question {code}',
 
     'context.changesChecklist': 'Modifie la liste',
+    'invalid.not_an_integer': 'Saisissez un nombre entier.',
+    'invalid.below_min': 'Ne peut pas être inférieur à {min}.',
+    'invalid.above_max': 'Ne peut pas être supérieur à {max}.',
+    'invalid.not_a_date': 'Saisissez une date valide.',
+    'invalid.in_the_future': 'Ne peut pas être une date future.',
     'context.specify': 'Veuillez préciser',
     'context.add': 'Ajouter {label}',
 
@@ -102,6 +107,10 @@ export const messages: Messages = {
     'setup.missingFields': {
         one: '{count} champ obligatoire reste à remplir.',
         other: '{count} champs obligatoires restent à remplir.',
+    },
+    'setup.invalidFields': {
+        one: '{count} réponse à corriger.',
+        other: '{count} réponses à corriger.',
     },
 
     'checklist.loading': 'Chargement',

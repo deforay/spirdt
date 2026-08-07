@@ -1,0 +1,15 @@
+{
+    "name": "integer-rejects-a-decimal",
+    "template": "spi-rdt-1.0.0",
+    "why": "Half a testing site is a typing slip. An integer field that quietly truncates 2.6 to 2 records a number the assessor never gave.",
+    "context": {
+        "poc_site_count": "2.6"
+    },
+    "expect": [
+        {
+            "field": "poc_site_count",
+            "reason": "not_an_integer",
+            "params": {}
+        }
+    ]
+}

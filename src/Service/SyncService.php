@@ -15,6 +15,7 @@ use App\Models\TestingSite;
 use App\Scoring\ScoringEngine;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
+use App\Validation\ContextValidator;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use InvalidArgumentException;
 use RuntimeException;
@@ -74,6 +75,7 @@ final class SyncService
         }
 
         $this->requireOwnSite($payload);
+        $this->requireValidContext($payload, $template);
 
         return Capsule::connection()->transaction(function () use (
             $payload,
@@ -536,6 +538,47 @@ final class SyncService
             'missing'        => $result->missing,
             'violations'     => $result->violations,
         ];
+    }
+
+    /**
+     * Part A must satisfy the limits the template declares.
+     *
+     * The device checks the same rules from the same template as the assessor
+     * types, so this should never fire in practice. That is the point of
+     * having it: it is what makes the device's check a convenience rather than
+     * the only thing standing between a typing slip and the record. A build
+     * from before a constraint existed, a payload replayed by hand, a client
+     * somebody wrote themselves — none of them are stopped by a form.
+     *
+     * Refused whole rather than stored with the bad field dropped. A visit
+     * missing the date of the previous assessment reads as a site that has
+     * never been assessed, and question 1.8 — have gaps from the last
+     * assessment been addressed — is then answered against nothing. The device
+     * marks the assessment blocked and shows the assessor which field, which
+     * is a thing they can act on.
+     *
+     * @param  array<string,mixed>      $payload
+     * @throws InvalidArgumentException
+     */
+    private function requireValidContext(array $payload, Template $template): void
+    {
+        $context = is_array($payload['context'] ?? null) ? $payload['context'] : [];
+        $definition = is_array($template->definition) ? $template->definition : [];
+
+        $problems = (new ContextValidator())->validate($definition, $context);
+
+        if ($problems === []) {
+            return;
+        }
+
+        // Named, not counted. "Two fields are invalid" sends somebody hunting
+        // through Part A; naming them is the difference between a message and
+        // an instruction.
+        $fields = implode(', ', array_map(static fn ($problem): string => $problem->field, $problems));
+
+        throw new InvalidArgumentException(
+            "Part A has answers the instrument does not allow: {$fields}.",
+        );
     }
 
     /**

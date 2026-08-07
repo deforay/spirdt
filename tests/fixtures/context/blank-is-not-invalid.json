@@ -1,0 +1,10 @@
+{
+    "name": "blank-is-not-invalid",
+    "template": "spi-rdt-1.0.0",
+    "why": "An optional field left empty has nothing to check. Reporting it as out of range would mean it could not be left empty, which is what optional means.",
+    "context": {
+        "poc_site_count": "",
+        "previous_assessment_date": ""
+    },
+    "expect": []
+}

@@ -1,0 +1,15 @@
+{
+    "name": "date-rejects-the-future",
+    "template": "spi-rdt-1.0.0",
+    "why": "An assessment that has not happened yet cannot have a date. Almost always a year typed wrongly, and it reaches question 1.8 — have gaps from the last assessment been addressed — which then compares against a visit that never took place.",
+    "context": {
+        "previous_assessment_date": "2099-01-01"
+    },
+    "expect": [
+        {
+            "field": "previous_assessment_date",
+            "reason": "in_the_future",
+            "params": {}
+        }
+    ]
+}

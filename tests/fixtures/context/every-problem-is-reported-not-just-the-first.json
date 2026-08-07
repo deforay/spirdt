@@ -1,0 +1,23 @@
+{
+    "name": "every-problem-is-reported-not-just-the-first",
+    "template": "spi-rdt-1.0.0",
+    "why": "Two fields wrong means two things to correct. Stopping at the first sends the assessor back twice.",
+    "context": {
+        "poc_site_count": "-1",
+        "previous_assessment_date": "2099-12-31"
+    },
+    "expect": [
+        {
+            "field": "previous_assessment_date",
+            "reason": "in_the_future",
+            "params": {}
+        },
+        {
+            "field": "poc_site_count",
+            "reason": "below_min",
+            "params": {
+                "min": 0
+            }
+        }
+    ]
+}

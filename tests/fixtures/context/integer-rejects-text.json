@@ -1,0 +1,15 @@
+{
+    "name": "integer-rejects-text",
+    "template": "spi-rdt-1.0.0",
+    "why": "The number of POC testing sites is counted and totalled. Text in that column is a number nobody can add up, so it is refused rather than stored and worked around later.",
+    "context": {
+        "poc_site_count": "many"
+    },
+    "expect": [
+        {
+            "field": "poc_site_count",
+            "reason": "not_an_integer",
+            "params": {}
+        }
+    ]
+}

@@ -19,6 +19,7 @@ import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
 import { formatPercent, formatTime, locale, t, text } from '@/i18n'
 import { expectedQuestions } from '@/scoring/engine'
+import { validateContext } from '@/validation/context'
 import type { Context, ResponseCode, Template } from '@/scoring/types'
 import { startSync, syncAll } from '@/sync/engine'
 
@@ -161,8 +162,20 @@ const missingContext = computed(() =>
     }),
 )
 
+/**
+ * Part A answers outside the limits the template declares.
+ *
+ * Separate from `missingContext`, which is about fields left empty. Empty and
+ * wrong are different problems with different fixes, and a count that adds them
+ * together tells the assessor neither.
+ */
+const contextProblems = computed(() => validateContext(template, draftContext.value))
+
 const setupReady = computed(
-    () => missingContext.value.length === 0 && draftPathogens.value.length > 0,
+    () =>
+        missingContext.value.length === 0 &&
+        contextProblems.value.length === 0 &&
+        draftPathogens.value.length > 0,
 )
 
 async function startChecklist() {
@@ -431,6 +444,7 @@ async function onSubmit() {
                     v-model="draftContext"
                     :fields="template.context_fields ?? []"
                     :applicability-fields="applicabilityFields"
+                    :problems="contextProblems"
                 />
             </section>
         </main>
@@ -449,6 +463,13 @@ async function onSubmit() {
             </p>
             <p v-else-if="missingContext.length > 0" class="pt-2 text-center text-[13px] text-label-2">
                 {{ t('setup.missingFields', { count: missingContext.length }) }}
+            </p>
+            <!-- Last, because an empty field is the commoner reason to be
+                 stopped here and the assessor should be told about that first.
+                 The field itself carries the detail; this only says why the
+                 button will not move. -->
+            <p v-else-if="contextProblems.length > 0" class="pt-2 text-center text-[13px] font-medium text-no">
+                {{ t('setup.invalidFields', { count: contextProblems.length }) }}
             </p>
         </footer>
     </div>

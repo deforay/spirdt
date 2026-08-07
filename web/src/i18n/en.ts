@@ -85,6 +85,11 @@ export const messages = {
     'question.noteLabel': 'Note for question {code}',
 
     'context.changesChecklist': 'Changes the checklist',
+    'invalid.not_an_integer': 'Enter a whole number.',
+    'invalid.below_min': 'Cannot be less than {min}.',
+    'invalid.above_max': 'Cannot be more than {max}.',
+    'invalid.not_a_date': 'Enter a real date.',
+    'invalid.in_the_future': 'Cannot be a date in the future.',
     'context.specify': 'Please specify',
     'context.add': 'Add {label}',
 
@@ -103,6 +108,10 @@ export const messages = {
     'setup.missingFields': {
         one: '{count} required field still to fill in.',
         other: '{count} required fields still to fill in.',
+    },
+    'setup.invalidFields': {
+        one: '{count} answer needs correcting.',
+        other: '{count} answers need correcting.',
     },
 
     'checklist.loading': 'Loading',

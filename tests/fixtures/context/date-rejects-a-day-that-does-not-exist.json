@@ -1,0 +1,15 @@
+{
+    "name": "date-rejects-a-day-that-does-not-exist",
+    "template": "spi-rdt-1.0.0",
+    "why": "The 31st of February passes a pattern check and fails a calendar. Both implementations must consult the calendar.",
+    "context": {
+        "previous_assessment_date": "2026-02-31"
+    },
+    "expect": [
+        {
+            "field": "previous_assessment_date",
+            "reason": "not_a_date",
+            "params": {}
+        }
+    ]
+}
