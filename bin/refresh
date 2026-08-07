@@ -249,8 +249,21 @@ $migrationsChanged = array_filter($changed, static fn (string $f): bool => str_s
 
 step('[3/4] Dependencies');
 
-if ($lockChanged) {
-    out('  composer.lock changed — installing');
+// Gating on the diff is the point of this script, but it assumes the checkout
+// was already runnable. On one that has never had composer install run, the
+// lock file never changes, so the install is skipped forever and every step
+// after it fails on a missing autoloader — with a PHP fatal rather than
+// anything naming the cause.
+//
+// So the absence of vendor/autoload.php forces the install regardless of the
+// diff. Cheap to test, and it is the difference between a fresh clone working
+// and a stack trace.
+$vendorMissing = !is_file($root . '/vendor/autoload.php');
+
+if ($lockChanged || $vendorMissing) {
+    out($vendorMissing
+        ? '  vendor/ is absent — installing'
+        : '  composer.lock changed — installing');
     [$ciOut, $ciCode] = run($prefix . 'composer install --no-interaction', $dryRun);
     if ($ciCode !== 0 && !$dryRun) {
         out('  composer install failed:', 'red');
@@ -261,6 +274,13 @@ if ($lockChanged) {
 } else {
     out('  composer.lock unchanged — skipped', 'dim');
 }
+
+// Composer sets this from post-install-cmd, which only fires when the install
+// above runs. A pull that changes the hooks but not the lock file would
+// otherwise leave them unwired, which is silent: the commit that the hook
+// exists to refuse simply succeeds. Unconditional because it is a no-op when
+// already correct.
+run('git config core.hooksPath .githooks', $dryRun);
 
 step('[4/4] Schema');
 

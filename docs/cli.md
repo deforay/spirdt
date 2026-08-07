@@ -48,9 +48,13 @@ Migrations are deliberately **not** gated on the diff here — a previously fail
 
 The developer loop: pull the latest code, then do only the work the diff actually requires.
 
-- `composer install` runs **only** when `composer.lock` changed
+- `composer install` runs **only** when `composer.lock` changed, or when `vendor/autoload.php` is absent
 - migrations run **only** when something under `migrations/` changed
 - already at the target commit means the whole run is a fast no-op
+
+The second install condition is not a weakening of the first. Gating on the diff assumes the checkout was already runnable, and on one that has never had `composer install` run, the lock file never changes — so the install is skipped forever and every later step dies on a missing autoloader, with a PHP fatal that names no cause. On a healthy checkout the test is one `is_file()` and nothing else changes.
+
+`core.hooksPath` is set on every run. Composer normally does it from `post-install-cmd`, which only fires when the install above runs, so a pull that changes the hooks but not the lock file would leave them unwired — and that failure is silent, because the commit a hook exists to refuse simply succeeds.
 
 It works out for itself whether to run follow-up commands natively or inside the Compose container.
 
