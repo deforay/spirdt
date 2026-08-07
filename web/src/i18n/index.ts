@@ -201,3 +201,26 @@ export function formatPercent(value: number, decimals: number): string {
 export function formatTime(value: Date): string {
     return value.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 }
+
+/**
+ * A stored date, written the way the reader's language writes it.
+ *
+ * Takes the `YYYY-MM-DD` string the device stores rather than a Date, and
+ * splits it by hand instead of parsing. `new Date('2026-08-07')` is parsed as
+ * UTC midnight and then rendered in local time, which west of Greenwich prints
+ * the day before — so a visit made on the 7th is filed, correctly, and shown
+ * as the 6th.
+ */
+export function formatDate(value: string): string {
+    const [year, month, day] = value.split('-').map(Number)
+
+    if (!year || !month || !day) {
+        return value
+    }
+
+    return new Date(year, month - 1, day).toLocaleDateString(locale.value, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    })
+}

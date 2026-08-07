@@ -1,9 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import { PhArrowRight } from '@phosphor-icons/vue'
+
 import { cachedSites, fetchSites, type Site } from '@/api/sites'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
-import { t } from '@/i18n'
+import { formatDate, t } from '@/i18n'
+
+/** An unfinished visit, as this screen needs to describe it. */
+export interface DraftSummary {
+    id: string
+    siteName: string
+    assessedOn: string
+    answered: number
+    total: number
+    updatedAt: string
+}
 
 /**
  * Choose the site being assessed.
@@ -19,7 +31,23 @@ import { t } from '@/i18n'
  * works with no signal.
  */
 
-const emit = defineEmits<{ chosen: [site: Site] }>()
+/**
+ * Unfinished visits come first, above the site list.
+ *
+ * An assessment is written to the device as it is answered and survives a
+ * refresh, a crash and a flat battery — that is the whole architecture. What it
+ * did not survive was this screen, which offered no way back to it. Data that
+ * is safe and unreachable is lost as far as the assessor is concerned, and the
+ * obvious recovery is to start again and answer everything twice.
+ *
+ * Above the sites rather than beside them, because finishing a visit already
+ * begun is almost always what somebody opening this app means to do.
+ */
+const props = defineProps<{ drafts?: DraftSummary[] }>()
+
+const emit = defineEmits<{ chosen: [site: Site]; resume: [id: string] }>()
+
+const drafts = computed(() => props.drafts ?? [])
 
 const sites = ref<Site[]>(cachedSites())
 const filter = ref('')
@@ -71,7 +99,41 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
             <div class="mt-1.5"><LocaleSwitcher /></div>
         </header>
 
+        <!-- Unfinished visits, above everything. Somebody opening this app
+             usually means to finish one, not to start another. -->
+        <section v-if="drafts.length > 0" class="px-4 pb-4 sm:px-0">
+            <h2 class="eyebrow px-1 pb-1.5 text-label-2">{{ t('sites.unfinished') }}</h2>
+
+            <div class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
+                <button
+                    v-for="(draft, index) in drafts"
+                    :key="draft.id"
+                    type="button"
+                    class="flex w-full items-center gap-3 px-3.5 py-3 text-left"
+                    :class="index > 0 ? 'border-t border-hairline' : ''"
+                    @click="emit('resume', draft.id)"
+                >
+                    <span class="min-w-0 flex-1">
+                        <span class="block truncate text-[17px]">{{ draft.siteName }}</span>
+                        <span class="tnum block text-[13px] text-label-2">
+                            {{ formatDate(draft.assessedOn) }} ·
+                            {{
+                                t('sites.draftProgress', {
+                                    answered: draft.answered,
+                                    total: draft.total,
+                                })
+                            }}
+                        </span>
+                    </span>
+                    <PhArrowRight :size="18" class="shrink-0 text-accent" aria-hidden="true" />
+                </button>
+            </div>
+        </section>
+
         <div class="px-4 pb-3 sm:px-0">
+            <h2 v-if="drafts.length > 0" class="eyebrow px-1 pb-1.5 text-label-2">
+                {{ t('sites.startNew') }}
+            </h2>
             <input
                 v-model="filter"
                 type="search"

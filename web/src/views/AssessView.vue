@@ -11,12 +11,14 @@ import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
-import SitePicker from '@/components/SitePicker.vue'
+import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
 import StorageNotice from '@/components/StorageNotice.vue'
 import SyncBadge from '@/components/SyncBadge.vue'
 import { useAssessment } from '@/composables/useAssessment'
+import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
 import { formatPercent, formatTime, locale, t, text } from '@/i18n'
+import { expectedQuestions } from '@/scoring/engine'
 import type { Context, ResponseCode, Template } from '@/scoring/types'
 import { startSync, syncAll } from '@/sync/engine'
 
@@ -57,11 +59,73 @@ const applicabilityFields = computed(() =>
 const draftContext = ref<Context>({})
 const draftPathogens = ref<StoredPathogen[]>([])
 
-onMounted(() => {
+/**
+ * Visits begun and not submitted.
+ *
+ * The device writes every answer as it is given, so a draft survives a
+ * refresh, a crash and a flat battery. What it could not survive was having
+ * nowhere to be listed: the app opened on the site picker every time, and an
+ * assessor with no way back to yesterday's visit starts it again.
+ */
+const drafts = ref<DraftSummary[]>([])
+
+async function loadDrafts() {
+    const rows = (await listAssessments()).filter((row) => row.status !== 'submitted')
+
+    // Counted rather than carried on the row. A stored count is a second copy
+    // of the answers, and a second copy drifts.
+    //
+    // The total is per visit, not a fixed 59: Section 4 repeats once per
+    // pathogen and Section 5 drops out entirely when the site refers no
+    // specimens, so each draft is measured against its own instrument.
+    drafts.value = await Promise.all(
+        rows.map(async (row) => ({
+            id: row.id,
+            siteName: row.siteName,
+            assessedOn: row.assessedOn,
+            answered: (await loadAnswers(row.id)).filter((answer) => answer.response !== null)
+                .length,
+            total: expectedQuestions(
+                template,
+                row.context,
+                row.pathogens.map((pathogen) => pathogen.name),
+            ).length,
+            updatedAt: row.updatedAt,
+        })),
+    )
+}
+
+onMounted(async () => {
     // The shell has already established that there is a usable session; this
     // view is not reachable without one.
     startSync()
+    await loadDrafts()
 })
+
+async function onResume(id: string) {
+    const existing = await getAssessment(id)
+
+    if (existing === undefined) {
+        await loadDrafts()
+
+        return
+    }
+
+    await assessment.resume(existing)
+
+    activePathogen.value = existing.pathogens[0]?.name ?? null
+    activeSection.value = template.sections[0]?.code ?? '1'
+
+    // Back to setup when the visit never got past it. Sending someone into a
+    // checklist whose pathogens were never named shows Section 4 with nothing
+    // in it and no way to say why.
+    stage.value = existing.pathogens.length === 0 ? 'setup' : 'checklist'
+
+    if (stage.value === 'setup') {
+        draftContext.value = { ...existing.context }
+        draftPathogens.value = [...existing.pathogens]
+    }
+}
 
 async function onSiteChosen(site: Site) {
     await assessment.start({
@@ -288,12 +352,19 @@ async function onSubmit() {
 
     if (!outcome.ok) {
         submitError.value = outcome.reason ?? t('submit.failed')
+
+        return
     }
+
+    // A submitted visit stops being unfinished, so it leaves the list. Done
+    // here rather than on the next mount because the assessor may go straight
+    // back to choose the next site.
+    await loadDrafts()
 }
 </script>
 
 <template>
-    <SitePicker v-if="stage === 'site'" @chosen="onSiteChosen" />
+    <SitePicker v-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
 
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
