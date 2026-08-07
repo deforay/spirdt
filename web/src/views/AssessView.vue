@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PhArrowLeft, PhArrowRight } from '@phosphor-icons/vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 
@@ -22,6 +22,7 @@ import { expectedQuestions } from '@/scoring/engine'
 import { validateContext } from '@/validation/context'
 import type { Context, ResponseCode, Template } from '@/scoring/types'
 import { startSync, syncAll } from '@/sync/engine'
+import { useRoute, useRouter } from 'vue-router'
 
 /**
  * Running a visit: choose a site, set it up, work the checklist, review,
@@ -96,11 +97,94 @@ async function loadDrafts() {
     )
 }
 
+/**
+ * Where the assessor is, kept in the URL.
+ *
+ * A visit is one route and four refs — the stage, the section, the pathogen —
+ * and a refresh reset all of them to the site list. On a bench, a browser
+ * reloading a backgrounded tab is not an unusual event, and losing your place
+ * in a fifty-nine question form because of it is the kind of thing that makes
+ * people stop trusting the app.
+ *
+ * The query string rather than a stored blob: it describes what is actually on
+ * screen, so it cannot claim a visit that has since been submitted without the
+ * restore below noticing. replace() rather than push() because every section
+ * change would otherwise be a history entry, and Back would walk backwards
+ * through a form rather than leaving it.
+ */
+const route = useRoute()
+const router = useRouter()
+
+function rememberPosition() {
+    const current = assessment.assessment.value
+
+    const query =
+        current === null || stage.value === 'site'
+            ? {}
+            : {
+                  visit: current.id,
+                  stage: stage.value,
+                  ...(stage.value === 'checklist' ? { section: activeSection.value } : {}),
+                  ...(activePathogen.value === null ? {} : { pathogen: activePathogen.value }),
+              }
+
+    void router.replace({ query })
+}
+
+watch([stage, activeSection, activePathogen], rememberPosition)
+
+async function restorePosition(): Promise<boolean> {
+    const id = typeof route.query.visit === 'string' ? route.query.visit : ''
+    const wanted = typeof route.query.stage === 'string' ? route.query.stage : ''
+
+    if (id === '' || !['setup', 'checklist', 'review'].includes(wanted)) {
+        return false
+    }
+
+    const existing = await getAssessment(id)
+
+    // Gone, or finished since. Falling through to the site list is right:
+    // a URL is a claim about the past, not an instruction.
+    if (existing === undefined || existing.status === 'submitted') {
+        return false
+    }
+
+    await assessment.resume(existing)
+
+    const section = typeof route.query.section === 'string' ? route.query.section : ''
+    const pathogen = typeof route.query.pathogen === 'string' ? route.query.pathogen : ''
+
+    activeSection.value =
+        template.sections.some((entry) => entry.code === section)
+            ? section
+            : (template.sections[0]?.code ?? '1')
+
+    activePathogen.value =
+        existing.pathogens.find((entry) => entry.name === pathogen)?.name ??
+        existing.pathogens[0]?.name ??
+        null
+
+    // Setup needs its drafts filled from what was stored, and a checklist with
+    // no pathogens named has nothing to show for Section 4.
+    if (wanted === 'setup' || existing.pathogens.length === 0) {
+        draftContext.value = { ...existing.context }
+        draftPathogens.value = [...existing.pathogens]
+        stage.value = 'setup'
+
+        return true
+    }
+
+    stage.value = wanted as Stage
+
+    return true
+}
+
 onMounted(async () => {
     // The shell has already established that there is a usable session; this
     // view is not reachable without one.
     startSync()
     await loadDrafts()
+    await restorePosition()
 })
 
 async function onResume(id: string) {
