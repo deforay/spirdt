@@ -36,7 +36,7 @@ final class AuthEndpointTest extends TestCase
 
         TenantContext::withoutScope(function (): void {
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
-            foreach (['login_attempts', 'refresh_tokens', 'users', 'roles', 'organizations'] as $table) {
+            foreach (['login_attempts', 'refresh_tokens', 'users', 'role_permissions', 'roles', 'organizations'] as $table) {
                 Capsule::table($table)->delete();
             }
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
@@ -240,19 +240,12 @@ final class AuthEndpointTest extends TestCase
 
     private function makeUser(int $organizationId, string $email, string $password): int
     {
+        $this->makeRoles($organizationId, 'assessor');
+
         $roleId = Capsule::table('roles')
             ->where('organization_id', $organizationId)
             ->where('key', 'assessor')
             ->value('id');
-
-        if ($roleId === null) {
-            $roleId = Capsule::table('roles')->insertGetId([
-                'organization_id' => $organizationId,
-                'key'             => 'assessor',
-                'name'            => 'Assessor',
-                'is_system'       => 1,
-            ]);
-        }
 
         return (int) Capsule::table('users')->insertGetId([
             'organization_id' => $organizationId,

@@ -112,14 +112,7 @@ final class ReportsTest extends TestCase
         ]);
 
         foreach ([$this->orgId, $this->partnerOrgId] as $org) {
-            foreach (['admin', 'assessor', 'viewer'] as $key) {
-                Capsule::table('roles')->insert([
-                    'organization_id' => $org,
-                    'key'             => $key,
-                    'name'            => ucfirst($key),
-                    'is_system'       => 1,
-                ]);
-            }
+            $this->makeRoles($org, 'admin', 'assessor', 'viewer');
         }
 
         $this->makeUser($this->orgId, 'boss@example.org', 'admin');

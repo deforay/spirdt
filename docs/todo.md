@@ -1,6 +1,6 @@
 # What is left
 
-State as of 6 August 2026. Written
+State as of 7 August 2026. Written
 so work can resume cold.
 
 ## Decided but not built
@@ -47,6 +47,29 @@ Still open, and deliberately left until the shape is clearer: whether a country
 needs its own settings screen, whether organisations need types (ministry
 versus partner), and **whether organisation A may see organisation B's score on
 a site they both audit** — today, no.
+
+### Permissions — the gate is in place, the screen to change them is not
+Routes require a capability rather than a role name, `role_permissions` is
+seeded for every role, and the sign-in response carries what the account holds
+so the navigation matches what the API will allow. See the permission model in
+[architecture](architecture.md#roles).
+
+What is missing is the way to edit a grant without SQL. The layer is only worth
+having if an organisation can move a permission — until then the defaults are
+the whole of it, and the honest description is that the shape changed rather
+than the behaviour.
+
+The screen is small: the roles of one organisation, a checkbox per permission,
+`is_system` roles editable but undeletable. Two things need deciding before it
+is built. Whether an administrator may grant `users.manage` — which is the
+right to hand out their own job, and the same escalation the create-a-superadmin
+guard already refuses. And whether custom roles are in scope at all, or whether
+an organisation only ever re-shapes the five it has.
+
+Two things still gate on the role's name and are correct to: `TenantContext`
+decides cross-scope reads from admin-or-superadmin, which is tenancy rather
+than capability, and the assignments screen offers assessors and administrators
+as assignees, which asks about other people rather than the caller.
 
 ### Form management — deferred, and blocked on one ruling
 Letting a country customise the instrument. The schema already takes a

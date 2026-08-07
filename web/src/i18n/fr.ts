@@ -27,6 +27,9 @@ export const messages: Messages = {
     'signIn.submitting': 'Connexion en cours',
     'signIn.failed': 'Connexion impossible.',
 
+    'noAccess.title': 'Ce compte n\u2019a encore aucun \u00e9cran',
+    'noAccess.body': 'Personne ne lui a donn\u00e9 acc\u00e8s \u00e0 quoi que ce soit. Demandez \u00e0 votre administrateur, qui peut le faire depuis l\u2019\u00e9cran des personnes.',
+
     'password.title': 'Choisissez un mot de passe',
     'password.why':
         "Votre compte utilise un mot de passe défini par quelqu'un d'autre. Remplacez-le avant de commencer.",

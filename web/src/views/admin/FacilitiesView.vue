@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { type Facility, type GeoTree, listFacilities, listGeoUnits } from '@/api/registry'
-import { session } from '@/auth/session'
+import { can, PERMISSION } from '@/auth/permissions'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import PagedList from '@/components/admin/PagedList.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
@@ -32,7 +32,7 @@ const search = ref('')
 const loading = ref(true)
 const error = ref('')
 
-const canWrite = computed(() => ['admin', 'superadmin'].includes(session.value?.user.role ?? ''))
+const canWrite = computed(() => can(PERMISSION.registryWrite))
 
 async function act<T>(run: () => Promise<T>): Promise<T | null> {
     error.value = ''

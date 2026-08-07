@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
+import { can, PERMISSION, type PermissionKey } from '@/auth/permissions'
 import { session } from '@/auth/session'
 
 /**
@@ -16,15 +17,13 @@ import { session } from '@/auth/session'
  *
  * These guards are for getting people to the right place, NOT for security.
  * Anything a route protects, the API protects again with
- * RequireRoleMiddleware — a guard in a bundle the user has already downloaded
- * is a signpost, not a lock.
+ * RequirePermissionMiddleware — a guard in a bundle the user has already
+ * downloaded is a signpost, not a lock.
+ *
+ * Each route names the CAPABILITY it needs rather than the roles that happen to
+ * have it. An organisation that grants reports to a role this file has never
+ * heard of gets a working screen, not a redirect.
  */
-
-/** Who may collect audits. Mirrors the role list on the /sync routes. */
-const ASSESSING = ['assessor', 'admin', 'superadmin']
-
-/** Who may read and run the organisation. */
-const MANAGING = ['admin', 'superadmin', 'viewer']
 
 const routes: RouteRecordRaw[] = [
     {
@@ -32,22 +31,19 @@ const routes: RouteRecordRaw[] = [
         name: 'home',
         // Nothing of its own: it decides where this person belongs and sends
         // them there, so a shared bookmark works for everybody.
-        redirect: () => (canManage() ? { name: 'admin-reports' } : { name: 'assess' }),
+        redirect: () => ({ name: landing() }),
     },
     {
         path: '/assess',
         name: 'assess',
         component: () => import('@/views/AssessView.vue'),
-        meta: { roles: ASSESSING },
+        meta: { permission: PERMISSION.assessmentsSubmit },
     },
     {
         path: '/admin/users',
         name: 'admin-users',
         component: () => import('@/views/admin/UsersView.vue'),
-        // A viewer cannot administer people; the API refuses them too. Kept in
-        // MANAGING rather than narrowed here so there is one list of roles
-        // that reach management at all, and the API decides the rest.
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.usersManage },
     },
     {
         // The first screen that shows collected data rather than the things
@@ -56,104 +52,113 @@ const routes: RouteRecordRaw[] = [
         path: '/admin/reports',
         name: 'admin-reports',
         component: () => import('@/views/admin/ReportsView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.reportsRead },
     },
     {
         path: '/admin/reports/:id',
         name: 'admin-report',
         component: () => import('@/views/admin/ReportView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.reportsRead },
     },
     {
         path: '/admin/places',
         name: 'admin-places',
         component: () => import('@/views/admin/PlacesView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/facilities',
         name: 'admin-facilities',
         component: () => import('@/views/admin/FacilitiesView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/facilities/new',
         name: 'admin-facility-new',
         component: () => import('@/views/admin/FacilityFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryWrite },
     },
     {
         path: '/admin/facilities/:id',
         name: 'admin-facility',
         component: () => import('@/views/admin/FacilityFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/sites',
         name: 'admin-sites',
         component: () => import('@/views/admin/SitesView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/organizations',
         name: 'admin-organizations',
         component: () => import('@/views/admin/OrganizationsView.vue'),
         // Superadmin only, and the API enforces it again.
-        meta: { roles: ['superadmin'] },
+        meta: { permission: PERMISSION.organizationsManage },
     },
     {
         path: '/admin/assignments',
         name: 'admin-assignments',
         component: () => import('@/views/admin/AssignmentsView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/places/new',
         name: 'admin-place-new',
         component: () => import('@/views/admin/PlaceFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryWrite },
     },
     {
         path: '/admin/places/:id',
         name: 'admin-place',
         component: () => import('@/views/admin/PlaceFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/sites/new',
         name: 'admin-site-new',
         component: () => import('@/views/admin/SiteFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryWrite },
     },
     {
         path: '/admin/sites/:id',
         name: 'admin-site',
         component: () => import('@/views/admin/SiteFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.registryRead },
     },
     {
         path: '/admin/users/new',
         name: 'admin-user-new',
         component: () => import('@/views/admin/UserFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.usersManage },
     },
     {
         path: '/admin/users/:id',
         name: 'admin-user',
         component: () => import('@/views/admin/UserFormView.vue'),
-        meta: { roles: MANAGING },
+        meta: { permission: PERMISSION.usersManage },
     },
     {
         path: '/admin/organizations/new',
         name: 'admin-organization-new',
         component: () => import('@/views/admin/OrganizationFormView.vue'),
-        meta: { roles: ['superadmin'] },
+        meta: { permission: PERMISSION.organizationsManage },
     },
     {
         path: '/admin/organizations/:id',
         name: 'admin-organization',
         component: () => import('@/views/admin/OrganizationFormView.vue'),
-        meta: { roles: ['superadmin'] },
+        meta: { permission: PERMISSION.organizationsManage },
+    },
+
+    // Deliberately carries no permission of its own. It is where an account
+    // that can open nothing else is sent, so a guard on it would send that
+    // account somewhere that sends it back here.
+    {
+        path: '/no-access',
+        name: 'no-access',
+        component: () => import('@/views/NoAccessView.vue'),
     },
 
     // /admin is not a screen — the management pages all live beneath it — but
@@ -189,14 +194,6 @@ export const router = createRouter({
     routes,
 })
 
-function role(): string {
-    return session.value?.user.role ?? ''
-}
-
-function canManage(): boolean {
-    return MANAGING.includes(role())
-}
-
 router.beforeEach((to) => {
     // Signed out, and not signed in yet: App.vue shows the sign-in screen over
     // the top of whatever route this is, so there is nothing to redirect to.
@@ -204,15 +201,42 @@ router.beforeEach((to) => {
         return true
     }
 
-    const allowed = to.meta.roles
+    const required = to.meta.permission as PermissionKey | undefined
 
-    if (Array.isArray(allowed) && !allowed.includes(role())) {
-        // Somewhere they can actually go, rather than a dead end. Reports and
-        // not users: a viewer reaches management but the users API refuses
-        // them, so sending them there swapped one dead end for another that
-        // merely took a round trip to reveal itself.
-        return { name: canManage() ? 'admin-reports' : 'assess' }
+    if (required !== undefined && !can(required)) {
+        // Somewhere they can actually go, rather than a dead end. Reports
+        // first because it is what most management accounts sign in for, and
+        // the registry after it, because an account may hold one without the
+        // other now that the two are separate permissions.
+        return { name: landing() }
     }
 
     return true
 })
+
+/** The best screen this account can actually open. */
+function landing(): string {
+    if (can(PERMISSION.reportsRead)) {
+        return 'admin-reports'
+    }
+
+    if (can(PERMISSION.registryRead)) {
+        return 'admin-places'
+    }
+
+    if (can(PERMISSION.usersManage)) {
+        return 'admin-users'
+    }
+
+    if (can(PERMISSION.organizationsManage)) {
+        return 'admin-organizations'
+    }
+
+    if (can(PERMISSION.assessmentsSubmit)) {
+        return 'assess'
+    }
+
+    // Holds nothing. Anywhere else would refuse and send them back here, which
+    // is a redirect loop rather than a message.
+    return 'no-access'
+}

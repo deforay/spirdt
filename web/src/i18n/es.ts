@@ -25,6 +25,9 @@ export const messages: Messages = {
     'signIn.submitting': 'Iniciando sesión',
     'signIn.failed': 'No se pudo iniciar sesión.',
 
+    'noAccess.title': 'Esta cuenta a\u00fan no tiene pantallas',
+    'noAccess.body': 'Nadie le ha dado acceso a nada. P\u00eddaselo a su administrador, que puede concederlo desde la pantalla de personas.',
+
     'password.title': 'Elija una contraseña',
     'password.why':
         'Su cuenta usa una contraseña que definió otra persona. Sustitúyala antes de empezar.',

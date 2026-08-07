@@ -127,8 +127,9 @@ one nobody can administer any more.
 
 ### `bin/provision-org`
 
-Onboards an organisation: creates it, seeds the five system roles, and creates
-its first administrator. Prints a generated password once.
+Onboards an organisation: creates it, seeds the five system roles with the
+permissions each holds, and creates its first administrator. Prints a generated
+password once.
 
 ```bash
 bin/provision-org --code=zm-moh --name="Ministry of Health Zambia" \
@@ -239,10 +240,11 @@ bin/dev/create-user --org=demo --email=jane@example.org --name="Jane Doe" --role
 Roles: `superadmin`, `admin`, `assessor`, `viewer`, `site_user`. Prompts for the
 password unless `--password` is given. Minimum twelve characters.
 
-!!! note "Roles carry no permissions yet"
-    The role key travels in the token and `AuthMiddleware` attaches it to the
-    request, but nothing reads it. An admin token currently opens exactly the
-    same routes as an assessor token.
+Each role is created holding the permissions that role gets by default, so an
+account made this way reaches the same routes as one provisioned properly. The
+grants come from the same map `bin/provision-org` uses. Re-running restores a
+default that was removed by hand, which is another reason this is a development
+helper and not a server tool.
 
 ## Review
 

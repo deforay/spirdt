@@ -46,14 +46,8 @@ if (!is_file($root . '/vendor/autoload.php')) {
 
 require $root . '/vendor/autoload.php';
 
-/** The five in the baseline schema. is_system marks them undeletable. */
-const SYSTEM_ROLES = [
-    'superadmin' => 'Superadmin',
-    'admin'      => 'Administrator',
-    'assessor'   => 'Assessor',
-    'viewer'     => 'Viewer',
-    'site_user'  => 'Site user',
-];
+/** The five in the baseline schema, with what each may do. */
+const SYSTEM_ROLES = \App\Auth\Roles::SYSTEM;
 
 $options = [];
 foreach (array_slice($argv, 1) as $argument) {
@@ -143,16 +137,33 @@ try {
         $organizationId = (int) $organizationId;
     }
 
+    $find = $pdo->prepare('SELECT id FROM roles WHERE organization_id = ? AND `key` = ?');
+    $grant = $pdo->prepare(
+        'INSERT IGNORE INTO role_permissions (role_id, permission_key) VALUES (?, ?)',
+    );
+
     foreach (SYSTEM_ROLES as $key => $label) {
         $pdo->prepare(
             'INSERT INTO roles (organization_id, `key`, name, is_system) VALUES (?, ?, ?, 1)
              ON DUPLICATE KEY UPDATE id = id',
         )->execute([$organizationId, $key, $label]);
+
+        // Looked up rather than taken from lastInsertId: the insert above is
+        // an upsert, and on the duplicate branch there is no new id to read.
+        $find->execute([$organizationId, $key]);
+        $existingRoleId = (int) $find->fetchColumn();
+
+        // Restores the defaults, including any that were removed by hand. That
+        // is acceptable in a development helper that also conjures the
+        // organisation around the account. It is why nothing in the running
+        // application does the same.
+        foreach (\App\Auth\Roles::grantsFor($key) as $permission) {
+            $grant->execute([$existingRoleId, $permission]);
+        }
     }
 
-    $statement = $pdo->prepare('SELECT id FROM roles WHERE organization_id = ? AND `key` = ?');
-    $statement->execute([$organizationId, $roleKey]);
-    $roleId = (int) $statement->fetchColumn();
+    $find->execute([$organizationId, $roleKey]);
+    $roleId = (int) $find->fetchColumn();
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
 

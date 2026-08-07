@@ -181,6 +181,35 @@ try {
         $version === null ? PF_WARN : PF_OK,
         $version === null ? 'no schema yet — run: composer migrate' : "version {$version}",
     );
+
+    /**
+     * A role holding no permissions can reach nothing, and the gate has no
+     * fallback to the role's name — deliberately, so that revoking the last
+     * permission means what it says.
+     *
+     * The failure that produces is silent and total: everybody in the
+     * organisation signs in successfully and every screen refuses them. It
+     * cannot happen through the application, only through a database restored
+     * from before 0.1.15 or a migration that was skipped, and in both cases
+     * this is the one place anybody would think to look.
+     */
+    try {
+        $orphans = $pdo->query(
+            'SELECT COUNT(*) FROM roles r
+             LEFT JOIN role_permissions p ON p.role_id = r.id
+             WHERE p.role_id IS NULL AND r.`key` <> "site_user"',
+        );
+
+        $count = $orphans === false ? 0 : (int) $orphans->fetchColumn();
+
+        check(
+            'Roles have permissions',
+            $count === 0 ? PF_OK : PF_WARN,
+            $count === 0 ? '' : "{$count} role(s) grant nothing — run: composer migrate",
+        );
+    } catch (PDOException) {
+        // No roles table yet. The schema check above already said so.
+    }
 } catch (PDOException $e) {
     check('DB reachable', PF_FAIL, $e->getMessage());
 

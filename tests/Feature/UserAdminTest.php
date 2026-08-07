@@ -39,7 +39,7 @@ final class UserAdminTest extends TestCase
         TenantContext::withoutScope(function (): void {
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
-                ['login_attempts', 'refresh_tokens', 'users', 'roles', 'organizations', 'programmes'] as $table
+                ['login_attempts', 'refresh_tokens', 'users', 'role_permissions', 'roles', 'organizations', 'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
             }
@@ -48,14 +48,7 @@ final class UserAdminTest extends TestCase
 
         $this->orgId = $this->makeTenant('ua-org', 'User Admin Org');
 
-        foreach (['superadmin', 'admin', 'assessor', 'viewer', 'site_user'] as $key) {
-            Capsule::table('roles')->insert([
-                'organization_id' => $this->orgId,
-                'key'             => $key,
-                'name'            => ucfirst($key),
-                'is_system'       => 1,
-            ]);
-        }
+        $this->makeRoles($this->orgId);
 
         $this->boss = $this->makeUser('boss@example.org', 'admin');
         $this->assessor = $this->makeUser('joseph@example.org', 'assessor');
@@ -73,7 +66,7 @@ final class UserAdminTest extends TestCase
         $response = $this->request('GET', '/api/admin/users', token: $this->signIn('joseph@example.org'));
 
         self::assertSame(403, $response->getStatusCode());
-        self::assertSame('role_not_permitted', $this->body($response)['error']['code']);
+        self::assertSame('permission_required', $this->body($response)['error']['code']);
     }
 
     public function testAnAdministratorSeesTheOrganisation(): void
@@ -395,12 +388,7 @@ final class UserAdminTest extends TestCase
     {
         $otherOrg = $this->makeTenant('other-org', 'Other');
 
-        Capsule::table('roles')->insert([
-            'organization_id' => $otherOrg,
-            'key'             => 'assessor',
-            'name'            => 'Assessor',
-            'is_system'       => 1,
-        ]);
+        $this->makeRoles($otherOrg, 'assessor');
 
         $outsider = (int) Capsule::table('users')->insertGetId([
             'organization_id' => $otherOrg,

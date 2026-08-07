@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Auth\Roles;
 use App\Exception\AuthException;
 use App\Service\TokenService;
 use App\Support\RequestContext;
@@ -36,9 +37,10 @@ use Slim\Psr7\Response;
  * precisely to take an account away from whoever has its password, left the
  * session it was called to end running.
  *
- * The cost is one indexed lookup per authenticated request. That is the whole
- * price of "revoked means revoked", and the alternative — a shorter token life
- * — only narrows the window rather than closing it.
+ * The cost is two indexed lookups per authenticated request: the account, and
+ * what its role may do. That is the whole price of "revoked means revoked", and
+ * the alternative — a shorter token life — only narrows the window rather than
+ * closing it.
  */
 final class AuthMiddleware implements MiddlewareInterface
 {
@@ -82,6 +84,7 @@ final class AuthMiddleware implements MiddlewareInterface
             ->first([
                 'users.is_active',
                 'users.must_change_password',
+                'roles.id as role_id',
                 'roles.key as role',
                 'organizations.programme_id',
                 'organizations.is_active as organization_active',
@@ -123,6 +126,12 @@ final class AuthMiddleware implements MiddlewareInterface
                 ->withAttribute('user_id', $claims['sub'])
                 ->withAttribute('organization_id', $claims['org'])
                 ->withAttribute('role', $role)
+                // What the account may do, read from the role's rows rather
+                // than inferred from its name. Resolved here so it is read
+                // once, on the same doctrine as everything above: a
+                // capability withdrawn is withdrawn on the next request, not
+                // when the token runs out.
+                ->withAttribute('permissions', Roles::permissionsOf((int) $account->role_id))
                 // Read by the request log and the audit trail. Put here
                 // because this is the only place that has verified the token
                 // it came from — anything downstream reading it from a header

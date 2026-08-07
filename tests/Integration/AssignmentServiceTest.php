@@ -44,7 +44,7 @@ final class AssignmentServiceTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['site_assignments', 'campaign_sites', 'campaigns', 'assessments', 'testing_sites',
-                    'facilities', 'templates', 'users', 'roles', 'organizations', 'programmes'] as $table
+                    'facilities', 'templates', 'users', 'role_permissions', 'roles', 'organizations', 'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
             }

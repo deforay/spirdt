@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { type GeoTree, listGeoUnits } from '@/api/registry'
-import { session } from '@/auth/session'
+import { can, PERMISSION } from '@/auth/permissions'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import { t } from '@/i18n'
 import { RouterLink } from 'vue-router'
@@ -24,7 +24,7 @@ const search = ref('')
 const loading = ref(true)
 const error = ref('')
 
-const canWrite = computed(() => ['admin', 'superadmin'].includes(session.value?.user.role ?? ''))
+const canWrite = computed(() => can(PERMISSION.registryWrite))
 
 const matches = computed(() => {
     const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean)

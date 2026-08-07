@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import { can, PERMISSION } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import { signOut } from '@/auth/login'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
@@ -15,34 +16,34 @@ import { t } from '@/i18n'
  * column here would waste two thirds of the screen on the tables it exists to
  * show.
  *
- * The navigation lists only what this role can open. A viewer sees the
- * readable screens and not the ones that change things — which matches what
- * the API will allow, so a link never leads somewhere that refuses.
+ * The navigation lists only what this account can open, asked as what it may
+ * DO rather than what its role is called. The two answered the same until
+ * permissions became editable; now an organisation that grants the registry to
+ * a role of its own gets the links, and one that takes reports away from its
+ * viewers stops showing them.
+ *
+ * Each entry names the same permission its route does, so a link never leads
+ * somewhere that refuses.
  */
 
 const props = defineProps<{ title: string; subtitle?: string }>()
 
 const user = computed(() => session.value?.user ?? null)
 
-const canAdminister = computed(() =>
-    ['admin', 'superadmin'].includes(user.value?.role ?? ''),
-)
-
-/** Managing the other organisations in this country is the superadmin's job. */
-const ownsProgramme = computed(() => user.value?.role === 'superadmin')
-
 const links = computed(() =>
     [
-        // People is administrators only; the registry and the plan are readable
-        // by a viewer, because the dashboard filters by the same hierarchy.
-        { to: { name: 'admin-reports' }, label: t('reports.title'), show: true },
-        { to: { name: 'admin-users' }, label: t('admin.users'), show: canAdminister.value },
-        { to: { name: 'admin-places' }, label: t('places.title'), show: true },
-        { to: { name: 'admin-facilities' }, label: t('facilities.title'), show: true },
-        { to: { name: 'admin-sites' }, label: t('sitesAdmin.title'), show: true },
-        { to: { name: 'admin-assignments' }, label: t('assignments.title'), show: true },
-        { to: { name: 'admin-organizations' }, label: t('organizations.title'), show: ownsProgramme.value },
-    ].filter((link) => link.show),
+        { to: { name: 'admin-reports' }, label: t('reports.title'), need: PERMISSION.reportsRead },
+        { to: { name: 'admin-users' }, label: t('admin.users'), need: PERMISSION.usersManage },
+        { to: { name: 'admin-places' }, label: t('places.title'), need: PERMISSION.registryRead },
+        { to: { name: 'admin-facilities' }, label: t('facilities.title'), need: PERMISSION.registryRead },
+        { to: { name: 'admin-sites' }, label: t('sitesAdmin.title'), need: PERMISSION.registryRead },
+        { to: { name: 'admin-assignments' }, label: t('assignments.title'), need: PERMISSION.registryRead },
+        {
+            to: { name: 'admin-organizations' },
+            label: t('organizations.title'),
+            need: PERMISSION.organizationsManage,
+        },
+    ].filter((link) => can(link.need)),
 )
 
 async function onSignOut(): Promise<void> {

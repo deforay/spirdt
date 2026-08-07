@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Auth\Roles;
 use App\Models\Organization;
 use App\Models\Programme;
 use App\Models\Role;
@@ -33,14 +34,6 @@ use InvalidArgumentException;
  */
 final class OrganizationAdminService
 {
-    private const SYSTEM_ROLES = [
-        'superadmin' => 'Superadmin',
-        'admin'      => 'Administrator',
-        'assessor'   => 'Assessor',
-        'viewer'     => 'Viewer',
-        'site_user'  => 'Site user',
-    ];
-
     /**
      * Everyone in this programme, with enough to see whether they are working.
      *
@@ -157,7 +150,7 @@ final class OrganizationAdminService
 
             $newId = (int) $organization->id;
 
-            foreach (self::SYSTEM_ROLES as $key => $label) {
+            foreach (Roles::SYSTEM as $key => $label) {
                 $role = new Role();
                 $role->fill([
                     'organization_id' => $newId,
@@ -166,6 +159,12 @@ final class OrganizationAdminService
                     'is_system'       => 1,
                 ]);
                 $role->save();
+
+                // In the same transaction as the role itself. A role that
+                // exists without its permissions is one nobody can use, and an
+                // administrator looking at it has no way to tell that from a
+                // role somebody deliberately emptied.
+                Roles::seed((int) $role->id, $key);
             }
 
             $roleId = Role::acrossOrganizations()

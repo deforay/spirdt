@@ -31,6 +31,9 @@ export const messages = {
     'signIn.submitting': 'Signing in',
     'signIn.failed': 'Could not sign in.',
 
+    'noAccess.title': 'This account has no screens yet',
+    'noAccess.body': 'Nobody has given it access to anything. Ask your administrator, who can grant it from the people screen.',
+
     'password.title': 'Choose a password',
     'password.why': 'Your account is using a password somebody else set. Replace it before you start.',
     'password.current': 'Current',

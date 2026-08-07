@@ -40,7 +40,7 @@ final class RegistryAdminTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['site_assignments', 'assessments', 'testing_sites', 'facilities', 'geo_units',
-                    'templates', 'refresh_tokens', 'users', 'roles', 'organizations',
+                    'templates', 'refresh_tokens', 'users', 'role_permissions', 'roles', 'organizations',
                     'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
@@ -69,14 +69,7 @@ final class RegistryAdminTest extends TestCase
         ]);
 
         foreach ([$this->orgId, $this->partnerOrgId, $this->foreignOrgId] as $org) {
-            foreach (['admin', 'assessor', 'viewer'] as $key) {
-                Capsule::table('roles')->insert([
-                    'organization_id' => $org,
-                    'key'             => $key,
-                    'name'            => ucfirst($key),
-                    'is_system'       => 1,
-                ]);
-            }
+            $this->makeRoles($org, 'admin', 'assessor', 'viewer');
         }
 
         $this->makeUser($this->orgId, 'boss@example.org', 'admin');

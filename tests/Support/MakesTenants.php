@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Auth\Roles;
 use App\Service\TokenService;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -105,22 +106,45 @@ trait MakesTenants
         );
     }
 
+    /**
+     * Roles in an organisation, holding what the application would give them.
+     *
+     * A ROLE WITH NO PERMISSIONS REACHES NOTHING. A fixture that inserts the
+     * row and stops fails every request with 403, which tells a test nothing
+     * about the thing it was written to check. Seeded from the same map
+     * bin/provision-org uses, so a test that passes is a test the real grants
+     * allow — and one that has to be edited when a grant changes, which is the
+     * point.
+     *
+     * Idempotent, and defaults to all five.
+     */
+    private function makeRoles(int $organizationId, string ...$keys): void
+    {
+        foreach ($keys === [] ? array_keys(Roles::SYSTEM) : $keys as $key) {
+            $roleId = Capsule::table('roles')
+                ->where('organization_id', $organizationId)
+                ->where('key', $key)
+                ->value('id')
+                ?? Capsule::table('roles')->insertGetId([
+                    'organization_id' => $organizationId,
+                    'key'             => $key,
+                    'name'            => Roles::SYSTEM[$key] ?? ucfirst($key),
+                    'is_system'       => 1,
+                ]);
+
+            Roles::seed((int) $roleId, $key);
+        }
+    }
+
     /** The user a token names, with the role it claims. Idempotent on the id. */
     private function makeAccount(int $organizationId, int $userId, string $role): void
     {
+        $this->makeRoles($organizationId, $role);
+
         $roleId = Capsule::table('roles')
             ->where('organization_id', $organizationId)
             ->where('key', $role)
             ->value('id');
-
-        if ($roleId === null) {
-            $roleId = Capsule::table('roles')->insertGetId([
-                'organization_id' => $organizationId,
-                'key'             => $role,
-                'name'            => ucfirst($role),
-                'is_system'       => 1,
-            ]);
-        }
 
         $attributes = [
             'organization_id'      => $organizationId,

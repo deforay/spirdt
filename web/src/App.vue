@@ -14,7 +14,7 @@ import { router } from '@/router'
  *   Not signed in            → sign in
  *   Signed in, password set  → replace it, because until then the server
  *   by somebody else            refuses every other request
- *   Signed in properly       → whichever half of the app this role belongs to
+ *   Signed in properly       → the best screen this account can open
  *
  * The first two sit ABOVE the router rather than being routes of their own.
  * They are not places you navigate to — there is nowhere else to be while
@@ -32,7 +32,7 @@ const signedIn = computed(() => session.value !== null)
 const mustChangePassword = computed(() => session.value?.user.mustChangePassword === true)
 
 /**
- * Re-run the route decision now that a role exists.
+ * Re-run the route decision now that the permissions are known.
  *
  * Sign-in happens outside the router, so nothing has yet chosen between the
  * assessor and management halves — and `/` resolved before the session existed

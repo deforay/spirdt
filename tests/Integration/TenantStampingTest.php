@@ -40,7 +40,7 @@ final class TenantStampingTest extends TestCase
 
         TenantContext::withoutScope(function (): void {
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
-            foreach (['geo_units', 'roles', 'organizations', 'programmes'] as $table) {
+            foreach (['geo_units', 'role_permissions', 'roles', 'organizations', 'programmes'] as $table) {
                 Capsule::table($table)->delete();
             }
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');

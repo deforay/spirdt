@@ -28,6 +28,13 @@ export interface SessionUser {
     email: string
     fullName: string
     role: string
+    /**
+     * What the account may do, as the server had it at sign-in.
+     *
+     * Optional because a session saved before this existed has none. Read
+     * through auth/permissions.ts, which treats absent as holding nothing.
+     */
+    permissions?: string[]
     organizationId: number
     organization: string | null
     mustChangePassword: boolean

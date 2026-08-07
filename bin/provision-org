@@ -93,15 +93,6 @@ try {
     con_fail('Nothing was asked and nothing was written.');
 }
 
-/** Seeded for every organisation. is_system marks them undeletable. */
-const SYSTEM_ROLES = [
-    'superadmin' => 'Superadmin',
-    'admin'      => 'Administrator',
-    'assessor'   => 'Assessor',
-    'viewer'     => 'Viewer',
-    'site_user'  => 'Site user',
-];
-
 $options = [];
 foreach (array_slice($argv, 1) as $argument) {
     if (preg_match('/^--([a-z-]+)=(.*)$/', $argument, $matches) === 1) {
@@ -231,10 +222,24 @@ try {
 
     $organizationId = (int) $pdo->lastInsertId();
 
-    foreach (SYSTEM_ROLES as $key => $label) {
+    // The role list and its permissions both come from App\Auth\Roles, so this
+    // script and the management app stand up identical organisations. A second
+    // copy of the map here is how the two drift until somebody provisioned by
+    // the wrong one cannot do their job.
+    $grant = $pdo->prepare(
+        'INSERT IGNORE INTO role_permissions (role_id, permission_key) VALUES (?, ?)',
+    );
+
+    foreach (\App\Auth\Roles::SYSTEM as $key => $label) {
         $pdo->prepare(
             'INSERT INTO roles (organization_id, `key`, name, is_system) VALUES (?, ?, ?, 1)',
         )->execute([$organizationId, $key, $label]);
+
+        $newRoleId = (int) $pdo->lastInsertId();
+
+        foreach (\App\Auth\Roles::grantsFor($key) as $permission) {
+            $grant->execute([$newRoleId, $permission]);
+        }
     }
 
     // Standing up a NEW programme makes this person its owner, so they get

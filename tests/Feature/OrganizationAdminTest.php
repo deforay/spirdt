@@ -39,7 +39,7 @@ final class OrganizationAdminTest extends TestCase
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
             foreach (
                 ['site_assignments', 'assessments', 'testing_sites', 'facilities', 'geo_units',
-                    'templates', 'refresh_tokens', 'users', 'roles', 'organizations',
+                    'templates', 'refresh_tokens', 'users', 'role_permissions', 'roles', 'organizations',
                     'programmes'] as $table
             ) {
                 Capsule::table($table)->delete();
@@ -54,14 +54,7 @@ final class OrganizationAdminTest extends TestCase
         $this->shareProgramme($this->partner, $this->ministry);
 
         foreach ([$this->ministry, $this->partner, $this->abroad] as $org) {
-            foreach (['superadmin', 'admin', 'assessor', 'viewer', 'site_user'] as $key) {
-                Capsule::table('roles')->insert([
-                    'organization_id' => $org,
-                    'key'             => $key,
-                    'name'            => ucfirst($key),
-                    'is_system'       => 1,
-                ]);
-            }
+            $this->makeRoles($org);
         }
 
         $this->makeUser($this->ministry, 'owner@example.org', 'superadmin');
@@ -102,7 +95,7 @@ final class OrganizationAdminTest extends TestCase
         $response = $this->get('/api/admin/organizations', $this->signIn('boss@example.org'));
 
         self::assertSame(403, $response->getStatusCode());
-        self::assertSame('role_not_permitted', $this->body($response)['error']['code']);
+        self::assertSame('permission_required', $this->body($response)['error']['code']);
     }
 
     // ─── adding one ───

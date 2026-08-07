@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Auth\Roles;
 use App\Exception\AuthException;
 use App\Models\Organization;
 use App\Models\Role;
@@ -345,6 +346,13 @@ final class AuthService
                 'email'                => (string) $user->email,
                 'full_name'            => (string) $user->full_name,
                 'role'                 => $roleKey,
+                // So the management app can show what this account can do
+                // rather than guessing from the role name. A CONVENIENCE AND
+                // NOT A CONTROL: it decides which links appear, never which
+                // requests succeed. Every route re-reads the grants from the
+                // database, so a client that edits this list gets a screen full
+                // of buttons that all return 403.
+                'permissions'          => Roles::permissionsOf((int) $user->role_id),
                 'organization_id'      => $organizationId,
                 'organization'         => $organization === null ? null : (string) $organization->name,
                 'must_change_password' => (bool) $user->must_change_password,

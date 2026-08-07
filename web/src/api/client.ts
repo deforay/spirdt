@@ -223,6 +223,7 @@ async function exchange(): Promise<boolean> {
             email: string
             full_name: string
             role: string
+            permissions: string[]
             organization_id: number
             organization: string | null
             must_change_password: boolean
@@ -238,6 +239,12 @@ async function exchange(): Promise<boolean> {
             email: body.user.email,
             fullName: body.user.full_name,
             role: body.user.role,
+            // Carried across the refresh, and re-read from the server rather
+            // than copied from the session being replaced. Dropping it here
+            // would empty the navigation every fifteen minutes; copying it
+            // would mean a permission granted this morning never appears until
+            // the holder signs out.
+            permissions: body.user.permissions ?? [],
             organizationId: body.user.organization_id,
             organization: body.user.organization,
             mustChangePassword: body.user.must_change_password,

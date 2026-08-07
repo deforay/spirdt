@@ -11,6 +11,7 @@ interface TokenPair {
         email: string
         full_name: string
         role: string
+        permissions: string[]
         organization_id: number
         organization: string | null
         must_change_password: boolean
@@ -35,6 +36,10 @@ function toSession(body: TokenPair): Session {
             email: body.user.email,
             fullName: body.user.full_name,
             role: body.user.role,
+            // Defaulted rather than assumed present: an older server, or a
+            // cached response from one, would otherwise put undefined here and
+            // the navigation would throw rather than simply showing less.
+            permissions: body.user.permissions ?? [],
             organizationId: body.user.organization_id,
             organization: body.user.organization,
             mustChangePassword: body.user.must_change_password,

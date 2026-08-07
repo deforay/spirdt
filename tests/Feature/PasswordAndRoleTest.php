@@ -41,7 +41,7 @@ final class PasswordAndRoleTest extends TestCase
 
         TenantContext::withoutScope(function (): void {
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 0');
-            foreach (['login_attempts', 'refresh_tokens', 'users', 'roles', 'organizations'] as $table) {
+            foreach (['login_attempts', 'refresh_tokens', 'users', 'role_permissions', 'roles', 'organizations'] as $table) {
                 Capsule::table($table)->delete();
             }
             Capsule::connection()->statement('SET FOREIGN_KEY_CHECKS = 1');
@@ -199,7 +199,7 @@ final class PasswordAndRoleTest extends TestCase
         $response = $this->request('POST', '/api/sync/assessments', ['id' => 'nope'], $this->signIn('viewer@example.org'));
 
         self::assertSame(403, $response->getStatusCode());
-        self::assertSame('role_not_permitted', $this->body($response)['error']['code']);
+        self::assertSame('permission_required', $this->body($response)['error']['code']);
     }
 
     public function testASiteUserCannotFileAnAssessment(): void
@@ -247,19 +247,12 @@ final class PasswordAndRoleTest extends TestCase
 
     private function makeUser(string $email, string $roleKey, bool $mustChange = false): int
     {
+        $this->makeRoles($this->organizationId, $roleKey);
+
         $roleId = Capsule::table('roles')
             ->where('organization_id', $this->organizationId)
             ->where('key', $roleKey)
             ->value('id');
-
-        if ($roleId === null) {
-            $roleId = Capsule::table('roles')->insertGetId([
-                'organization_id' => $this->organizationId,
-                'key'             => $roleKey,
-                'name'            => ucfirst($roleKey),
-                'is_system'       => 1,
-            ]);
-        }
 
         return (int) Capsule::table('users')->insertGetId([
             'organization_id'      => $this->organizationId,

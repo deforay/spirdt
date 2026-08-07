@@ -25,6 +25,9 @@ export const messages: Messages = {
     'signIn.submitting': 'A iniciar sessão',
     'signIn.failed': 'Não foi possível iniciar sessão.',
 
+    'noAccess.title': 'Esta conta ainda n\u00e3o tem ecr\u00e3s',
+    'noAccess.body': 'Ningu\u00e9m lhe deu acesso a nada. Pe\u00e7a ao seu administrador, que o pode conceder no ecr\u00e3 das pessoas.',
+
     'password.title': 'Escolha uma palavra-passe',
     'password.why':
         'A sua conta usa uma palavra-passe definida por outra pessoa. Substitua-a antes de começar.',
