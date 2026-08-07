@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Bootstrap\Providers;
 
 use App\Bootstrap\ServiceProvider;
+use App\Helper\Log;
 use DI\Container;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\RotatingFileHandler;
@@ -25,7 +26,13 @@ final class CoreServicesProvider implements ServiceProvider
             // while handling a request shares it. That UID is what makes a
             // failed sync traceable across the middleware, the service layer
             // and the error handler.
-            $logger->pushProcessor(new UidProcessor(12));
+            // Held rather than constructed inline: the request log table
+            // records the same UID, and a row that cannot be joined to the
+            // lines written beside it is half a record.
+            $uid = new UidProcessor(12);
+            Log::setRequestUid($uid->getUid());
+
+            $logger->pushProcessor($uid);
             $logger->pushProcessor(new PsrLogMessageProcessor());
 
             $handler = new RotatingFileHandler(

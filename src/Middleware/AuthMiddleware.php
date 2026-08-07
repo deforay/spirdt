@@ -6,6 +6,7 @@ namespace App\Middleware;
 
 use App\Exception\AuthException;
 use App\Service\TokenService;
+use App\Support\RequestContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Psr\Http\Message\ResponseInterface;
@@ -105,6 +106,11 @@ final class AuthMiddleware implements MiddlewareInterface
             return $this->forbidden(AuthException::passwordChangeRequired()->getMessage());
         }
 
+        // Also on a static, because the request logger runs outside routing
+        // and a PSR-7 attribute set here is invisible to anything wrapping
+        // this. See RequestContext.
+        RequestContext::setSessionHash($claims['sid']);
+
         TenantContext::set(
             $claims['org'],
             $claims['sub'],
@@ -116,7 +122,12 @@ final class AuthMiddleware implements MiddlewareInterface
             $request
                 ->withAttribute('user_id', $claims['sub'])
                 ->withAttribute('organization_id', $claims['org'])
-                ->withAttribute('role', $role),
+                ->withAttribute('role', $role)
+                // Read by the request log and the audit trail. Put here
+                // because this is the only place that has verified the token
+                // it came from — anything downstream reading it from a header
+                // would be reading something the caller chose.
+                ->withAttribute('session_hash', $claims['sid'] ?? null),
         );
     }
 

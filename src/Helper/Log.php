@@ -27,9 +27,30 @@ final class Log
 {
     private static ?LoggerInterface $logger = null;
 
+    /**
+     * The UID stamped on every line this process writes.
+     *
+     * Held here as well as inside Monolog's processor because the request log
+     * table stores it too, and a row that cannot be joined to the lines
+     * written while handling the same request is half a record. Monolog keeps
+     * it private to the processor, so the value is handed over at boot rather
+     * than dug out later.
+     */
+    private static ?string $requestUid = null;
+
     public static function setLogger(?LoggerInterface $logger): void
     {
         self::$logger = $logger;
+    }
+
+    public static function setRequestUid(?string $uid): void
+    {
+        self::$requestUid = $uid;
+    }
+
+    public static function requestUid(): ?string
+    {
+        return self::$requestUid;
     }
 
     /** @param array<string,mixed> $context */

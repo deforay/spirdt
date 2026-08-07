@@ -134,6 +134,11 @@ final class TenantContext
     /** Between requests, and between tests. */
     public static function forget(): void
     {
+        // The request identity goes with it. They are set together by
+        // authentication and a stale session hash on the next request would
+        // attribute one person's activity to another.
+        \App\Support\RequestContext::forget();
+
         self::$current = null;
         self::$unscopedDepth = 0;
     }

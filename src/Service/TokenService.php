@@ -64,6 +64,7 @@ final class TokenService
         bool $isPlatformAdmin = false,
         bool $mustChangePassword = false,
         ?int $programmeId = null,
+        ?string $sessionHash = null,
     ): string {
         $now = time();
 
@@ -82,6 +83,21 @@ final class TokenService
                 // token for the same reason as the rest: resolving it would
                 // mean joining organizations on every single request.
                 'prg'   => $programmeId,
+                /**
+                 * The session this token belongs to.
+                 *
+                 * Minted once at sign-in and copied across every refresh, so
+                 * it is the one value that identifies a run of activity as
+                 * belonging to one person on one device. An IP cannot do that
+                 * job: assessors work behind carrier-grade NAT where a whole
+                 * province shares an address, so requests from one IP are not
+                 * one person and requests from two are not two people.
+                 *
+                 * Carried in the token because the alternative is a database
+                 * lookup on every request to learn something the token could
+                 * simply say.
+                 */
+                'sid'   => $sessionHash,
             ],
             $this->secret,
             'HS256',
@@ -93,7 +109,7 @@ final class TokenService
      * signed with a different secret. Deliberately one return for all of them:
      * telling a caller which of those went wrong tells an attacker too.
      *
-     * @return array{sub:int,org:int,role:string,admin:bool,pwd:bool,prg:int|null}|null
+     * @return array{sub:int,org:int,role:string,admin:bool,pwd:bool,prg:int|null,sid:string|null}|null
      */
     public function verify(string $token): ?array
     {
@@ -122,6 +138,11 @@ final class TokenService
             // for that to fail — the alternative is showing one programme's
             // national site list to another.
             'prg'   => isset($claims['prg']) ? (int) $claims['prg'] : null,
+            // Null on a token minted before sessions were identified. The logs
+            // then record the request without a session rather than refusing
+            // it: a token issued yesterday is still a valid token, and losing
+            // one line of correlation is not worth signing somebody out for.
+            'sid'   => isset($claims['sid']) ? (string) $claims['sid'] : null,
         ];
     }
 }

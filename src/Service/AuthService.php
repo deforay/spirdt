@@ -155,7 +155,16 @@ final class AuthService
             ->where('id', $row->id)
             ->update(['revoked_at' => gmdate('Y-m-d H:i:s')]);
 
-        return $this->issue($user, $deviceId ?? $row->device_id, $userAgent);
+        // The session carries across the rotation. A refresh mints a new
+        // token and revokes the old one every fifteen minutes; a session
+        // identifier derived from the token would change with it, which is
+        // exactly the continuity it exists to provide.
+        return $this->issue(
+            $user,
+            $deviceId ?? $row->device_id,
+            $userAgent,
+            $row->session_hash === null ? null : (string) $row->session_hash,
+        );
     }
 
     /** Signing out is best effort: an unknown token is already not usable. */
@@ -279,8 +288,22 @@ final class AuthService
     /**
      * @return array<string,mixed>
      */
-    private function issue(User $user, ?string $deviceId, ?string $userAgent): array
-    {
+    private function issue(
+        User $user,
+        ?string $deviceId,
+        ?string $userAgent,
+        ?string $sessionHash = null,
+    ): array {
+        /**
+         * One value per sign-in, random rather than derived.
+         *
+         * Deriving it from the refresh token would make a log line enough to
+         * reconstruct the token it came from, which turns a debugging aid into
+         * a credential. This is a name for a session and nothing else: it
+         * cannot be used to become one.
+         */
+        $sessionHash ??= bin2hex(random_bytes(32));
+
         $organizationId = (int) $user->organization_id;
 
         $role = Role::acrossOrganizations()->where('roles.id', (int) $user->role_id)->first();
@@ -295,6 +318,7 @@ final class AuthService
             false,
             (bool) $user->must_change_password,
             $organization === null ? null : (int) $organization->programme_id,
+            $sessionHash,
         );
 
         $refreshToken = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -302,6 +326,7 @@ final class AuthService
         Capsule::table('refresh_tokens')->insert([
             'user_id'    => (int) $user->id,
             'token_hash' => hash('sha256', $refreshToken),
+            'session_hash' => $sessionHash,
             'device_id'  => $deviceId === null ? null : mb_substr($deviceId, 0, 100),
             'user_agent' => $userAgent === null ? null : mb_substr($userAgent, 0, 255),
             'expires_at' => gmdate('Y-m-d H:i:s', time() + $this->refreshTtlSeconds),

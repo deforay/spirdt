@@ -62,6 +62,10 @@ final class Bootstrap
         $app->setBasePath('/api');
 
         // Middleware stack — outermost first.
+        // Outermost of the application middleware, so it sees the status that
+        // is actually returned — including one produced by the error handler,
+        // which is the case most worth having a record of.
+        $app->add(new Middleware\ApiLoggerMiddleware());
         $app->add(new Middleware\SecurityHeadersMiddleware());
         $app->add(new Middleware\JsonBodyParserMiddleware());
         $app->add(new Middleware\CorsMiddleware());
