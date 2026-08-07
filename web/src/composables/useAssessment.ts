@@ -313,6 +313,10 @@ export function useAssessment(template: Template) {
                     question_code: code ?? '',
                     pathogen: pathogen === '' ? null : (pathogen ?? null),
                     response: value as string,
+                    // The engine needs this to tell an explained gap from an
+                    // unexplained one. It changes no score — only whether the
+                    // visit may be submitted.
+                    comment: comments.get(key) ?? '',
                 }
             }),
     )

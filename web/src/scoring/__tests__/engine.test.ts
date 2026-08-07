@@ -14,7 +14,7 @@ import type { Context } from '../types'
 const EXPECT_KEYS = [
     'total_score', 'total_possible', 'percentage', 'level', 'pathogen_count',
     'is_scorable', 'is_complete', 'is_valid',
-    'missing_count', 'unexpected_count', 'violation_count',
+    'missing_count', 'missing_notes_count', 'unexpected_count', 'violation_count',
     'sections', 'pathogens',
 ]
 
@@ -49,6 +49,7 @@ describe('scoring engine', () => {
                 is_complete: result.isComplete,
                 is_valid: result.isValid,
                 missing_count: result.missing.length,
+                missing_notes_count: result.missingNotes.length,
                 unexpected_count: result.unexpected.length,
                 violation_count: result.violations.length,
             }

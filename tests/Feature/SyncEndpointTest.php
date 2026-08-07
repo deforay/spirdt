@@ -262,6 +262,10 @@ final class SyncEndpointTest extends TestCase
             'template_code'    => 'spi-rdt',
             'template_version' => '1.0.0',
             'assessed_on'      => '2026-08-05',
+            // A draft. Three answers of fifty-nine is one, and the endpoint
+            // refuses a payload that calls itself submitted without being
+            // finished — which is the point of the test below that does.
+            'status'           => 'draft',
             'context'          => ['refers_specimens' => 'no'],
             'pathogens'        => [['key' => 'hiv', 'name' => 'HIV']],
             'answers'          => [

@@ -1,0 +1,19 @@
+{
+    "name": "a-note-on-an-answer-that-does-not-need-one",
+    "why": "A Yes with a comment is ordinary — an assessor recording what they saw — and must not be counted as anything. Pins that the rule reads comment_required_for rather than assuming every response needs a note.",
+    "template": "spi-rdt-1.0.0",
+    "context": {
+        "refers_specimens": "no"
+    },
+    "pathogens": [
+        "hiv"
+    ],
+    "default_response": "Y",
+    "comments": {
+        "1.1": "Organogram posted by the door."
+    },
+    "expect": {
+        "missing_notes_count": 0,
+        "total_score": 100
+    }
+}

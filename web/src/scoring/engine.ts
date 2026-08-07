@@ -116,6 +116,7 @@ export function expectedQuestions(
                     questionCode: question.code,
                     pathogen,
                     naAllowed: question.na_allowed === true,
+                    commentRequiredFor: question.comment_required_for ?? [],
                     key: questionKey(question.code, pathogen),
                 })
             }
@@ -156,8 +157,10 @@ function excludedResponses(template: Template): string[] {
 function indexAnswers(
     answers: AnswerInput[],
     known: Set<string>,
-): { byKey: Map<string, string>; problems: string[] } {
+): { byKey: Map<string, string>; comments: Map<string, string>; problems: string[] } {
     const byKey = new Map<string, string>()
+    // Kept so the engine can tell an explained gap from an unexplained one.
+    const comments = new Map<string, string>()
     const problems: string[] = []
 
     for (const answer of answers) {
@@ -174,9 +177,10 @@ function indexAnswers(
         }
 
         byKey.set(key, answer.response)
+        comments.set(key, (answer.comment ?? '').trim())
     }
 
-    return { byKey, problems }
+    return { byKey, comments, problems }
 }
 
 export function score(
@@ -192,10 +196,11 @@ export function score(
     const maxPoints = values.length === 0 ? 0 : Math.max(...values)
     const roundDp = template.scoring?.round_dp ?? 2
 
-    const { byKey, problems } = indexAnswers(answers, known)
+    const { byKey, comments, problems } = indexAnswers(answers, known)
     const violations = [...problems]
     const consumed = new Set<string>()
     const missing: string[] = []
+    const missingNotes: string[] = []
 
     // Every section gets a tally up front. A section absent from a report reads
     // as an oversight; a section present with zeroes reads as a finding.
@@ -269,6 +274,20 @@ export function score(
 
         consumed.add(question.key)
 
+        /**
+         * A Partial, a No or a Not applicable is a claim about the site, and
+         * the template says which of them have to be explained. An unexplained
+         * one is not a smaller answer than the others — it is a finding nobody
+         * can act on six months later, which is the whole reason the visit is
+         * made.
+         */
+        if (
+            question.commentRequiredFor.includes(response as ResponseCode) &&
+            (comments.get(question.key) ?? '') === ''
+        ) {
+            missingNotes.push(question.key)
+        }
+
         if (excluded.includes(response)) {
             if (!question.naAllowed) {
                 violations.push(`${question.key}: response ${response} is not permitted on this question`)
@@ -330,6 +349,7 @@ export function score(
         sections: [...sections.values()],
         pathogens: [...byPathogen.values()],
         missing,
+        missingNotes,
         unexpected,
         violations,
         scoringVersion: SCORING_VERSION,

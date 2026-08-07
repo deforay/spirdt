@@ -22,6 +22,15 @@ final readonly class ExpectedQuestion
         public string $questionCode,
         public ?string $pathogen,
         public bool $naAllowed,
+        /**
+         * Responses the template obliges the assessor to explain, from the
+         * question's comment_required_for. A Partial or a No is a gap the site
+         * has to act on, and a gap with no words beside it is one nobody can
+         * work from six months later.
+         *
+         * @var list<string>
+         */
+        public array $commentRequiredFor = [],
     ) {
     }
 

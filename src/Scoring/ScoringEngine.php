@@ -98,6 +98,10 @@ final class ScoringEngine
                         questionCode: self::stringOf($question['code'] ?? ''),
                         pathogen: $pathogen,
                         naAllowed: (bool) ($question['na_allowed'] ?? false),
+                        commentRequiredFor: array_values(array_filter(
+                            (array) ($question['comment_required_for'] ?? []),
+                            'is_string',
+                        )),
                     );
                 }
             }
@@ -108,7 +112,7 @@ final class ScoringEngine
 
     /**
      * @param array<string,mixed>                                                  $template
-     * @param list<array{question_code:string,response:string,pathogen?:?string}>  $answers
+     * @param list<array{question_code:string,response:string,pathogen?:?string,comment?:?string}> $answers
      * @param array<string,mixed>                                                  $context
      * @param list<string>                                                         $pathogens
      */
@@ -123,11 +127,13 @@ final class ScoringEngine
         $index      = $this->indexAnswers($answers);
         $violations = $index['duplicates'];
         $byKey      = $index['answers'];
+        $comments   = $index['comments'];
         $consumed   = [];
 
         $sections  = $this->emptySectionTallies($template, $context);
-        $byPathogen = [];
-        $missing    = [];
+        $byPathogen  = [];
+        $missing     = [];
+        $missingNotes = [];
 
         foreach ($this->expectedQuestions($template, $context, $pathogens) as $question) {
             $key = $question->key();
@@ -178,6 +184,18 @@ final class ScoringEngine
 
             $consumed[$key] = true;
             $response       = $byKey[$key];
+
+            // A Partial, a No or a Not applicable is a claim about the site,
+            // and the template says which of them have to be explained. An
+            // unexplained one is not a smaller answer than the others — it is
+            // a finding nobody can act on six months later, which is the whole
+            // reason the visit is made.
+            if (
+                in_array($response->value, $question->commentRequiredFor, true)
+                && ($comments[$key] ?? '') === ''
+            ) {
+                $missingNotes[] = $key;
+            }
 
             if (in_array($response->value, $excluded, true)) {
                 if (!$question->naAllowed) {
@@ -250,6 +268,7 @@ final class ScoringEngine
             sections: array_values($sections),
             pathogens: array_values($byPathogen),
             missing: $missing,
+            missingNotes: $missingNotes,
             unexpected: $unexpected,
             violations: $violations,
             scoringVersion: self::VERSION,
@@ -346,13 +365,14 @@ final class ScoringEngine
      * and the database's unique constraint means it should not be reachable
      * from stored data in the first place — only from a malformed sync payload.
      *
-     * @param  list<array{question_code:string,response:string,pathogen?:?string}> $answers
-     * @return array{answers:array<string,Response>,duplicates:list<string>}
+     * @param  list<array{question_code:string,response:string,pathogen?:?string,comment?:?string}> $answers
+     * @return array{answers:array<string,Response>,duplicates:list<string>,comments:array<string,string>}
      */
     private function indexAnswers(array $answers): array
     {
         $byKey      = [];
         $duplicates = [];
+        $comments   = [];
 
         foreach ($answers as $answer) {
             $pathogen = $answer['pathogen'] ?? null;
@@ -370,9 +390,15 @@ final class ScoringEngine
             }
 
             $byKey[$key] = $response;
+
+            // Kept so the engine can tell an explained gap from an unexplained
+            // one. Absent for a caller that has no comments to give — a score
+            // recomputed from responses alone still works, and simply reports
+            // no missing notes.
+            $comments[$key] = trim((string) ($answer['comment'] ?? ''));
         }
 
-        return ['answers' => $byKey, 'duplicates' => $duplicates];
+        return ['answers' => $byKey, 'duplicates' => $duplicates, 'comments' => $comments];
     }
 
     /**

@@ -1,0 +1,23 @@
+{
+    "name": "a-gap-with-a-note",
+    "why": "The same visit with the gap explained. Pins that a note satisfies the rule rather than merely being stored, so the check cannot be tightened into refusing every Partial and No.",
+    "template": "spi-rdt-1.0.0",
+    "context": {
+        "refers_specimens": "no"
+    },
+    "pathogens": [
+        "hiv"
+    ],
+    "default_response": "Y",
+    "answers": {
+        "2.1": "N"
+    },
+    "comments": {
+        "2.1": "No documented equipment inventory."
+    },
+    "expect": {
+        "missing_notes_count": 0,
+        "is_complete": true,
+        "total_score": 98
+    }
+}

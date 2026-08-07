@@ -446,7 +446,11 @@ final class ReportsTest extends TestCase
             'template_code'    => 'spi-rdt',
             'template_version' => '1.0.0',
             'assessed_on'      => '2026-08-05',
-            'status'           => 'submitted',
+            // A draft, because three answers of fifty-nine is one. These tests
+            // are about reading a visit back, and a report shows a visit still
+            // being worked on — that is the state somebody is usually chasing
+            // it in.
+            'status'           => 'draft',
             'context'          => ['refers_specimens' => 'no'],
             'pathogens'        => [['key' => 'hiv', 'name' => 'HIV']],
             'answers'          => [

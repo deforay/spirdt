@@ -9,6 +9,7 @@ use App\Models\Assessment;
 use App\Models\AssessmentPathogen;
 use App\Models\AssessmentScore;
 use App\Models\Finding;
+use App\Scoring\ScoringEngine;
 use App\Service\SyncService;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
@@ -98,7 +99,7 @@ final class SyncServiceTest extends TestCase
 
         $stored = Assessment::findByUuid($result['assessment_id']);
         self::assertNotNull($stored);
-        self::assertSame('submitted', $stored->status);
+        self::assertSame('draft', $stored->status, 'three answers of fifty-nine is a draft');
 
         $score = AssessmentScore::query()->first();
         self::assertNotNull($score);
@@ -451,7 +452,7 @@ final class SyncServiceTest extends TestCase
     {
         $sync = new SyncService();
 
-        $sync->accept($this->payload());
+        $sync->accept($this->submittablePayload());
 
         $submitted = Assessment::findByUuid('019fd200-0000-7000-8000-000000000001');
         self::assertNotNull($submitted);
@@ -576,6 +577,72 @@ final class SyncServiceTest extends TestCase
         self::assertSame(3, count($result['accepted']));
     }
 
+    /**
+     * The rule the app has always shown and the server has never checked.
+     *
+     * docs/scoring.md said the submission endpoint refuses on is_complete and
+     * is_valid. It did not — the device disabled its own button and the server
+     * stored whatever arrived, which makes the rule a property of one build of
+     * one client rather than of the record.
+     */
+    public function testAnIncompleteVisitCannotBeSubmitted(): void
+    {
+        $payload = $this->payload();
+        $payload['status'] = 'submitted';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/unanswered/');
+
+        (new SyncService())->accept($payload);
+    }
+
+    /**
+     * Every question in the instrument obliges a note on a Partial, a No or a
+     * Not applicable. A gap with no words beside it is one nobody can act on
+     * six months later, which is the whole reason the visit is made.
+     */
+    public function testAGapWithNoNoteCannotBeSubmitted(): void
+    {
+        $payload = $this->submittablePayload();
+
+        // One answer turned into a gap, and nothing written against it.
+        $payload['answers'][0]['response'] = 'N';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/required note/');
+
+        (new SyncService())->accept($payload);
+    }
+
+    /** The same gap, explained, goes through. */
+    public function testAGapWithANoteIsAccepted(): void
+    {
+        $payload = $this->submittablePayload();
+        $payload['answers'][0]['response'] = 'N';
+        $payload['answers'][0]['comment'] = 'No organogram displayed anywhere on site.';
+
+        $result = (new SyncService())->accept($payload);
+
+        $stored = Assessment::findByUuid($result['assessment_id']);
+        self::assertNotNull($stored);
+        self::assertSame('submitted', $stored->status);
+    }
+
+    /**
+     * A draft is accepted incomplete, deliberately. Syncing mid-visit is how an
+     * assessor gets work off a tablet before losing it, and refusing that would
+     * make the safest thing they can do the thing that fails.
+     */
+    public function testADraftIsAcceptedHoweverIncomplete(): void
+    {
+        $payload = $this->payload();
+        $payload['status'] = 'draft';
+
+        $result = (new SyncService())->accept($payload);
+
+        self::assertSame(3, count($result['accepted']));
+    }
+
     public function testAnotherOrganizationCannotSeeTheAssessment(): void
     {
         $result = (new SyncService())->accept($this->payload());
@@ -639,6 +706,10 @@ final class SyncServiceTest extends TestCase
             'template_code'    => 'spi-rdt',
             'template_version' => '1.0.0',
             'assessed_on'      => '2026-08-05',
+            // Three answers out of fifty-nine is a draft. It defaulted to
+            // 'submitted' before the server checked, which meant most of this
+            // suite was exercising a submission that could never happen.
+            'status'           => 'draft',
             'context'          => ['refers_specimens' => 'no'],
             'device_id'        => 'test-device',
             'pathogens'        => [
@@ -651,6 +722,51 @@ final class SyncServiceTest extends TestCase
                 ['question_code' => '4.1', 'pathogen' => 'hiv', 'response' => 'Y'],
             ],
         ];
+    }
+
+    /**
+     * A visit the server will actually accept as submitted: every expected
+     * question answered, and a note against each response the template
+     * obliges the assessor to explain.
+     *
+     * Built from the engine's own expectedQuestions rather than a hand-written
+     * list, so it stays complete when the instrument gains a question. A
+     * hand-written one would drift and start failing for the wrong reason.
+     *
+     * @return array<string,mixed>
+     */
+    private function submittablePayload(): array
+    {
+        $payload = $this->payload();
+        $payload['status'] = 'submitted';
+
+        $definition = json_decode(
+            (string) file_get_contents(dirname(__DIR__, 2) . '/resources/templates/spi-rdt-1.0.0.json'),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        $pathogens = array_map(
+            static fn (array $row): string => (string) $row['key'],
+            $payload['pathogens'],
+        );
+
+        $answers = [];
+
+        foreach (
+            (new ScoringEngine())->expectedQuestions($definition, $payload['context'], $pathogens) as $question
+        ) {
+            $answers[] = [
+                'question_code' => $question->questionCode,
+                'pathogen'      => $question->pathogen,
+                'response'      => 'Y',
+            ];
+        }
+
+        $payload['answers'] = $answers;
+
+        return $payload;
     }
 
     /**

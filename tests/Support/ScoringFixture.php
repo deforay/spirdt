@@ -107,6 +107,7 @@ final class ScoringFixture
         $overrides = is_array($fixture['answers'] ?? null) ? $fixture['answers'] : [];
         $omit      = is_array($fixture['omit'] ?? null) ? $fixture['omit'] : [];
         $default   = is_string($fixture['default_response'] ?? null) ? $fixture['default_response'] : null;
+        $comments  = is_array($fixture['comments'] ?? null) ? $fixture['comments'] : [];
 
         $answers = [];
 
@@ -129,6 +130,7 @@ final class ScoringFixture
                 'question_code' => $question->questionCode,
                 'pathogen'      => $question->pathogen,
                 'response'      => $response,
+                'comment'       => $comments[$instance] ?? $comments[$question->questionCode] ?? null,
             ];
         }
 

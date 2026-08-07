@@ -118,8 +118,13 @@ Three things the engine refuses to resolve on its own, because each one silently
 |---|---|---|
 | `missing` | Expected but unanswered | Scored as zero and **kept in the denominator**, so a half-finished assessment reads as half-finished. Still reported, because a zero from silence and a zero from a *No* are different facts |
 | `unexpected` | An answer the template does not expect here — a retired question code, a removed pathogen, a Section 5 answer left behind after the site was marked as referring nothing | Scoring it adds points the site never earned, on a question nobody asked |
+| `missing_notes` | Answered with a response the template obliges the assessor to explain — `comment_required_for`, which is `P`, `N` and `NA` on all 59 questions — and nothing written against it | Reported rather than scored: the points are earned. What is absent is the thing the site is supposed to act on, and a gap nobody described is one nobody can close |
 | `violations` | Something the template forbids, chiefly N/A where `na_allowed` is false; also a duplicate or unrecognised response | Every N/A narrows the denominator, so permitting it freely lets a site certify by declaring questions inapplicable |
 
-The engine returns these alongside the score rather than throwing. A running score on the device is **legitimately incomplete** — the assessor watches it while working, and an exception mid-visit would take away the total needed to debrief the site. The submission endpoint is what refuses, on `is_complete` and `is_valid`.
+The engine returns these alongside the score rather than throwing. A running score on the device is **legitimately incomplete** — the assessor watches it while working, and an exception mid-visit would take away the total needed to debrief the site.
+
+The **submission endpoint** is what refuses, on all three: unanswered questions, gaps with no note, and anything the template forbids. It refuses only a payload whose `status` is `submitted`. A draft is accepted however incomplete, deliberately — syncing mid-visit is how an assessor gets work off a tablet before losing it, and refusing that would make the safest thing they can do the thing that fails.
+
+The device applies the same two gates before enabling its button. Both exist on purpose: a gate only the device enforces is a property of one build of one client rather than of the record, and a gate only the server enforces is a refusal at the end of a long day.
 
 Computed scores are **snapshotted** into `assessment_scores` at submission and never recomputed from a live template. A certification level has to mean the same thing in a year's time, after the organisation has edited its template five times. `scoring_version` records which implementation produced the numbers, so a later correction to the engine can be identified rather than silently rewriting history.

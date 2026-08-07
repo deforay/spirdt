@@ -115,6 +115,7 @@ export const messages: Messages = {
     'checklist.sections': 'Secções',
     'checklist.pathogens': 'Agentes patogénicos',
     'checklist.sectionScore': 'Pontuação da secção',
+    'checklist.editSetup': 'Parte A',
     'checklist.review': 'Rever',
     'checklist.answeredLabel': 'respondidas',
     'checklist.previousSection': 'Anterior',
@@ -145,6 +146,12 @@ export const messages: Messages = {
     'review.responsiblePerson': 'Pessoa responsável',
     'review.noGaps':
         'Nenhuma lacuna registada. Todas as respostas até agora são Sim ou Não aplicável.',
+    'review.needsNote': 'Falta uma nota',
+    'review.needsNoteHint': 'Um Parcial, Não ou N/A tem de ser justificado. O local não pode agir sobre uma lacuna que ninguém descreveu.',
+    'review.notesNeeded': {
+        one: '{count} resposta ainda precisa de uma nota.',
+        other: '{count} respostas ainda precisam de uma nota.',
+    },
     'review.bySection': 'Por secção',
     'review.notApplicable': 'Não aplicável',
     'review.submit': 'Submeter avaliação',

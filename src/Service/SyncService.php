@@ -90,6 +90,8 @@ final class SyncService
 
             $score = $this->snapshotScore($assessment, $template, $organizationId);
 
+            $this->requireSubmittable($assessment, $score);
+
             return [
                 'assessment_id'     => $assessmentId,
                 'accepted'          => $accepted,
@@ -504,6 +506,10 @@ final class SyncService
                 'question_code' => (string) $answer->question_code,
                 'pathogen'      => $pathogenId === null ? null : ($byId[$pathogenId] ?? null),
                 'response'      => (string) $answer->response,
+                // Carried so the engine can tell an explained gap from an
+                // unexplained one. The score is identical either way; what it
+                // changes is whether the visit may be submitted.
+                'comment'       => $answer->comment,
             ];
         }
 
@@ -536,8 +542,83 @@ final class SyncService
             'is_complete'    => $result->isComplete(),
             'is_valid'       => $result->isValid(),
             'missing'        => $result->missing,
+            // Answered, but with a gap the template obliges the assessor to
+            // explain and nothing written against it. The device shows these
+            // so they can be filled in; requireSubmittable refuses on them.
+            'missing_notes'  => $result->missingNotes,
             'violations'     => $result->violations,
         ];
+    }
+
+    /**
+     * A SUBMITTED visit must actually be finished.
+     *
+     * docs/scoring.md has said for some time that the submission endpoint is
+     * what refuses, on is_complete and is_valid. It did not. The device
+     * disabled its own button and the server accepted whatever arrived, which
+     * makes the rule a property of one build of one client rather than of the
+     * record.
+     *
+     * A DRAFT is accepted incomplete, deliberately and importantly. Syncing
+     * mid-visit is how an assessor gets work off a tablet before losing it, and
+     * refusing that would make the safest thing they can do the thing that
+     * fails. Only the claim that the visit is finished is checked.
+     *
+     * Three ways it can be unfinished, and they are different failures:
+     * questions never answered, gaps recorded with no explanation, and answers
+     * the template forbids. Each is named, because "the assessment is
+     * incomplete" sends somebody back through fifty-nine questions.
+     *
+     * @param  array<string,mixed>      $score
+     * @throws InvalidArgumentException
+     */
+    private function requireSubmittable(Assessment $assessment, array $score): void
+    {
+        if ((string) $assessment->status !== 'submitted') {
+            return;
+        }
+
+        $missing = is_array($score['missing'] ?? null) ? $score['missing'] : [];
+        $notes = is_array($score['missing_notes'] ?? null) ? $score['missing_notes'] : [];
+        $violations = is_array($score['violations'] ?? null) ? $score['violations'] : [];
+
+        $problems = [];
+
+        if ($missing !== []) {
+            $problems[] = count($missing) . ' unanswered: ' . $this->firstFew($missing);
+        }
+
+        if ($notes !== []) {
+            $problems[] = count($notes) . ' without the required note: ' . $this->firstFew($notes);
+        }
+
+        if ($violations !== []) {
+            $problems[] = count($violations) . ' not permitted: ' . $this->firstFew($violations);
+        }
+
+        if ($problems === []) {
+            return;
+        }
+
+        throw new InvalidArgumentException(
+            'This visit cannot be submitted yet — ' . implode('; ', $problems) . '.',
+        );
+    }
+
+    /**
+     * Enough to act on, not the whole list.
+     *
+     * Fifty-nine question codes in an error message is a wall of text the
+     * device shows to somebody standing in a laboratory. The count says how
+     * much is left and the first few say where to start.
+     *
+     * @param list<mixed> $items
+     */
+    private function firstFew(array $items): string
+    {
+        $shown = array_slice(array_map('strval', $items), 0, 3);
+
+        return implode(', ', $shown) . (count($items) > 3 ? '…' : '');
     }
 
     /**

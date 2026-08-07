@@ -30,6 +30,7 @@ final readonly class ScoreResult
      * @param list<array{number:int,code:string,scope:string,applicable:bool,score:int,possible:int,answered:int,excluded:int}> $sections
      * @param list<array{key:string,score:int,possible:int,answered:int,excluded:int}>                                          $pathogens
      * @param list<string>                                                                                                      $missing
+     * @param list<string>                                                                                                      $missingNotes
      * @param list<string>                                                                                                      $unexpected
      * @param list<string>                                                                                                      $violations
      */
@@ -44,6 +45,13 @@ final readonly class ScoreResult
         public array $sections,
         public array $pathogens,
         public array $missing,
+        /**
+         * Answered, but with a response the template obliges the assessor to
+         * explain and no words against it. Reported rather than scored: the
+         * points are earned, and what is absent is the thing the site is meant
+         * to act on.
+         */
+        public array $missingNotes,
         public array $unexpected,
         public array $violations,
         public string $scoringVersion,
@@ -84,7 +92,8 @@ final readonly class ScoreResult
         return [
             'sections'   => $this->sections,
             'pathogens'  => $this->pathogens,
-            'missing'    => $this->missing,
+            'missing'      => $this->missing,
+            'missing_notes' => $this->missingNotes,
             'unexpected' => $this->unexpected,
             'violations' => $this->violations,
         ];

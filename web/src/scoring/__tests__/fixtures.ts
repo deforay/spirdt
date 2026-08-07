@@ -29,6 +29,8 @@ export interface Fixture {
     pathogens?: string[]
     default_response?: string
     answers?: Record<string, string>
+    /** What the assessor wrote beside a response, keyed the same way as answers. */
+    comments?: Record<string, string>
     omit?: string[]
     extra_answers?: AnswerInput[]
     expect?: Record<string, unknown>
@@ -78,6 +80,7 @@ export function answersFor(
     const overrides = fixture.answers ?? {}
     const omit = fixture.omit ?? []
     const fallback = fixture.default_response
+    const comments = fixture.comments ?? {}
     const answers: AnswerInput[] = []
 
     for (const question of expectedQuestions(tpl, context, pathogens)) {
@@ -100,6 +103,7 @@ export function answersFor(
             question_code: question.questionCode,
             pathogen: question.pathogen,
             response,
+            comment: comments[instance] ?? comments[question.questionCode] ?? null,
         })
     }
 

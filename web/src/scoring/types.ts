@@ -114,6 +114,15 @@ export interface AnswerInput {
     question_code: string
     pathogen?: string | null
     response: string
+    /**
+     * What the assessor wrote beside the response.
+     *
+     * Optional, because a score recomputed from responses alone is still a
+     * valid score — it simply reports no missing notes. Supplied by the device
+     * and by the server's rescore, which are the two callers that can tell
+     * whether a gap was explained.
+     */
+    comment?: string | null
 }
 
 /** Part A answers, keyed by field code. Only applicability fields affect scoring. */
@@ -126,6 +135,8 @@ export interface ExpectedQuestion {
     questionCode: string
     pathogen: string | null
     naAllowed: boolean
+    /** Responses the template obliges the assessor to explain. */
+    commentRequiredFor: ResponseCode[]
     /** Natural key, mirroring the (question_code, pathogen_key) unique constraint. */
     key: string
 }
@@ -159,8 +170,14 @@ export interface ScoreResult {
     pathogenCount: number
     sections: SectionTally[]
     pathogens: PathogenTally[]
-    /** Expected but unanswered. Not in the denominator, so an unfinished assessment reads high. */
+    /** Expected but unanswered. Scored as zero and kept in the denominator. */
     missing: string[]
+    /**
+     * Answered, but with a response the template obliges the assessor to
+     * explain and no words against it. Reported rather than scored: the points
+     * are earned, and what is absent is the thing the site has to act on.
+     */
+    missingNotes: string[]
     /** Answered but not expected here. Ignored, never scored. */
     unexpected: string[]
     /** Recorded but forbidden by the template. Honoured as recorded, and reported. */

@@ -11,11 +11,14 @@ import type { ScoreResult, Template } from '@/scoring/types'
  *
  * Two things happen here that happen nowhere else.
  *
- * The completeness gate. A running percentage is computed only over answered
- * questions, so a half-finished assessment reads HIGH, not low — 12 of 12
- * answered Yes is 100% whether or not the other 47 exist. That is correct while
- * working and dangerous the moment it reaches a certificate, so submission is
- * refused until every expected question has an answer.
+ * The completeness gate, which is two rules rather than one. Every expected
+ * question needs an answer, and every Partial, No and Not applicable needs a
+ * note — the template says which responses oblige one, and all fifty-nine
+ * questions oblige all three. A gap nobody described is a gap the site cannot
+ * act on, which is the whole reason the visit is made.
+ *
+ * The server refuses on the same two. That is deliberate: a gate only the
+ * device enforces is a property of one build of one client, not of the record.
  *
  * The gaps. The User's Guide has the site debriefed on findings and actions
  * before the assessor leaves, so they are written here, with the site in the
@@ -127,11 +130,17 @@ const described = computed(
         ).length,
 )
 
-/** Missing questions grouped by section, so the list is navigable rather than long. */
-const missingBySection = computed(() => {
+/**
+ * Questions grouped by section, for whichever list is being shown.
+ *
+ * Unanswered and unexplained are two different lists with the same shape, and
+ * they are two different things to fix: one needs an answer, the other needs
+ * words against an answer already given.
+ */
+function groupBySection(keys: string[]) {
     const bySection = new Map<string, { code: string; title: string; count: number }>()
 
-    for (const key of props.result.missing) {
+    for (const key of keys) {
         const code = key.split('|')[0] ?? ''
         const section = props.template.sections.find((entry) =>
             entry.questions.some((question) => question.code === code),
@@ -155,7 +164,32 @@ const missingBySection = computed(() => {
     }
 
     return [...bySection.values()]
-})
+}
+
+const missingBySection = computed(() => groupBySection(props.result.missing))
+
+/**
+ * Gaps recorded with nothing written against them.
+ *
+ * Every question in the instrument obliges a note on a Partial, a No or a Not
+ * applicable. The row says so as the answer is given, but nothing stopped a
+ * visit being submitted with the box empty — so the rule was advice. The
+ * server refuses these now, and this is what tells the assessor before they
+ * find out from a refusal.
+ */
+const unexplainedBySection = computed(() => groupBySection(props.result.missingNotes))
+
+/**
+ * Both gates, in one place, matching what the server refuses on.
+ *
+ * The device disabling its own button was the only thing enforcing this until
+ * now, which made the rule a property of one build rather than of the record.
+ * The server checks the same two things; this is what keeps the assessor from
+ * meeting that refusal at the end of a long day.
+ */
+const submittable = computed(
+    () => props.result.isComplete && props.result.missingNotes.length === 0,
+)
 
 function findingsOf(gap: Gap): StoredFinding[] {
     return props.findings.get(gap.key) ?? []
@@ -260,6 +294,33 @@ function summaryOf(gap: Gap): string {
                 </div>
                 <p class="px-1 pt-1.5 text-[13px] text-label-2">
                     {{ t('review.unansweredNote') }}
+                </p>
+            </section>
+
+            <!-- Answered, but with a gap nobody explained. A different problem
+                 from an unanswered question and a different fix, so a
+                 different list. -->
+            <section v-if="unexplainedBySection.length > 0" class="mb-4">
+                <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
+                    {{ t('review.needsNote') }}
+                </h2>
+                <div class="overflow-hidden rounded-card bg-surface">
+                    <button
+                        v-for="(section, index) in unexplainedBySection"
+                        :key="section.code"
+                        type="button"
+                        class="flex w-full items-center justify-between px-3.5 py-3 text-left"
+                        :class="index > 0 ? 'border-t border-hairline' : ''"
+                        @click="emit('jump', section.code, null)"
+                    >
+                        <span class="text-[17px]">{{ section.title }}</span>
+                        <span class="tnum text-[15px] font-semibold text-partial">
+                            {{ formatNumber(section.count) }}
+                        </span>
+                    </button>
+                </div>
+                <p class="px-1 pt-1.5 text-[13px] text-label-2">
+                    {{ t('review.needsNoteHint') }}
                 </p>
             </section>
           </div>
@@ -510,7 +571,7 @@ function summaryOf(gap: Gap): string {
             <button
                 type="button"
                 class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40 min-[900px]:mx-auto min-[900px]:block min-[900px]:w-auto min-[900px]:px-16"
-                :disabled="!result.isComplete || submitting"
+                :disabled="!submittable || submitting"
                 @click="emit('submit')"
             >
                 {{ submitting ? t('review.submitting') : t('review.submit') }}
@@ -518,6 +579,12 @@ function summaryOf(gap: Gap): string {
 
             <p v-if="!result.isComplete" class="tnum pt-2 text-center text-[13px] text-label-2">
                 {{ t('review.stillNeeded', { count: result.missing.length }) }}
+            </p>
+            <p
+                v-else-if="result.missingNotes.length > 0"
+                class="tnum pt-2 text-center text-[13px] text-label-2"
+            >
+                {{ t('review.notesNeeded', { count: result.missingNotes.length }) }}
             </p>
         </footer>
     </div>

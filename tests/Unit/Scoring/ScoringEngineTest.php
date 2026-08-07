@@ -23,7 +23,7 @@ final class ScoringEngineTest extends TestCase
     private const EXPECT_KEYS = [
         'total_score', 'total_possible', 'percentage', 'level', 'pathogen_count',
         'is_scorable', 'is_complete', 'is_valid',
-        'missing_count', 'unexpected_count', 'violation_count',
+        'missing_count', 'missing_notes_count', 'unexpected_count', 'violation_count',
         'sections', 'pathogens',
     ];
 
@@ -33,7 +33,7 @@ final class ScoringEngineTest extends TestCase
 
     private const FIXTURE_KEYS = [
         'name', 'why', 'template', 'context', 'pathogens',
-        'default_response', 'answers', 'omit', 'extra_answers', 'expect',
+        'default_response', 'answers', 'comments', 'omit', 'extra_answers', 'expect',
     ];
 
     /**
@@ -200,7 +200,8 @@ final class ScoringEngineTest extends TestCase
             'is_scorable'      => $result->isScorable(),
             'is_complete'      => $result->isComplete(),
             'is_valid'         => $result->isValid(),
-            'missing_count'    => count($result->missing),
+            'missing_count'      => count($result->missing),
+            'missing_notes_count' => count($result->missingNotes),
             'unexpected_count' => count($result->unexpected),
             'violation_count'  => count($result->violations),
         ];

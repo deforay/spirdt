@@ -357,6 +357,30 @@ const repeating = computed(() => {
  * already on the device. The visit reappears under Unfinished, which is why
  * this needs no confirmation: there is nothing to lose by tapping it.
  */
+/**
+ * Back to Part A, mid-visit.
+ *
+ * The facility details and the pathogen list are answered before the checklist
+ * because one of them decides whether Section 5 applies at all — and that made
+ * them a door that only opened one way. A name typed wrongly, a pathogen
+ * forgotten, a site that turns out to refer specimens after all: all of it is
+ * discovered while working, and none of it was reachable.
+ *
+ * The drafts are refilled from what was stored rather than from whatever the
+ * refs happen to hold, because on a resumed visit they hold nothing.
+ */
+function editSetup() {
+    const current = assessment.assessment.value
+
+    if (current === null) {
+        return
+    }
+
+    draftContext.value = { ...current.context }
+    draftPathogens.value = [...current.pathogens]
+    stage.value = 'setup'
+}
+
 async function leaveVisit() {
     await assessment.flush()
     await loadDrafts()
@@ -525,6 +549,13 @@ async function onSubmit() {
                     <span class="truncate">
                         {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
                     </span>
+                </button>
+                <button
+                    type="button"
+                    class="shrink-0 rounded-full px-2.5 py-1.5 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
+                    @click="editSetup"
+                >
+                    {{ t('checklist.editSetup') }}
                 </button>
                 <LocaleSwitcher />
                 <SyncBadge @retry="syncAll()" />
