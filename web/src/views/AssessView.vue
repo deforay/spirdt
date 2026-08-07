@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhArrowLeft, PhArrowRight } from '@phosphor-icons/vue'
+import { PhArrowLeft, PhArrowRight, PhBuildings } from '@phosphor-icons/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
@@ -658,13 +658,6 @@ async function onSubmit() {
                         {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
                     </span>
                 </button>
-                <button
-                    type="button"
-                    class="shrink-0 rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-accent transition-opacity hover:opacity-80"
-                    @click="editSetup"
-                >
-                    {{ t('checklist.editSetup') }}
-                </button>
                 <LocaleSwitcher />
                 <SyncBadge @retry="syncAll()" />
             </div>
@@ -687,6 +680,18 @@ async function onSubmit() {
             class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2 md:hidden"
             :aria-label="t('checklist.sections')"
         >
+            <!-- Part A sits before Section 1 in the visit, so it sits before
+                 Section 1 here. An icon rather than a word: this row has room
+                 for numbers only, which is why the numbers are alone. -->
+            <button
+                type="button"
+                class="flex shrink-0 items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
+                :aria-label="t('checklist.editSetup')"
+                @click="editSetup"
+            >
+                <PhBuildings :size="15" aria-hidden="true" />
+            </button>
+
             <button
                 v-for="item in visibleSections"
                 :key="item.code"
