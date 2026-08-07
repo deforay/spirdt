@@ -36,7 +36,7 @@ composer install
 Set `JWT_SECRET` in `.env`. The application refuses to serve without at least 32 characters.
 
 ```bash
-php -r "echo bin2hex(random_bytes(32));"
+php -r "echo bin2hex(random_bytes(32)) . PHP_EOL;"
 ```
 
 The app is built into `public/` and committed, so there is no front-end build step. You only need `npm ci` in `web/` if you are going to change it.

@@ -92,7 +92,7 @@ $secret = (string) env('JWT_SECRET', '');
 check(
     'JWT_SECRET set',
     strlen($secret) >= 32 ? PF_OK : PF_FAIL,
-    strlen($secret) >= 32 ? '' : 'generate: php -r "echo bin2hex(random_bytes(32));"',
+    strlen($secret) >= 32 ? '' : 'generate: php -r "echo bin2hex(random_bytes(32)) . PHP_EOL;"',
 );
 
 $appEnv   = (string) env('APP_ENV', 'production');

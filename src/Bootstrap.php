@@ -99,7 +99,7 @@ final class Bootstrap
         $secret = (string) env('JWT_SECRET', '');
         if ($secret === '' || strlen($secret) < 32) {
             $errors[] = 'JWT_SECRET must be set and at least 32 characters. '
-                . 'Generate one with: php -r "echo bin2hex(random_bytes(32));"';
+                . 'Generate one with: php -r "echo bin2hex(random_bytes(32)) . PHP_EOL;"';
         }
 
         if ($errors !== []) {
