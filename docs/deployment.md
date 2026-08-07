@@ -73,6 +73,10 @@ a2enmod rewrite
 Preferred over `.htaccess`: Apache re-reads `.htaccess` on every request, and a
 vhost is parsed once at start-up.
 
+A ready copy with placeholders lives at `deploy/apache/spirdt.conf.example`,
+annotated with the reason for each block. The listing below is the same file
+with the commentary stripped.
+
 ```apache
 <VirtualHost *:80>
     ServerName spirdt.example.org
@@ -114,6 +118,14 @@ vhost is parsed once at start-up.
         # this, reloading on any screen but the first returns 404 — and a
         # reload is exactly what someone does when a screen looks wrong.
         RewriteEngine On
+
+        # The first condition is what stops the rule feeding itself. The !-f
+        # test is only a terminator while /index.html resolves to a real file,
+        # and a DocumentRoot pointing anywhere but web/dist is enough to break
+        # that — at which point the target matches the rule again and Apache
+        # gives up after ten passes. With this line the same mistake is a 404
+        # naming the missing file.
+        RewriteCond %{REQUEST_URI} !^/index\.html$
         RewriteCond %{REQUEST_FILENAME} !-f
         RewriteCond %{REQUEST_FILENAME} !-d
         RewriteRule ^ /index.html [L]

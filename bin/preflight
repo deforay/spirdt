@@ -105,6 +105,14 @@ check(
 
 // ─── 4. Writable paths ───
 
+// Writable BY THIS PROCESS, which is the user who ran the command. A web
+// server runs as its own account — _www, www-data — so a directory that
+// passes here can still be unwritable to Apache or nginx, and the failure
+// then surfaces as an application error with nothing pointing at permissions.
+// The group-write bit is the part that can be checked from here, so it is
+// reported rather than assumed.
+$groupClosed = [];
+
 foreach (['var/log', 'var/cache', 'var/exports', 'var/uploads'] as $dir) {
     $path = $root . '/' . $dir;
     if (!is_dir($path)) {
@@ -112,7 +120,32 @@ foreach (['var/log', 'var/cache', 'var/exports', 'var/uploads'] as $dir) {
     }
     $writable = is_dir($path) && is_writable($path);
     check("{$dir} writable", $writable ? PF_OK : PF_FAIL, $writable ? '' : 'check permissions');
+
+    if ($writable && (fileperms($path) & 0o020) === 0) {
+        $groupClosed[] = $dir;
+    }
 }
+
+if ($groupClosed !== []) {
+    check(
+        'var/ group-writable',
+        PF_WARN,
+        'not group-writable: ' . implode(', ', $groupClosed)
+            . ' — fine for bin/serve, breaks under a web server running as another user',
+    );
+}
+
+// ─── 4b. The built app ───
+//
+// web/dist is committed, so this is present in a fresh clone and absent only
+// when somebody has cleaned it. It is what a web server serves, so a missing
+// build is a blank site rather than a degraded one.
+$indexPath = $root . '/web/dist/index.html';
+check(
+    'web/dist built',
+    is_file($indexPath) ? PF_OK : PF_FAIL,
+    is_file($indexPath) ? '' : 'run: cd web && npm run build',
+);
 
 // ─── 5. Database ───
 

@@ -22,6 +22,8 @@ Takes a fresh clone to a running application: prerequisites, `.env` (generating 
 
 **Idempotent** — every step checks before acting.
 
+Written for **provisioning a machine**: production, or a demo box. It is safe on a development machine but not sufficient there, because it provisions the one database named in `.env` using credentials that must already exist — and development also needs the MySQL user and the separate test database. See [Installation](getting-started.md#option-b-native-no-docker) for the manual path.
+
 | Flag | Effect |
 |---|---|
 | `--reset` | Drop every table first. Refuses on `APP_ENV=production`; requires typing the database name |
