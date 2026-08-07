@@ -48,7 +48,7 @@ export const messages: Messages = {
     'sites.assignedToColleague': 'Atribuído a um colega',
     'sites.unassigned': 'Não atribuído',
     'sites.loading': 'A carregar locais.',
-    'sites.empty': 'Ainda não há locais. Um administrador adiciona-os, ou crie alguns localmente com',
+    'sites.empty': 'Ainda não há locais. Um administrador tem de adicionar os locais que avalia.',
 
     'sync.blocked': 'Requer atenção',
     'sync.running': 'A sincronizar',

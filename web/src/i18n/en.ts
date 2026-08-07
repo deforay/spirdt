@@ -53,7 +53,7 @@ export const messages = {
     'sites.assignedToColleague': 'Assigned to a colleague',
     'sites.unassigned': 'Not assigned',
     'sites.loading': 'Loading sites.',
-    'sites.empty': 'No sites yet. An administrator adds them, or seed some locally with',
+    'sites.empty': 'No sites yet. An administrator has to add the testing sites you assess.',
 
     'sync.blocked': 'Needs attention',
     'sync.running': 'Syncing',
