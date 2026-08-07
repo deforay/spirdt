@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { type Facility, listFacilities } from '@/api/registry'
 import { t } from '@/i18n'
@@ -20,6 +21,32 @@ const term = ref('')
 const matches = ref<Facility[]>([])
 const open = ref(false)
 
+/**
+ * Whether the registry holds any facility at all.
+ *
+ * A search box that finds nothing looks identical whether the answer is "no
+ * facility called that" or "no facilities". The second is the ordinary state
+ * of a newly provisioned organisation — its programme starts empty — and the
+ * first person to meet it reported the screen as broken rather than as a step
+ * they had not taken yet.
+ *
+ * Null until asked, so nothing is claimed before the answer is known.
+ */
+const anyExist = ref<boolean | null>(null)
+
+/** A search has run and come back. Distinguishes no matches from not looked. */
+const searched = ref(false)
+
+onMounted(async () => {
+    try {
+        anyExist.value = (await listFacilities({ perPage: 1 })).rows.length > 0
+    } catch {
+        // Unreachable server. Saying "there are no facilities" would be a
+        // claim about the registry made from a failed request.
+        anyExist.value = null
+    }
+})
+
 let timer: ReturnType<typeof setTimeout> | undefined
 
 watch(term, () => {
@@ -28,6 +55,7 @@ watch(term, () => {
     timer = setTimeout(async () => {
         if (term.value.trim() === '') {
             matches.value = []
+            searched.value = false
 
             return
         }
@@ -37,6 +65,8 @@ watch(term, () => {
         } catch {
             matches.value = []
         }
+
+        searched.value = true
     }, 250)
 })
 
@@ -68,6 +98,26 @@ function choose(facility: Facility): void {
             :placeholder="t('sitesAdmin.findFacility')"
             class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
         />
+
+        <!--
+            The registry is empty, which is where a new organisation starts.
+            Said as a step rather than as an absence, and with the way to take
+            it, because an empty search box explains nothing on its own.
+        -->
+        <RouterLink
+            v-if="anyExist === false"
+            :to="{ name: 'admin-facilities' }"
+            class="mt-1 block text-[13px] text-accent"
+        >
+            {{ t('sitesAdmin.noFacilitiesYet') }}
+        </RouterLink>
+
+        <p
+            v-else-if="searched && matches.length === 0"
+            class="mt-1 text-[13px] text-label-2"
+        >
+            {{ t('sitesAdmin.noFacilityMatch') }}
+        </p>
 
         <div
             v-if="matches.length > 0"

@@ -292,3 +292,23 @@ if ($generated) {
     con_print('info', 'Password: ' . $password);
     con_print('warn', 'Shown once. It is stored hashed and cannot be read back.');
 }
+
+/*
+ * The registry starts empty, and each part of it depends on the one before.
+ *
+ * A new organisation gets its own programme, which means no places, no
+ * facilities and no testing sites. An assessor signing in sees an empty site
+ * list; an administrator opening Testing sites finds a facility picker with
+ * nothing in it. An empty picker looks exactly like a broken picker, and the
+ * first person to meet one reported it as a fault rather than as an order of
+ * operations nobody had told them.
+ *
+ * Saying it here is where it costs nothing. The alternative is finding out
+ * three screens in, having concluded the application does not work.
+ */
+con_print('header', 'Next');
+con_print('info', 'The registry is empty. Build it in this order — each needs the one above:');
+con_print('info', '  1. Geography  — at least one province and district');
+con_print('info', '  2. Facilities — a facility belongs to a place');
+con_print('info', '  3. Testing sites — a site belongs to a facility');
+con_print('info', 'Assessors cannot start a visit until there is a testing site.');
