@@ -107,6 +107,11 @@ export const messages: Messages = {
     'checklist.pathogens': 'Pathogènes',
     'checklist.sectionScore': 'Score de la section',
     'checklist.review': 'Vérifier',
+    'checklist.previousSection': 'Précédent',
+    'checklist.nextSection': 'Suivant',
+    'checklist.nextPathogen': 'Pathogène suivant',
+    'checklist.provisional': 'Provisoire',
+    'checklist.progress': '{answered} sur {total} renseignées',
 
     'save.error': 'Non enregistré',
     'save.saving': 'Enregistrement',

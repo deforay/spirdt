@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PhArrowLeft, PhArrowRight } from '@phosphor-icons/vue'
 import { computed, onMounted, ref } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
@@ -133,6 +134,89 @@ const sectionTally = computed(() =>
     assessment.result.value.sections.find((s) => s.code === section.value.code),
 )
 
+/**
+ * Moving on, from where the assessor actually finishes.
+ *
+ * The section list is at the top of the screen, and a section is fifteen
+ * questions long. Reaching the end of one and having to scroll back up to
+ * choose the next is the whole visit, fifty-nine times.
+ */
+const sectionIndex = computed(() =>
+    visibleSections.value.findIndex((entry) => entry.code === activeSection.value),
+)
+
+const previousSection = computed(() =>
+    sectionIndex.value > 0 ? (visibleSections.value[sectionIndex.value - 1] ?? null) : null,
+)
+
+const nextSection = computed(() => visibleSections.value[sectionIndex.value + 1] ?? null)
+
+/**
+ * Section 4 is answered once per pathogen, so "next" means the next PATHOGEN
+ * until they are all done. Advancing to section 5 with a pathogen unanswered
+ * is how a visit reaches the review screen looking complete and is not.
+ */
+const nextPathogen = computed(() => {
+    if (section.value.scope !== 'pathogen') {
+        return null
+    }
+
+    const list = assessment.assessment.value?.pathogens ?? []
+    const at = list.findIndex((entry) => entry.name === activePathogen.value)
+
+    return at >= 0 ? (list[at + 1] ?? null) : null
+})
+
+/** The scroll container, so moving section starts at the top of the new one. */
+const questionList = ref<HTMLElement | null>(null)
+
+function toTop(): void {
+    questionList.value?.scrollTo({ top: 0, behavior: 'auto' })
+    window.scrollTo({ top: 0, behavior: 'auto' })
+}
+
+function goToSection(code: string): void {
+    activeSection.value = code
+
+    const target = template.sections.find((entry) => entry.code === code)
+
+    if (target?.scope === 'pathogen') {
+        activePathogen.value = assessment.assessment.value?.pathogens[0]?.name ?? null
+    }
+
+    toTop()
+}
+
+function goToPathogen(name: string): void {
+    activePathogen.value = name
+    toTop()
+}
+
+/**
+ * How much of the instrument has been answered.
+ *
+ * Needed because the percentage beside it is computed over ANSWERED questions
+ * only — see docs/scoring.md. That is right for a running score, and it means
+ * a half-finished visit of all Yes reads 100%. Saying so is the difference
+ * between a number the assessor can use and one that misleads them.
+ */
+const progress = computed(() => {
+    const result = assessment.result.value
+
+    // Excluded counts as answered: N/A is a response the assessor gave, and it
+    // leaves the denominator rather than the questionnaire.
+    const answered = result.sections.reduce(
+        (total, tally) => total + tally.answered + tally.excluded,
+        0,
+    )
+
+    return {
+        answered,
+        total: answered + result.missing.length,
+        isComplete: result.isComplete,
+    }
+})
+
 const answeredHere = computed(
     () =>
         section.value.questions.filter((q) => assessment.responseFor(q.code, instance.value) !== null)
@@ -152,6 +236,12 @@ const answersByKey = computed(() => {
 
 const levelTone = computed(() => {
     const level = assessment.result.value.level
+
+    // A certification band claimed off eight of fifty-nine questions is a
+    // stronger statement than the percentage beside it, and colour is what
+    // makes it read as settled. Until the visit is complete it stays neutral.
+    if (!assessment.result.value.isComplete) return 'bg-track text-label-2'
+
     if (level === null) return 'bg-track text-label-2'
     if (level >= 4) return 'bg-yes-soft text-yes'
     if (level === 3) return 'bg-accent-soft text-accent'
@@ -413,7 +503,7 @@ async function onSubmit() {
                     </button>
                 </nav>
 
-                <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:px-0">
+                <main ref="questionList" class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:px-0">
                     <div class="overflow-hidden rounded-card bg-surface md:rounded-surface md:shadow-surface">
                         <div v-for="(question, index) in section.questions" :key="question.code">
                             <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
@@ -445,6 +535,60 @@ async function onSubmit() {
                             </strong>
                         </div>
                     </div>
+
+                    <!--
+                        Moving on, where the assessor finishes rather than where
+                        the list of sections happens to live. Full-width targets
+                        on a phone: this is tapped at the end of every section,
+                        standing up, sometimes gloved.
+                    -->
+                    <nav
+                        class="mt-4 flex items-stretch gap-2"
+                        :aria-label="t('checklist.sections')"
+                    >
+                        <button
+                            v-if="previousSection"
+                            type="button"
+                            class="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-card bg-surface px-3 py-2.5 text-[15px] font-medium text-label-2 transition-colors hover:text-label"
+                            @click="goToSection(previousSection.code)"
+                        >
+                            <PhArrowLeft :size="16" aria-hidden="true" />
+                            <span class="truncate">{{ t('checklist.previousSection') }}</span>
+                        </button>
+
+                        <button
+                            v-if="nextPathogen"
+                            type="button"
+                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-label px-3 py-2.5 text-[15px] font-semibold text-ground transition-opacity hover:opacity-90"
+                            @click="goToPathogen(nextPathogen.name)"
+                        >
+                            <span class="truncate">{{ nextPathogen.name }}</span>
+                            <PhArrowRight :size="16" aria-hidden="true" />
+                        </button>
+
+                        <button
+                            v-else-if="nextSection"
+                            type="button"
+                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+                            @click="goToSection(nextSection.code)"
+                        >
+                            <span class="truncate">
+                                {{ nextSection.number }}. {{ text(nextSection.title) }}
+                            </span>
+                            <PhArrowRight :size="16" aria-hidden="true" />
+                        </button>
+
+                        <!-- Last section. The only thing left is to review. -->
+                        <button
+                            v-else
+                            type="button"
+                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+                            @click="stage = 'review'"
+                        >
+                            <span class="truncate">{{ t('checklist.review') }}</span>
+                            <PhArrowRight :size="16" aria-hidden="true" />
+                        </button>
+                    </nav>
                 </main>
             </div>
         </div>
@@ -455,23 +599,43 @@ async function onSubmit() {
         <footer
             class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6"
         >
-            <div>
-                <div class="tnum text-[22px] font-bold tracking-tight">
-                    {{
-                        assessment.result.value.percentage === null
-                            ? '—'
-                            : formatPercent(
-                                  assessment.result.value.percentage,
-                                  assessment.result.value.roundDp,
-                              )
-                    }}
+            <div class="min-w-0">
+                <div class="flex items-baseline gap-2">
+                    <span class="tnum text-[22px] font-bold tracking-tight">
+                        {{
+                            assessment.result.value.percentage === null
+                                ? '—'
+                                : formatPercent(
+                                      assessment.result.value.percentage,
+                                      assessment.result.value.roundDp,
+                                  )
+                        }}
+                    </span>
+                    <!--
+                        The percentage is computed over ANSWERED questions only,
+                        so a half-finished visit of all Yes reads 100%. That is
+                        correct for a running score and indefensible without
+                        this word beside it.
+                    -->
+                    <span v-if="!progress.isComplete" class="eyebrow text-label-3">
+                        {{ t('checklist.provisional') }}
+                    </span>
                 </div>
                 <div
                     :class="[
-                        'tnum text-xs',
+                        'tnum truncate text-xs',
                         assessment.saveState.value === 'error' ? 'font-semibold text-no' : 'text-label-2',
                     ]"
                 >
+                    <template v-if="!progress.isComplete">
+                        {{
+                            t('checklist.progress', {
+                                answered: progress.answered,
+                                total: progress.total,
+                            })
+                        }}
+                        ·
+                    </template>
                     {{ savedLabel }}
                 </div>
             </div>
