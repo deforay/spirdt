@@ -218,15 +218,12 @@ export function score(
     for (const question of expectedQuestions(template, context, pathogens)) {
         const response = byKey.get(question.key)
 
-        if (response === undefined) {
-            missing.push(question.key)
-            continue
-        }
-
-        consumed.add(question.key)
-
         const tally = sections.get(question.sectionCode)
         if (tally === undefined) {
+            if (response === undefined) {
+                missing.push(question.key)
+            }
+
             continue
         }
 
@@ -241,6 +238,36 @@ export function score(
         }
 
         const pathogenTally = question.pathogen === null ? undefined : byPathogen.get(question.pathogen)
+
+        /**
+         * An expected question with no answer scores nothing and still counts.
+         *
+         * The denominator is every question the visit is expected to answer,
+         * so a half-finished assessment reads as half-finished rather than as
+         * a high score over a small sample. It climbs from zero towards the
+         * real figure as the visit proceeds, and the number an assessor
+         * watches is one they can act on.
+         *
+         * The finished score is unaffected: once nothing is missing, the two
+         * ways of counting agree exactly. This changes what an INCOMPLETE
+         * assessment reads as, and nothing else.
+         *
+         * Not applicable is still excluded from both sides, because the
+         * assessor has said the question does not apply here. Silence is not
+         * that statement.
+         */
+        if (response === undefined) {
+            missing.push(question.key)
+
+            tally.possible += maxPoints
+            if (pathogenTally) {
+                pathogenTally.possible += maxPoints
+            }
+
+            continue
+        }
+
+        consumed.add(question.key)
 
         if (excluded.includes(response)) {
             if (!question.naAllowed) {
@@ -277,7 +304,20 @@ export function score(
         totalPossible += tally.possible
     }
 
-    const percentageScaled = scaled(totalScore, totalPossible, roundDp)
+    /**
+     * Nothing answered is not the same as everything wrong.
+     *
+     * Unanswered questions are in the denominator now, so a visit nobody has
+     * touched would otherwise divide zero by the whole instrument and report
+     * 0% — and in a list of sites that reads as a catastrophic result rather
+     * than a form somebody has not started. A score needs at least one answer
+     * behind it before it means anything.
+     */
+    const responded = [...sections.values()].some(
+        (tally) => tally.answered > 0 || tally.excluded > 0,
+    )
+
+    const percentageScaled = responded ? scaled(totalScore, totalPossible, roundDp) : null
 
     return {
         totalScore,
@@ -293,7 +333,10 @@ export function score(
         unexpected,
         violations,
         scoringVersion: SCORING_VERSION,
-        isScorable: totalPossible > 0,
+        // Tied to the percentage, not the denominator: an unanswered question
+        // counts against the visit, so a form nobody has opened has a
+        // denominator and no score.
+        isScorable: percentageScaled !== null,
         isComplete: missing.length === 0,
         isValid: violations.length === 0,
     }

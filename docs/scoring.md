@@ -9,9 +9,16 @@ Y  (Yes)            = 2 points
 P  (Partial)        = 1 point
 N  (No)             = 0 points
 NA (Not Applicable) = excluded from BOTH numerator and denominator
+(unanswered)        = 0 points, and STAYS in the denominator
 ```
 
 The N/A rule is the one that catches people out. An N/A question is **removed from the total possible score**, not scored as zero. A section of ten questions where one is N/A is scored out of 18, not 20.
+
+An unanswered question is the opposite, and the distinction is the whole point: it scores zero and stays in the denominator. A visit with ten of fifty-nine questions answered reads as a low score, not a high one over a small sample, and the figure climbs from zero towards the real one as the assessor works. Nothing about a **finished** assessment changes — with nothing missing, the two ways of counting agree exactly.
+
+This is also what stops the obvious abuse. If silence removed a question, the way to certify would be to answer the easy questions and leave the rest blank. N/A does remove a question, which is precisely why `na_allowed` is set on five questions in the instrument and not on fifty-nine.
+
+A visit with **no answers at all** is not scored at all. It has a denominator and no percentage, because "nobody has started this" and "this site scored zero" are different statements and a report that confuses them is worse than one that says nothing.
 
 ## Calculating
 
@@ -109,7 +116,7 @@ Three things the engine refuses to resolve on its own, because each one silently
 
 | | What it is | Why it is not just scored |
 |---|---|---|
-| `missing` | Expected but unanswered | Not in the denominator, so a half-finished assessment of all Y reads 100% |
+| `missing` | Expected but unanswered | Scored as zero and **kept in the denominator**, so a half-finished assessment reads as half-finished. Still reported, because a zero from silence and a zero from a *No* are different facts |
 | `unexpected` | An answer the template does not expect here — a retired question code, a removed pathogen, a Section 5 answer left behind after the site was marked as referring nothing | Scoring it adds points the site never earned, on a question nobody asked |
 | `violations` | Something the template forbids, chiefly N/A where `na_allowed` is false; also a duplicate or unrecognised response | Every N/A narrows the denominator, so permitting it freely lets a site certify by declaring questions inapplicable |
 

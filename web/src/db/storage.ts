@@ -20,7 +20,13 @@ import type { MessageKey } from '@/i18n'
  * assessor starts rather than after they have filled in fifty-nine questions.
  */
 
-export type StorageRisk = 'safe' | 'at-risk' | 'broken'
+/**
+ * `advisory` is not a warning. It says the browser has not *promised* to keep
+ * the data, which is the normal state of a desktop browser and of any tab that
+ * has not been installed — not a sign anything is wrong. Ranking it with a real
+ * problem trains people to ignore the row that matters.
+ */
+export type StorageRisk = 'safe' | 'advisory' | 'at-risk' | 'broken'
 
 export interface StorageReport {
     risk: StorageRisk
@@ -125,6 +131,25 @@ export function isInstalled(): boolean {
     return standalone || iosStandalone
 }
 
+/**
+ * Whether "add it to your home screen" is advice this device can act on.
+ *
+ * Coarse on purpose. A touch device with a phone- or tablet-sized screen can
+ * install a web app; a laptop shows the same prompt and the reader goes looking
+ * for a home screen that is not there. Being told to do something impossible is
+ * what makes a notice read as broken.
+ */
+function canInstall(): boolean {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        return false
+    }
+
+    const touch = (navigator.maxTouchPoints ?? 0) > 0
+    const handheld = window.matchMedia?.('(max-width: 1024px)').matches === true
+
+    return touch && handheld
+}
+
 export async function checkStorage(): Promise<StorageReport> {
     const writable = await verifyWritable()
     const persisted = await requestPersistence()
@@ -137,12 +162,12 @@ export async function checkStorage(): Promise<StorageReport> {
     if (!writable) {
         risk = 'broken'
         messageKey = 'storage.notWritable'
-    } else if (!persisted && !installed) {
-        risk = 'at-risk'
-        messageKey = 'storage.mayClear'
     } else if (!persisted) {
-        risk = 'at-risk'
-        messageKey = 'storage.notPersisted'
+        // Not persisted is the ordinary state, not a fault. What differs is the
+        // advice: "add to your home screen" is the answer on a phone and
+        // meaningless on a laptop, where there is no home screen to add it to.
+        risk = 'advisory'
+        messageKey = installed || !canInstall() ? 'storage.notPersisted' : 'storage.mayClear'
     }
 
     // Under a megabyte of headroom will not finish an assessment with photos.

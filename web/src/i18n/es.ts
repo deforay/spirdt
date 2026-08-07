@@ -59,9 +59,9 @@ export const messages: Messages = {
     'storage.notWritable':
         'Este dispositivo no está guardando nada. Desactive la navegación privada, o use otro navegador, antes de empezar.',
     'storage.mayClear':
-        'Este navegador puede borrar las evaluaciones guardadas. Añada la aplicación a la pantalla de inicio, y sincronice antes de salir del sitio.',
+        "Su trabajo se guarda en este dispositivo a medida que avanza. Añada la aplicación a la pantalla de inicio para mayor seguridad y sincronice cuando tenga cobertura.",
     'storage.notPersisted':
-        'Las evaluaciones guardadas no están protegidas contra el borrado. Sincronice antes de salir del sitio.',
+        "Su trabajo se guarda en este dispositivo a medida que avanza. Sincronice cuando tenga cobertura para que nada dependa solo de este navegador.",
     'storage.almostFull':
         'Este dispositivo casi no tiene espacio. Libere espacio antes de empezar.',
     'storage.saveFailed':
@@ -127,7 +127,7 @@ export const messages: Messages = {
     'review.points': '{score} de {possible} puntos',
     'review.unanswered': 'Sin responder',
     'review.unansweredNote':
-        'El porcentaje anterior solo cuenta las preguntas respondidas, por lo que es más alto que el de la evaluación terminada.',
+        'Las preguntas sin responder cuentan como cero, por lo que esta cifra sube a medida que se completa la evaluación.',
     'review.gaps': 'Brechas',
     'review.described': '{described} de {total} descritas',
     'review.gapPlaceholder': 'Qué falta o no se está haciendo',

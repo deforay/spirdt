@@ -52,7 +52,11 @@ final readonly class ScoreResult
 
     public function isScorable(): bool
     {
-        return $this->totalPossible > 0;
+        // Tied to the percentage rather than to the denominator. Since an
+        // unanswered question counts against the visit, a form nobody has
+        // opened has a denominator and no score, and those two must not
+        // disagree about whether it is scorable.
+        return $this->percentageScaled !== null;
     }
 
     public function isComplete(): bool

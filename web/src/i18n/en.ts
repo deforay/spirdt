@@ -64,9 +64,9 @@ export const messages = {
     'storage.notWritable':
         'This device is not saving anything. Turn off private browsing, or use a different browser, before you start.',
     'storage.mayClear':
-        'This browser may clear saved assessments. Add the app to your home screen, and sync before you leave the site.',
+        'Your work is saved on this device as you go. Add the app to your home screen to keep it safest, and sync when you have a signal.',
     'storage.notPersisted':
-        'Saved assessments are not protected from being cleared. Sync before you leave the site.',
+        'Your work is saved on this device as you go. Sync when you have a signal so nothing depends on this browser alone.',
     'storage.almostFull': 'This device is almost out of storage. Free up space before you start.',
     'storage.saveFailed':
         'The last answer was not saved to this device. Do not close this page.',
@@ -131,7 +131,7 @@ export const messages = {
     'review.points': '{score} of {possible} points',
     'review.unanswered': 'Unanswered',
     'review.unansweredNote':
-        'The percentage above counts only answered questions, so it reads higher than the finished assessment will.',
+        'Unanswered questions score zero, so this figure rises as the assessment is completed.',
     'review.gaps': 'Gaps',
     'review.described': '{described} of {total} described',
     'review.gapPlaceholder': 'What is missing or not being done',

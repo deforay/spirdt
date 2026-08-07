@@ -62,9 +62,9 @@ export const messages: Messages = {
     'storage.notWritable':
         "Cet appareil n'enregistre rien. Désactivez la navigation privée, ou utilisez un autre navigateur, avant de commencer.",
     'storage.mayClear':
-        "Ce navigateur peut effacer les évaluations enregistrées. Ajoutez l'application à votre écran d'accueil, et synchronisez avant de quitter le site.",
+        "Votre travail est enregistré sur cet appareil au fur et à mesure. Ajoutez l'application à votre écran d'accueil pour plus de sûreté, et synchronisez dès que vous avez du réseau.",
     'storage.notPersisted':
-        "Les évaluations enregistrées ne sont pas protégées contre l'effacement. Synchronisez avant de quitter le site.",
+        "Votre travail est enregistré sur cet appareil au fur et à mesure. Synchronisez dès que vous avez du réseau afin que rien ne dépende de ce seul navigateur.",
     'storage.almostFull':
         "Cet appareil n'a presque plus d'espace de stockage. Libérez de l'espace avant de commencer.",
     'storage.saveFailed':
@@ -130,7 +130,7 @@ export const messages: Messages = {
     'review.points': '{score} sur {possible} points',
     'review.unanswered': 'Sans réponse',
     'review.unansweredNote':
-        "Le pourcentage ci-dessus ne compte que les questions répondues ; il est donc plus élevé que celui de l'évaluation terminée.",
+        "Les questions sans réponse comptent pour zéro : ce chiffre augmente à mesure que l'évaluation est complétée.",
     'review.gaps': 'Écarts',
     'review.described': '{described} sur {total} décrits',
     'review.gapPlaceholder': "Ce qui manque ou n'est pas fait",

@@ -116,7 +116,7 @@ final class SyncEndpointTest extends TestCase
 
         self::assertIsArray($body);
         self::assertSame(4, $body['score']['total_score']);
-        self::assertSame(6, $body['score']['total_possible']);
+        self::assertSame(100, $body['score']['total_possible']);
     }
 
     public function testTheOrganizationComesFromTheTokenNotTheBody(): void

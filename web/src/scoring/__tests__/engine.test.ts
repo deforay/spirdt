@@ -118,13 +118,20 @@ describe('scoring engine', () => {
         expect(result.totalScore, 'the first answer stands; the duplicate is dropped').toBe(8)
     })
 
+    /**
+     * The question stays in the denominator: an unrecognised response leaves
+     * it unanswered, and an unanswered question counts against the visit. That
+     * is the safe direction — the alternative is a payload that scores well by
+     * sending nonsense for everything it would rather not answer.
+     */
     it('refuses a response the template does not define', () => {
         const tpl = template('fixture-custom-bands')
         const result = score(tpl, [{ question_code: '1.1', pathogen: null, response: 'MAYBE' }])
 
         expect(result.isValid).toBe(false)
         expect(result.isComplete).toBe(false)
-        expect(result.totalPossible).toBe(0)
+        expect(result.totalScore, 'nonsense earns no points').toBe(0)
+        expect(result.totalPossible, 'and does not shrink what it is measured against').toBe(8)
     })
 
     it.each([

@@ -1,15 +1,22 @@
 {
     "name": "incomplete-assessment",
-    "why": "Two questions left unanswered and everything else Yes. The running total reads 100% because an unanswered question is in neither the numerator nor the denominator — which is correct for the score the assessor watches mid-visit, and catastrophic if it reaches a certificate. This case exists to pin the thing that stops it: the two questions are reported missing and is_complete is false, and the submission endpoint refuses on that rather than on the percentage looking implausible.",
+    "why": "Two questions left unanswered and everything else Yes. An expected question with no answer scores nothing and stays in the denominator, so the running total reads 96% rather than 100% — a half-finished assessment reads as half-finished rather than as a high score over a small sample, and the figure climbs towards the real one as the visit proceeds. Not applicable is still excluded from both sides, because that is the assessor saying the question does not apply and silence is not that statement. The two questions are still reported missing and is_complete is still false: the submission endpoint refuses on that, never on the percentage looking implausible.",
     "template": "spi-rdt-1.0.0",
-    "context": { "refers_specimens": "no" },
-    "pathogens": ["hiv"],
+    "context": {
+        "refers_specimens": "no"
+    },
+    "pathogens": [
+        "hiv"
+    ],
     "default_response": "Y",
-    "omit": ["2.1", "2.2"],
+    "omit": [
+        "2.1",
+        "2.2"
+    ],
     "expect": {
         "total_score": 96,
-        "total_possible": 96,
-        "percentage": 100.0,
+        "total_possible": 100,
+        "percentage": 96.0,
         "level": 4,
         "is_scorable": true,
         "is_complete": false,
@@ -17,7 +24,13 @@
         "missing_count": 2,
         "unexpected_count": 0,
         "sections": {
-            "2": { "score": 16, "possible": 16, "answered": 8, "excluded": 0, "applicable": true }
+            "2": {
+                "score": 16,
+                "possible": 20,
+                "answered": 8,
+                "excluded": 0,
+                "applicable": true
+            }
         }
     }
 }

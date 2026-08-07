@@ -118,7 +118,15 @@ final class ScoringEngineTest extends TestCase
 
     /**
      * A response outside the template's set — a newer app version, a corrupted
-     * payload — must not be scored as anything, least of all as a zero.
+     * payload — earns nothing and does not make the assessment submittable.
+     *
+     * The question stays in the denominator, because an unrecognised response
+     * leaves it unanswered and an unanswered question is counted against the
+     * visit. That is the safe direction: the alternative is a payload that
+     * scores well by sending nonsense for everything it would rather not
+     * answer. What actually stops it reaching a certificate is that the
+     * assessment is neither valid nor complete, and the submission endpoint
+     * refuses on both.
      */
     public function testUnrecognisedResponseIsRejected(): void
     {
@@ -130,7 +138,8 @@ final class ScoringEngineTest extends TestCase
 
         self::assertFalse($result->isValid());
         self::assertFalse($result->isComplete());
-        self::assertSame(0, $result->totalPossible);
+        self::assertSame(0, $result->totalScore, 'nonsense earns no points');
+        self::assertSame(8, $result->totalPossible, 'and does not shrink what it is measured against');
     }
 
     /**

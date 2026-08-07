@@ -102,9 +102,12 @@ final class SyncServiceTest extends TestCase
         $score = AssessmentScore::query()->first();
         self::assertNotNull($score);
         self::assertSame(2, (int) $score->pathogen_count);
-        // 3.1 Yes and 3.2 No, plus 4.1 Yes for one pathogen: 4 of 6.
+        // 3.1 Yes and 3.2 No, plus 4.1 Yes for one pathogen, earning 4.
+        // The denominator is the WHOLE instrument for two pathogens, because
+        // an unanswered question counts against the visit rather than
+        // shrinking what it is measured against.
         self::assertSame(4, (int) $score->total_score);
-        self::assertSame(6, (int) $score->total_possible);
+        self::assertSame(146, (int) $score->total_possible);
         self::assertFalse($result['score']['is_complete'], 'a partial visit is not complete');
     }
 
@@ -495,7 +498,7 @@ final class SyncServiceTest extends TestCase
 
         self::assertSame(3, Answer::query()->count(), 'corrected, not duplicated');
         self::assertSame(6, $second['score']['total_score']);
-        self::assertSame(6, $second['score']['total_possible']);
+        self::assertSame(146, $second['score']['total_possible']);
     }
 
     public function testNotApplicableLeavesTheDenominator(): void
@@ -503,12 +506,27 @@ final class SyncServiceTest extends TestCase
         $sync = new SyncService();
         $payload = $this->payload();
 
+        // The same visit with 3.9 left unanswered, to measure against.
+        $before = $sync->accept($payload);
+
         // 3.9 permits Not applicable; it must not be scored as a zero.
         $payload['answers'][] = ['question_code' => '3.9', 'response' => 'NA', 'comment' => 'No requirement.'];
         $result = $sync->accept($payload);
 
-        self::assertSame(4, $result['score']['total_score']);
-        self::assertSame(6, $result['score']['total_possible'], 'NA adds nothing to either side');
+        self::assertSame(4, $result['score']['total_score'], 'NA earns nothing');
+
+        // And it TAKES the question out of the denominator, which is not the
+        // same as leaving it blank. Blank counts against the visit; Not
+        // applicable says the question does not apply here and removes it.
+        //
+        // That difference is exactly why na_allowed exists on five questions
+        // and not fifty-nine. A site that could answer NA freely could
+        // certify by declaring the hard questions inapplicable.
+        self::assertSame(
+            $before['score']['total_possible'] - 2,
+            $result['score']['total_possible'],
+            'NA narrows the denominator; an unanswered question does not',
+        );
     }
 
     public function testAnotherOrganizationCannotSeeTheAssessment(): void
@@ -561,7 +579,7 @@ final class SyncServiceTest extends TestCase
         $result = (new SyncService())->accept($payload);
 
         self::assertSame(3, Answer::query()->count(), 'the undeclared pathogen answer is not stored');
-        self::assertSame(6, $result['score']['total_possible']);
+        self::assertSame(146, $result['score']['total_possible']);
     }
 
     /** @return array<string,mixed> */

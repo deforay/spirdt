@@ -152,7 +152,9 @@ final class ReportsTest extends TestCase
         self::assertSame('Copperbelt › Kitwe', $row['place']);
         self::assertSame('2026-08-05', $row['assessed_on']);
         self::assertSame(4, $row['total_score']);
-        self::assertSame(6, $row['total_possible']);
+        // The whole instrument for one pathogen: an unanswered question
+        // counts against the visit rather than shrinking the denominator.
+        self::assertSame(100, $row['total_possible']);
     }
 
     /**
@@ -230,12 +232,13 @@ final class ReportsTest extends TestCase
 
         self::assertTrue($report['score']['scored']);
         self::assertSame(4, $report['score']['total_score']);
-        self::assertSame(6, $report['score']['total_possible']);
+        self::assertSame(100, $report['score']['total_possible']);
 
-        // Read from the template's bands rather than from a constant, so a
+        // Three answers out of the whole instrument is 4%, which is Level 0.
+        // The band is read from the template rather than from a constant, so a
         // country that moves its thresholds moves this with them.
-        self::assertSame('Level 2', $report['score']['band']['label']);
-        self::assertSame(2, $report['score']['level']);
+        self::assertSame('Level 0', $report['score']['band']['label']);
+        self::assertSame(0, $report['score']['level']);
     }
 
     /**

@@ -22,6 +22,11 @@ namespace App\Scoring;
  *     value to the possible total.
  *   - NA is excluded from BOTH numerator and denominator. It is not a zero.
  *     A section of ten questions with one NA is scored out of 18, not 20.
+ *   - An UNANSWERED question is the opposite of NA: it scores zero and stays
+ *     in the denominator, so a half-finished visit reads as half-finished
+ *     rather than as a high score over a small sample. A finished assessment
+ *     is unaffected, because with nothing missing the two agree exactly.
+ *     This is also what stops silence being the cheap way to certify.
  *   - Section 4 repeats per pathogen, so the possible total scales with how
  *     many pathogens were assessed.
  *   - An optional section whose applicability field is false contributes
@@ -31,9 +36,12 @@ namespace App\Scoring;
  * Three things are reported rather than scored, and each is a hazard that
  * silently inflates a percentage if handled any other way:
  *
- *   missing     Expected but unanswered. NOT counted in the denominator, so a
- *               half-finished assessment of all Y would otherwise read 100%.
- *               ScoreResult::isComplete() is what stops that being submitted.
+ *   missing     Expected but unanswered. Scored as zero and counted in the
+ *               denominator, so the percentage does not flatter an unfinished
+ *               visit — but still reported, because a zero from silence and a
+ *               zero from a recorded No are different facts and only one of
+ *               them is an assessment. ScoreResult::isComplete() is what stops
+ *               the former being submitted.
  *   unexpected  An answer to a question the template does not expect here — a
  *               retired question code, a pathogen that was removed, a Section 5
  *               answer left behind when the site was marked as referring
@@ -124,21 +132,52 @@ final class ScoringEngine
         foreach ($this->expectedQuestions($template, $context, $pathogens) as $question) {
             $key = $question->key();
 
+            // Held as a local: the narrowing survives the early exits below,
+            // where a property access is re-widened at each one.
+            $pathogen = $question->pathogen;
+
+            if (!isset($sections[$question->sectionCode])) {
+                if (!isset($byKey[$key])) {
+                    $missing[] = $key;
+                }
+
+                continue;
+            }
+
+            if ($pathogen !== null) {
+                // ??= rather than a guarded assignment: it states in one place
+                // that the tally exists from here on, which is what lets the
+                // increments below be read without re-proving it at each early
+                // exit.
+                $byPathogen[$pathogen] ??= ['key' => $pathogen, 'score' => 0, 'possible' => 0, 'answered' => 0, 'excluded' => 0];
+            }
+
+            // An expected question with no answer scores nothing and still
+            // counts. The denominator is every question the visit is expected
+            // to answer, so a half-finished assessment reads as half-finished
+            // rather than as a high score over a small sample.
+            //
+            // The finished score is unaffected: with nothing missing, the two
+            // ways of counting agree exactly. This changes what an INCOMPLETE
+            // assessment reads as, and nothing else.
+            //
+            // Not applicable is still excluded from both sides. That is the
+            // assessor saying the question does not apply here, and silence is
+            // not that statement.
             if (!isset($byKey[$key])) {
                 $missing[] = $key;
+
+                $sections[$question->sectionCode]['possible'] += $maxPoints;
+
+                if ($pathogen !== null) {
+                    $byPathogen[$pathogen]['possible'] += $maxPoints;
+                }
+
                 continue;
             }
 
             $consumed[$key] = true;
             $response       = $byKey[$key];
-
-            if (!isset($sections[$question->sectionCode])) {
-                continue;
-            }
-
-            if ($question->pathogen !== null && !isset($byPathogen[$question->pathogen])) {
-                $byPathogen[$question->pathogen] = ['key' => $question->pathogen, 'score' => 0, 'possible' => 0, 'answered' => 0, 'excluded' => 0];
-            }
 
             if (in_array($response->value, $excluded, true)) {
                 if (!$question->naAllowed) {
@@ -151,8 +190,8 @@ final class ScoringEngine
 
                 ++$sections[$question->sectionCode]['excluded'];
 
-                if ($question->pathogen !== null) {
-                    ++$byPathogen[$question->pathogen]['excluded'];
+                if ($pathogen !== null) {
+                    ++$byPathogen[$pathogen]['excluded'];
                 }
 
                 continue;
@@ -164,10 +203,10 @@ final class ScoringEngine
             $sections[$question->sectionCode]['possible'] += $maxPoints;
             ++$sections[$question->sectionCode]['answered'];
 
-            if ($question->pathogen !== null) {
-                $byPathogen[$question->pathogen]['score']    += $earned;
-                $byPathogen[$question->pathogen]['possible'] += $maxPoints;
-                ++$byPathogen[$question->pathogen]['answered'];
+            if ($pathogen !== null) {
+                $byPathogen[$pathogen]['score']    += $earned;
+                $byPathogen[$pathogen]['possible'] += $maxPoints;
+                ++$byPathogen[$pathogen]['answered'];
             }
         }
 
@@ -185,7 +224,20 @@ final class ScoringEngine
             $totalPossible += $tally['possible'];
         }
 
-        $scaled = Percentage::scaled($totalScore, $totalPossible, $roundDp);
+        // Nothing answered is not the same as everything wrong. Unanswered
+        // questions are in the denominator now, so a visit nobody has touched
+        // would otherwise divide zero by the whole instrument and report 0% —
+        // which in a list of sites reads as a catastrophic result rather than
+        // a form somebody has not started.
+        $responded = false;
+        foreach ($sections as $tally) {
+            if ($tally['answered'] > 0 || $tally['excluded'] > 0) {
+                $responded = true;
+                break;
+            }
+        }
+
+        $scaled = $responded ? Percentage::scaled($totalScore, $totalPossible, $roundDp) : null;
 
         return new ScoreResult(
             totalScore: $totalScore,
