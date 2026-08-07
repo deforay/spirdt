@@ -206,6 +206,7 @@ export const messages = {
     'locale.instrumentNote':
         'The checklist itself stays in its published language until the instrument is translated.',
 
+    'account.changePassword': 'Change password',
     'admin.users': 'People',
     'admin.usersSubtitle': 'Who can sign in, and as what.',
     'admin.signOut': 'Sign out',

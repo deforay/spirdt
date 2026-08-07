@@ -204,6 +204,7 @@ export const messages: Messages = {
     'locale.instrumentNote':
         'A lista em si permanece no idioma em que foi publicada até o instrumento ser traduzido.',
 
+    'account.changePassword': 'Alterar palavra-passe',
     'admin.users': 'Pessoas',
     'admin.usersSubtitle': 'Quem pode iniciar sessão, e como.',
     'admin.signOut': 'Terminar sessão',

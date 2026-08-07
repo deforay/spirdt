@@ -155,6 +155,33 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/OrganizationFormView.vue'),
         meta: { roles: ['superadmin'] },
     },
+
+    // /admin is not a screen — the management pages all live beneath it — but
+    // it is the address somebody types. Without this it matched nothing and
+    // rendered nothing: a blank page with no navigation on it, and no way back
+    // except knowing another URL.
+    {
+        path: '/admin',
+        redirect: { name: 'admin-reports' },
+    },
+
+    /**
+     * Anything else.
+     *
+     * A single-page app answers every path with itself, so a mistyped or
+     * retired URL reaches the router rather than the web server, and a router
+     * with no match for it renders an empty document. Nothing on that page
+     * says what happened and nothing on it leads anywhere.
+     *
+     * Sent home rather than shown an error, because home already knows where
+     * this person belongs: an assessor lands on their site list and a manager
+     * on the reports. A dead end is worse than a redirect that is occasionally
+     * more decisive than the reader expected.
+     */
+    {
+        path: '/:pathMatch(.*)*',
+        redirect: { name: 'home' },
+    },
 ]
 
 export const router = createRouter({

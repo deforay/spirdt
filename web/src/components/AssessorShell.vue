@@ -1,0 +1,131 @@
+<script setup lang="ts">
+import { PhCaretDown, PhKey, PhSignOut } from '@phosphor-icons/vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+
+import { signOut } from '@/auth/login'
+import { session } from '@/auth/session'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
+import SyncBadge from '@/components/SyncBadge.vue'
+import { t } from '@/i18n'
+import { syncAll } from '@/sync/engine'
+
+/**
+ * The frame around every assessor screen.
+ *
+ * The management side has had one since the beginning; the assessor side had
+ * none, and the cost was not cosmetic. Signing out lived only on the admin
+ * shell, so an assessor could not leave at all — on a shared tablet the next
+ * person to pick it up was signed in as the last, and every visit they
+ * recorded was filed against that name.
+ *
+ * It also gives the identity somewhere to live. An application whose output is
+ * a record of who assessed what should say who it thinks you are, on the
+ * screen, without being asked.
+ *
+ * Deliberately slim. This sits above a fifty-nine question form worked
+ * standing up, and every row it takes is a row of questions somebody has to
+ * scroll past. Brand, sync state, language, and a menu — nothing else earns
+ * the height.
+ *
+ * The sync badge and the language switcher moved here from the screens below.
+ * They were repeated on three of them and absent from the fourth, which is
+ * what a shell is for.
+ */
+
+const emit = defineEmits<{ changePassword: [] }>()
+
+const open = ref(false)
+
+const user = computed(() => session.value?.user ?? null)
+
+async function onSignOut(): Promise<void> {
+    open.value = false
+    await signOut(session.value?.refreshToken ?? null)
+}
+
+function onChangePassword(): void {
+    open.value = false
+    emit('changePassword')
+}
+
+/**
+ * Close on any click that is not inside the menu.
+ *
+ * A menu that stays open behind the next tap is a menu whose Sign out gets
+ * pressed by somebody reaching for a question underneath it.
+ */
+const root = ref<HTMLElement | null>(null)
+
+function onDocumentClick(event: MouseEvent): void {
+    if (open.value && root.value !== null && !root.value.contains(event.target as Node)) {
+        open.value = false
+    }
+}
+
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
+</script>
+
+<template>
+    <div class="flex min-h-screen flex-col bg-ground">
+        <header class="border-b border-hairline bg-surface">
+            <div class="mx-auto flex w-full max-w-[1040px] items-center gap-3 px-4 py-2 sm:px-6">
+                <span class="text-[15px] font-bold tracking-tight">SPI-RDT</span>
+
+                <span class="flex-1"></span>
+
+                <SyncBadge @retry="syncAll()" />
+                <LocaleSwitcher />
+
+                <div ref="root" class="relative">
+                    <button
+                        type="button"
+                        class="flex min-h-11 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
+                        :aria-expanded="open"
+                        aria-haspopup="menu"
+                        @click="open = !open"
+                    >
+                        <!-- The name is the point of showing anything here, so
+                             it is what survives when the screen is narrow. -->
+                        <span class="max-w-[9rem] truncate">{{ user?.fullName }}</span>
+                        <PhCaretDown :size="13" class="shrink-0" aria-hidden="true" />
+                    </button>
+
+                    <div
+                        v-if="open"
+                        role="menu"
+                        class="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-surface bg-surface shadow-surface"
+                    >
+                        <p class="truncate px-3.5 pb-1 pt-3 text-[13px] text-label-3">
+                            {{ user?.email }}
+                        </p>
+
+                        <button
+                            type="button"
+                            role="menuitem"
+                            class="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[15px]"
+                            @click="onChangePassword"
+                        >
+                            <PhKey :size="16" class="shrink-0 text-label-3" aria-hidden="true" />
+                            {{ t('account.changePassword') }}
+                        </button>
+
+                        <button
+                            type="button"
+                            role="menuitem"
+                            class="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left text-[15px] text-no"
+                            @click="onSignOut"
+                        >
+                            <PhSignOut :size="16" class="shrink-0" aria-hidden="true" />
+                            {{ t('admin.signOut') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex min-h-0 flex-1 flex-col">
+            <slot />
+        </div>
+    </div>
+</template>

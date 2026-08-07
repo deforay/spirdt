@@ -6,14 +6,14 @@ import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 
 import type { Site } from '@/api/sites'
 import { session } from '@/auth/session'
+import AssessorShell from '@/components/AssessorShell.vue'
+import ChangePassword from '@/components/ChangePassword.vue'
 import ContextForm from '@/components/ContextForm.vue'
-import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
 import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
 import StorageNotice from '@/components/StorageNotice.vue'
-import SyncBadge from '@/components/SyncBadge.vue'
 import { useAssessment } from '@/composables/useAssessment'
 import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
@@ -21,7 +21,7 @@ import { formatPercent, formatTime, locale, t, text } from '@/i18n'
 import { expectedQuestions } from '@/scoring/engine'
 import { validateContext } from '@/validation/context'
 import type { Context, ResponseCode, Template } from '@/scoring/types'
-import { startSync, syncAll } from '@/sync/engine'
+import { startSync } from '@/sync/engine'
 import { useRoute, useRouter } from 'vue-router'
 
 /**
@@ -49,6 +49,15 @@ const activeSection = ref(template.sections[0]?.code ?? '1')
 const activePathogen = ref<string | null>(null)
 const submitting = ref(false)
 const submitError = ref('')
+
+/**
+ * Changing a password on purpose, rather than because the server insisted.
+ *
+ * The same screen serves both. App.vue shows it when must_change_password is
+ * set and there is no way past it; here it is opened from the account menu and
+ * can be closed again, which is the difference between a gate and a setting.
+ */
+const changingPassword = ref(false)
 
 
 /** Part A fields whose value decides whether a section applies. */
@@ -519,7 +528,10 @@ async function onSubmit() {
 </script>
 
 <template>
-    <SitePicker v-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
+  <AssessorShell @change-password="changingPassword = true">
+    <ChangePassword v-if="changingPassword" @changed="changingPassword = false" />
+
+    <SitePicker v-else-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
 
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
@@ -544,7 +556,6 @@ async function onSubmit() {
                     {{ t('locale.instrumentNote') }}
                 </p>
             </div>
-            <div class="mt-1"><LocaleSwitcher /></div>
         </header>
 
         <!--
@@ -658,8 +669,6 @@ async function onSubmit() {
                         {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
                     </span>
                 </button>
-                <LocaleSwitcher />
-                <SyncBadge @retry="syncAll()" />
             </div>
             <h1 class="text-[30px] font-bold tracking-tight">{{ text(section.title) }}</h1>
             <span class="tnum text-[13px] text-label-2">
@@ -936,4 +945,5 @@ async function onSubmit() {
             </div>
         </footer>
     </div>
+  </AssessorShell>
 </template>

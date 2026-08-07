@@ -206,6 +206,7 @@ export const messages: Messages = {
     'locale.instrumentNote':
         "La liste elle-même reste dans sa langue de publication tant que l'instrument n'est pas traduit.",
 
+    'account.changePassword': 'Changer le mot de passe',
     'admin.users': 'Personnes',
     'admin.usersSubtitle': 'Qui peut se connecter, et à quel titre.',
     'admin.signOut': 'Se déconnecter',

@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { PhArrowRight, PhSignOut } from '@phosphor-icons/vue'
+import { PhArrowRight } from '@phosphor-icons/vue'
 
 import { cachedSites, fetchSites, type Site } from '@/api/sites'
-import { signOut } from '@/auth/login'
-import { session } from '@/auth/session'
-import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import { formatDate, t } from '@/i18n'
 
 /** An unfinished visit, as this screen needs to describe it. */
@@ -50,23 +47,6 @@ const props = defineProps<{ drafts?: DraftSummary[] }>()
 const emit = defineEmits<{ chosen: [site: Site]; resume: [id: string] }>()
 
 const drafts = computed(() => props.drafts ?? [])
-
-/**
- * The way out.
- *
- * Signing out existed only on the management shell, so an assessor could not
- * leave at all — the app opened on this screen, kept the session in
- * localStorage, and offered nothing that ended it. On a shared tablet that is
- * not an inconvenience: the next person to pick it up is signed in as the last
- * one, and every visit they record is filed against that name.
- *
- * Here rather than mid-visit, because this is the screen somebody is on when
- * they have finished — and a sign-out button next to a half-answered checklist
- * is a button that gets pressed by mistake.
- */
-async function onSignOut(): Promise<void> {
-    await signOut(session.value?.refreshToken ?? null)
-}
 
 const sites = ref<Site[]>(cachedSites())
 const filter = ref('')
@@ -114,17 +94,6 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
             <div>
                 <h1 class="text-[30px] font-bold tracking-tight">{{ t('sites.title') }}</h1>
                 <p class="mt-0.5 text-[13px] text-label-2">{{ t('sites.subtitle') }}</p>
-            </div>
-            <div class="mt-1.5 flex shrink-0 items-center gap-2">
-                <LocaleSwitcher />
-                <button
-                    type="button"
-                    class="flex min-h-11 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
-                    @click="onSignOut"
-                >
-                    <PhSignOut :size="15" aria-hidden="true" />
-                    <span>{{ t('admin.signOut') }}</span>
-                </button>
             </div>
         </header>
 
