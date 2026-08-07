@@ -113,13 +113,19 @@ without that, a second gap raised on a question could land on top of the first.
 `0.1.12` adds the column. All of it is a bridge, and worth deleting once no
 device can still be on version 4.
 
-### Responsive layout
-Every screen is `max-w-[430px]` — right for a phone in one hand, wrong on the
-laptops and tablets assessors also use. Deferred deliberately ("form design is
-something that we can address any time"). When it happens: section rail instead
-of a pill row at ≥768px, two columns on setup and review above ~900px, a
-signature pad that grows with its container, and **no shrinking of touch
-targets** — mouse users tolerate large ones, fingers do not tolerate small ones.
+### Responsive layout — assessor app done, admin outstanding
+The assessor screens were every one of them `max-w-[430px]`. They now widen: a
+section rail with the titles restored at ≥768px, setup in two columns, review
+split at ≥900px with the summary sticky beside the gaps. Touch targets do not
+shrink anywhere — width buys information, not density. Surfaces took a 20px
+radius against the 11px kept on controls, and the response control gained a
+mark beside each word, because Yes/Partial/No were separated by colour alone.
+See [Design](design.md).
+
+**The admin side has not had this pass.** It was already `max-w-[1100px]`, so it
+is not broken at width, but it has none of the icons and none of the surface
+treatment, and the two halves of the app now disagree about what a screen looks
+like.
 
 ## Not yet designed
 
@@ -140,6 +146,13 @@ targets** — mouse users tolerate large ones, fingers do not tolerate small one
 - **`bin/housekeeping`** and OpenAPI generation.
 - **Component tests** for the Vue side — there is no jsdom environment yet, so
   every frontend test today is logic rather than rendering.
+- **Error pages.** Two gaps, not one. The API answering `/api/*` with JSON is
+  correct and stays. But an error raised *before* PHP — a bad rewrite, a
+  missing document root, a web server refusing a request — is served by Apache
+  as its own bare page, unstyled and unlogged, because nothing in the
+  application ever sees it. That wants `ErrorDocument`. Separately the app
+  itself has no not-found screen: an unknown path serves `index.html` and the
+  router shows whatever an unmatched route shows, which nobody has looked at.
 
 ## Open questions for the client
 
@@ -161,6 +174,28 @@ targets** — mouse users tolerate large ones, fingers do not tolerate small one
 - **Non-English wording is unreviewed.** French, Portuguese and Spanish were
   written in one pass and no native speaker has read them. One file each, about
   90 lines. See `docs/i18n.md`.
+- **A backup can be empty and still report success.** `composer db:backup`
+  printed `✓ Backup created` and wrote a 13-byte archive containing nothing.
+  Two causes, both found on 2026-08-07. MySQL 8's `mysqldump` reads tablespaces
+  and needs the global `PROCESS` privilege, which an app user granted `ALL ON
+  spirdt.*` does not have — it then errors and **exits 0**. And db-tools passes
+  the password through `MYSQL_PWD`, which is the *lowest* precedence MySQL
+  recognises, below option files: a `~/.my.cnf` carrying another user's
+  credentials silently wins, and the dump authenticates as the wrong account.
+  The application itself is unaffected — it connects over PDO with mysqlnd,
+  which reads no option files — so this reaches only the tooling that shells
+  out to the client binary. The fix on our side is to stop relying on
+  precedence and pass the application's own configuration explicitly:
+  `--no-defaults` plus credentials, so nothing on the host can override what
+  the project intends. Until then `bin/upgrade`'s promise to abort on a failed
+  backup does not hold, because this failure succeeds. See
+  [Operations](operations.md).
+- **Cross-origin is unfinished, not merely unconfigured.** `CorsMiddleware`
+  matches an allow-list, but no route answers `OPTIONS`, so a preflighted
+  request dies at Slim's 405 before the middleware can help. Nothing needs it
+  today — every supported setup is same-origin, and the Vite dev server proxies
+  rather than calling across — which is exactly why it would be discovered late
+  by whoever first splits the app onto its own host.
 - **Server error messages are English only.** The API returns wording rather
   than keys and has no notion of the caller's language, so sign-in and sync
   failures ignore the language switch.

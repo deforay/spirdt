@@ -16,6 +16,37 @@ db-tools does considerably more than dump:
 vendor/bin/db-tools list       # restore, verify, pitr, export, import, size, clean
 ```
 
+!!! danger "Check the size. A backup can be empty and still report success"
+    On 2026-08-07 `composer db:backup` printed `✓ Backup created` and wrote a
+    13-byte archive containing nothing at all. The dump had failed.
+
+    The cause is a privilege, not a bug in the dump: MySQL 8's `mysqldump`
+    reads `INFORMATION_SCHEMA.FILES` to record tablespaces, and that needs the
+    **global `PROCESS`** privilege. An application user granted `ALL ON
+    spirdt.*` does not have it. `mysqldump` then errors — and exits `0`, so
+    nothing downstream can tell.
+
+    Grant it wherever the app user was created:
+
+    ```sql
+    GRANT PROCESS ON *.* TO 'spirdt'@'127.0.0.1';
+    FLUSH PRIVILEGES;
+    ```
+
+    Read the consequence in full, because it is the part that matters: the
+    upgrade path below promises to abort if the backup fails. It cannot. A
+    backup that fails *this* way succeeds, so the guard never fires and the
+    migration proceeds with no restore point. **Verify the archive is a
+    plausible size before trusting an upgrade to it**, until db-tools refuses
+    to write an empty dump:
+
+    ```bash
+    zstd -dc var/backups/db/<archive>.sql.zst | wc -c
+    ```
+
+    This is the second failure of the same shape — see the encryption note
+    below. The pattern is what to watch for, not the individual cause.
+
 !!! warning "Backups are currently unencrypted"
     db-tools encrypts by default, but supplying an encryption password currently produces **no archive at all** while still exiting 0. `--no-encrypt` is therefore passed explicitly — a backup step that silently writes nothing is far worse than an unencrypted one.
 
@@ -51,6 +82,8 @@ Five steps:
 Two design points worth understanding:
 
 **The backup is not optional.** If it fails, the upgrade stops before anything else changes. An upgrade with no restore point is how a bad migration becomes an incident rather than an inconvenience. `--skip-backup` exists for when one was just taken by other means.
+
+That guard is only as good as what "fails" means, and twice now db-tools has written nothing while exiting `0` — see the warnings under [Backups](#backups). The step stops an upgrade that *errors*, not one that produces an empty archive. Until the tool distinguishes the two, check the size of the archive before relying on it.
 
 **Migrations run unconditionally**, unlike in `bin/refresh`. A previously failed run can leave pending work that the current pull's diff says nothing about, so gating on the diff would skip it.
 

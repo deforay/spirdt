@@ -59,6 +59,11 @@ CREATE DATABASE IF NOT EXISTS spirdt_test CHARACTER SET utf8mb4 COLLATE utf8mb4_
 CREATE USER IF NOT EXISTS 'spirdt'@'127.0.0.1' IDENTIFIED BY 'spirdt';
 GRANT ALL PRIVILEGES ON spirdt.*      TO 'spirdt'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON spirdt_test.* TO 'spirdt'@'127.0.0.1';
+-- Global, and not an oversight. mysqldump reads INFORMATION_SCHEMA.FILES to
+-- record tablespaces, which needs PROCESS across the server rather than on one
+-- schema. Without it every backup is EMPTY and still reports success — see
+-- docs/operations.md.
+GRANT PROCESS ON *.* TO 'spirdt'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL
 ```
