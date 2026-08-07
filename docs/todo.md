@@ -48,23 +48,22 @@ needs its own settings screen, whether organisations need types (ministry
 versus partner), and **whether organisation A may see organisation B's score on
 a site they both audit** — today, no.
 
-### Permissions — the gate is in place, the screen to change them is not
+### Permissions — done for the five system roles
 Routes require a capability rather than a role name, `role_permissions` is
-seeded for every role, and the sign-in response carries what the account holds
-so the navigation matches what the API will allow. See the permission model in
-[architecture](architecture.md#roles).
+seeded for every role, the sign-in response carries what the account holds so
+the navigation matches what the API will allow, and `/admin/roles` edits the
+grants. See the permission model in [architecture](architecture.md#permissions).
 
-What is missing is the way to edit a grant without SQL. The layer is only worth
-having if an organisation can move a permission — until then the defaults are
-the whole of it, and the honest description is that the shape changed rather
-than the behaviour.
+Escalation is bounded by three guards in `RoleAdminService`: nobody grants what
+they do not hold, nobody edits a role that outranks theirs, nobody takes
+`roles.manage` off their own role.
 
-The screen is small: the roles of one organisation, a checkbox per permission,
-`is_system` roles editable but undeletable. Two things need deciding before it
-is built. Whether an administrator may grant `users.manage` — which is the
-right to hand out their own job, and the same escalation the create-a-superadmin
-guard already refuses. And whether custom roles are in scope at all, or whether
-an organisation only ever re-shapes the five it has.
+**Custom roles are not in scope and that was a decision, not an omission.** An
+organisation reshapes the five it has. Adding a sixth means naming it, deciding
+where it ranks against `admin` and `superadmin` — the rank table is what stops
+an administrator editing their way upward — and answering what happens to the
+people holding it when it is deleted. None of that is hard, and none of it
+should be settled by whoever needs one role in a hurry.
 
 Two things still gate on the role's name and are correct to: `TenantContext`
 decides cross-scope reads from admin-or-superadmin, which is tenancy rather

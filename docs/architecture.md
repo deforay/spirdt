@@ -50,17 +50,38 @@ Discipline is not a control, so the isolation is structural:
 
 Two hard rules: an organisation superadmin cannot escalate to platform admin, and cannot see another organisation.
 
-**Routes gate on permissions, not on role names.** Each role holds a set of keys in `role_permissions` — `assessments.submit`, `registry.read`, `registry.write`, `assignments.write`, `reports.read`, `users.manage`, `organizations.manage` — and every route group requires one of them. The role table above describes what those grants add up to by default; it is not what the code compares against.
-
-The difference matters when an organisation wants something the five roles do not express. Naming roles in routes means a new capability is a new role, and every route that should have included it has to be found and edited. Naming the capability means the grant moves and the routes never change.
-
-Grants are read from the database on every authenticated request, alongside the account's active flag and its role. A permission withdrawn is withdrawn on the next request, not when the access token expires. There is no fallback to the defaults when a role holds nothing: a role with no rows reaches nothing, so that revoking the last permission means what it says rather than restoring every permission the role ever had.
-
-The sign-in response carries the list so the management app can hide a link it would only be refused on. That is a description of what will happen, never the thing that decides it.
-
 Role alone is insufficient — a user has an organisation **and** a geographic scope. A district viewer sees one district of one organisation.
 
 Platform admins live in a **separate table** from users, not as a flag. That makes "platform admin cannot read assessment data" structural rather than a permission check someone can get wrong: they hold no `organization_id`, so the tenant scope has nothing to resolve. It also keeps `users.organization_id` `NOT NULL` — the one column the whole isolation model rests on.
+
+### Permissions
+
+**Routes gate on permissions, not on role names.** Each role holds a set of keys in `role_permissions`, and every route group requires one of them. The role table above describes what those grants add up to by default. It is not what the code compares against, and `/admin/roles` changes it.
+
+| Permission | Allows |
+|---|---|
+| `assessments.submit` | File an assessment against a testing site |
+| `registry.read` | Look up places, facilities, testing sites, and who covers them |
+| `registry.write` | Add and correct those records, including merging duplicates |
+| `assignments.write` | Decide which assessor covers which place |
+| `reports.read` | Read collected assessments and their scores |
+| `users.manage` | Create accounts, change roles, reset passwords, deactivate |
+| `roles.manage` | Change what a role may do |
+| `organizations.manage` | Add organisations to the programme |
+
+The difference matters when an organisation wants something the five roles do not express. Naming roles in routes makes a new capability a new role, and every route that should have included it has to be found and edited. Naming the capability moves the grant and leaves the routes alone.
+
+Grants are read from the database on every authenticated request, alongside the account's active flag and its role. A permission withdrawn is withdrawn on the next request, not when the access token expires.
+
+A role holding no rows reaches nothing. There is no fallback to the defaults, so revoking the last permission means what it says rather than restoring every permission the role ever had.
+
+The sign-in response carries the list so the management app can hide a link it would only be refused on. That is a description of what will happen, never the thing that decides it.
+
+`roles.manage` is the one permission that can be used to obtain the others, so editing grants is bounded by three rules:
+
+1. Nobody may grant a permission they do not hold. Permissions in an organisation can be redistributed, never enlarged from below.
+2. Nobody may edit a role that outranks their own. This is the rule user administration already applies to people.
+3. Nobody may remove `roles.manage` from their own role. Every other removal is reversible by the person who made it. That one is not.
 
 ## Offline and sync
 
