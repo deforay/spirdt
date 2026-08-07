@@ -58,6 +58,19 @@ export interface StoredAssessment {
     status: 'draft' | 'complete' | 'submitted'
     startedAt: string
     updatedAt: string
+    /**
+     * Where the assessor was when the visit started, if the device would say.
+     *
+     * Always optional and never waited on. A visit refused for want of a
+     * satellite fix is a visit that does not happen, and the assessor is
+     * standing in the laboratory either way. The server falls back to the
+     * facility's own coordinates when this is absent, and records which of the
+     * two a row came from.
+     */
+    latitude?: number | null
+    longitude?: number | null
+    accuracyM?: number | null
+    locatedAt?: string | null
     /** Set when the server has acknowledged this assessment. */
     syncedAt: string | null
     syncState: SyncState

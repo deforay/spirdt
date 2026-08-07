@@ -130,6 +130,8 @@ final class SyncService
             'app_version'      => $payload['app_version'] ?? null,
         ];
 
+        $attributes += $this->locationOf($payload, $assessment);
+
         // Stamped once, when the visit is actually submitted. Re-stamping on
         // every retry would make the audit trail say the visit was submitted
         // whenever the device last had a signal.
@@ -548,6 +550,91 @@ final class SyncService
             'missing_notes'  => $result->missingNotes,
             'violations'     => $result->violations,
         ];
+    }
+
+    /**
+     * Where the visit happened, and which of two answers that is.
+     *
+     * A reading from the device is what the predecessor collected and what a
+     * map wants: it says where the assessor was standing, which is evidence of
+     * the visit. It is often impossible — indoors, in a basement, on a laptop,
+     * or where permission was refused — and a map with holes in it is less
+     * useful than one falling back to the registry.
+     *
+     * So the facility's own coordinates are the fallback, and location_source
+     * records which was used. What the fallback must never do is pass as the
+     * other: an analysis of where assessors actually went has to be able to
+     * exclude the inherited ones.
+     *
+     * A payload with no reading does not clear one already stored. A visit
+     * syncs repeatedly and the device may get a fix on only one of those
+     * attempts; the later silence is absence of news rather than news.
+     *
+     * @param  array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private function locationOf(array $payload, ?Assessment $existing): array
+    {
+        $latitude = $this->coordinate($payload, 'latitude', 90);
+        $longitude = $this->coordinate($payload, 'longitude', 180);
+
+        if ($latitude !== null && $longitude !== null) {
+            $accuracy = $payload['accuracy_m'] ?? null;
+            $takenAt = $payload['located_at'] ?? null;
+
+            return [
+                'latitude'        => $latitude,
+                'longitude'       => $longitude,
+                'accuracy_m'      => is_numeric($accuracy) ? (int) $accuracy : null,
+                'location_source' => 'device',
+                'located_at'      => is_string($takenAt) && strtotime($takenAt) !== false
+                    ? gmdate('Y-m-d H:i:s', (int) strtotime($takenAt))
+                    : null,
+            ];
+        }
+
+        // Already positioned by an earlier sync of the same visit. Leave it.
+        if ($existing !== null && $existing->latitude !== null) {
+            return [];
+        }
+
+        $facility = Facility::query()
+            ->where('facilities.id', BinaryUuid::toBytes($this->requireUuid($payload, 'facility_id')))
+            ->first();
+
+        if ($facility === null || $facility->latitude === null || $facility->longitude === null) {
+            return [];
+        }
+
+        return [
+            'latitude'        => (float) $facility->latitude,
+            'longitude'       => (float) $facility->longitude,
+            // The registry has no accuracy to report, and inventing one would
+            // make an inherited pin indistinguishable from a measured fix.
+            'accuracy_m'      => null,
+            'location_source' => 'facility',
+            'located_at'      => null,
+        ];
+    }
+
+    /**
+     * A coordinate the device sent, or null when absent or out of range.
+     *
+     * @param array<string,mixed> $payload
+     */
+    private function coordinate(array $payload, string $key, float $limit): ?float
+    {
+        $value = $payload[$key] ?? null;
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $number = (float) $value;
+
+        // Out of range is a broken client rather than a place. Dropped rather
+        // than refused: a visit is worth storing without its position.
+        return abs($number) > $limit ? null : $number;
     }
 
     /**

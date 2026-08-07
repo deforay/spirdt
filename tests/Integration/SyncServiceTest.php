@@ -666,6 +666,83 @@ final class SyncServiceTest extends TestCase
         self::assertSame(3, count($result['accepted']));
     }
 
+    /**
+     * The predecessor collected a geopoint on every submission and plotted one
+     * marker per assessment. This is the reading that map is built from, and
+     * it says where the assessor stood rather than where a record claims the
+     * facility is.
+     */
+    public function testADeviceReadingIsStoredAsTheVisitsLocation(): void
+    {
+        $payload = $this->payload();
+        $payload['latitude'] = -12.8024;
+        $payload['longitude'] = 28.2132;
+        $payload['accuracy_m'] = 12;
+        $payload['located_at'] = '2026-08-05T09:14:00Z';
+
+        $result = (new SyncService())->accept($payload);
+
+        $stored = Assessment::findByUuid($result['assessment_id']);
+        self::assertNotNull($stored);
+        self::assertSame('device', $stored->location_source);
+        self::assertSame(12, (int) $stored->accuracy_m);
+        self::assertEqualsWithDelta(-12.8024, (float) $stored->latitude, 0.0000001);
+    }
+
+    /**
+     * No fix is the ordinary case indoors, so the registry answers instead —
+     * and says that it did, because an inherited pin and a measured one are
+     * different facts and only one is evidence of a visit.
+     */
+    public function testWithNoReadingTheFacilitysOwnPositionIsUsed(): void
+    {
+        Capsule::table('facilities')
+            ->where('id', BinaryUuid::toBytes($this->facilityId))
+            ->update(['latitude' => -15.4167, 'longitude' => 28.2833]);
+
+        $result = (new SyncService())->accept($this->payload());
+
+        $stored = Assessment::findByUuid($result['assessment_id']);
+        self::assertNotNull($stored);
+        self::assertSame('facility', $stored->location_source);
+        self::assertNull($stored->accuracy_m, 'the registry has no accuracy to report');
+    }
+
+    /**
+     * A visit syncs repeatedly and the device may get a fix on only one of
+     * those attempts. Later silence is absence of news, not news.
+     */
+    public function testALaterSyncWithNoReadingDoesNotClearThePosition(): void
+    {
+        $sync = new SyncService();
+
+        $payload = $this->payload();
+        $payload['latitude'] = -12.8024;
+        $payload['longitude'] = 28.2132;
+        $sync->accept($payload);
+
+        $sync->accept($this->payload());
+
+        $stored = Assessment::findByUuid('019fd200-0000-7000-8000-000000000001');
+        self::assertNotNull($stored);
+        self::assertSame('device', $stored->location_source);
+        self::assertEqualsWithDelta(-12.8024, (float) $stored->latitude, 0.0000001);
+    }
+
+    /** Out of range is a broken client, not a place. The visit still stores. */
+    public function testAnImpossibleCoordinateIsDroppedRatherThanStored(): void
+    {
+        $payload = $this->payload();
+        $payload['latitude'] = 999;
+        $payload['longitude'] = 28.2132;
+
+        $result = (new SyncService())->accept($payload);
+
+        $stored = Assessment::findByUuid($result['assessment_id']);
+        self::assertNotNull($stored);
+        self::assertNull($stored->latitude);
+    }
+
     public function testAnotherOrganizationCannotSeeTheAssessment(): void
     {
         $result = (new SyncService())->accept($this->payload());

@@ -210,6 +210,31 @@ export async function saveContext(
  * ignores them, and a pathogen removed by mistake can be added back with its
  * answers intact. The server drops them from the payload for the same reason.
  */
+/**
+ * Record where the visit was made.
+ *
+ * Written on its own rather than as part of createAssessment, because the fix
+ * arrives after the assessment does — often several seconds after, sometimes
+ * never. It does not mark the assessment dirty on its own account: the
+ * position travels with the next sync the visit makes anyway, and a device
+ * with no signal should not acquire an outbound request for a coordinate.
+ */
+export async function saveLocation(
+    assessmentId: string,
+    fix: { latitude: number; longitude: number; accuracyM: number | null; takenAt: string },
+): Promise<StoredAssessment | null> {
+    return chain(`location:${assessmentId}`, async () => {
+        await db.assessments.update(assessmentId, {
+            latitude: fix.latitude,
+            longitude: fix.longitude,
+            accuracyM: fix.accuracyM,
+            locatedAt: fix.takenAt,
+        })
+
+        return (await db.assessments.get(assessmentId)) ?? null
+    })
+}
+
 export async function savePathogens(
     assessmentId: string,
     input: StoredPathogen[],

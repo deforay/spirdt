@@ -26,6 +26,11 @@ export interface SyncPayload {
     context: Record<string, unknown>
     device_id: string
     started_at: string
+    /** Where the assessor was. Absent when the device would not say. */
+    latitude?: number
+    longitude?: number
+    accuracy_m?: number
+    located_at?: string
     pathogens: Array<{ key: string; name: string }>
     answers: Array<{
         question_code: string
@@ -100,6 +105,20 @@ export function buildPayload(
             context: assessment.context,
             device_id: deviceId,
             started_at: assessment.startedAt,
+            // Omitted rather than sent as null, so a payload from a device
+            // that never got a fix does not overwrite a position an earlier
+            // sync of the same visit managed to record.
+            ...(typeof assessment.latitude === 'number' &&
+            typeof assessment.longitude === 'number'
+                ? {
+                      latitude: assessment.latitude,
+                      longitude: assessment.longitude,
+                      ...(typeof assessment.accuracyM === 'number'
+                          ? { accuracy_m: assessment.accuracyM }
+                          : {}),
+                      ...(assessment.locatedAt ? { located_at: assessment.locatedAt } : {}),
+                  }
+                : {}),
             pathogens: assessment.pathogens.map((pathogen) => ({
                 key: pathogen.key,
                 name: pathogen.name,

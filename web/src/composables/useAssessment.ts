@@ -10,6 +10,7 @@ import {
     loadFindings,
     saveAnswer,
     saveContext,
+    saveLocation,
     questionGroupKey,
     removeFinding,
     saveFinding,
@@ -23,6 +24,7 @@ import {
     type StoredPathogen,
     type StoredResponse,
 } from '@/db/database'
+import { currentFix } from '@/db/location'
 import { checkStorage, type StorageReport } from '@/db/storage'
 import { t } from '@/i18n'
 import { questionKey, score } from '@/scoring/engine'
@@ -86,6 +88,26 @@ export function useAssessment(template: Template) {
         })
 
         assessment.value = created
+
+        /**
+         * Asked for now, written whenever it arrives.
+         *
+         * Not awaited: a first fix indoors can take half a minute or never
+         * come, and the assessor is standing in the laboratory either way. The
+         * checklist opens immediately and the position lands on the row behind
+         * them, or does not.
+         */
+        void currentFix().then(async (fix) => {
+            if (fix === null || assessment.value?.id !== created.id) {
+                return
+            }
+
+            const located = await saveLocation(created.id, fix)
+
+            if (located !== null) {
+                assessment.value = located
+            }
+        })
 
         for (const row of await loadAnswers(created.id)) {
             const key = questionKey(row.questionCode, row.pathogen)
