@@ -1,0 +1,19 @@
+# The built app under web/dist is tracked on purpose: a server needs Apache,
+# PHP and a database, and requiring node on top of that to produce files the
+# build already produced here is a dependency with nothing to show for it.
+#
+# What it costs is that the repository now carries a generated artefact, and
+# the three settings below are what keep that from leaking into review.
+
+# Collapsed in GitHub's diff view, and excluded from language statistics.
+web/dist/** linguist-generated=true
+
+# No textual diff. A fingerprinted, minified bundle produces thousands of
+# changed lines that say nothing a human can read.
+web/dist/** -diff
+
+# No merge either. There is no meaningful way to reconcile two versions of a
+# minified chunk, and any attempt produces a file that is valid to git and
+# broken to a browser. A conflict here is resolved by rebuilding, which is
+# also the only resolution that can be right.
+web/dist/** -merge

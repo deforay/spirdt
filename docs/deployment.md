@@ -13,9 +13,30 @@ The split is the same whichever web server you use:
 | `/assets/*` | `web/dist/assets` | Fingerprinted by the build, cacheable for a year |
 | everything else | `web/dist/index.html` | Unmatched paths are routes inside the app |
 
-## Build the app first
+## The app arrives built
 
-Nothing serves `/` until this has been run:
+`web/dist` is committed. A checkout is deployable as it stands: Apache or nginx,
+PHP, a database, and nothing else. Node is a development dependency, not a
+deployment one.
+
+That is the point of tracking it. A server that has to build the app needs a
+toolchain on it whose only output is files the developer's machine already
+produced — and it needs that toolchain to keep working, on a box nobody logs
+into between releases.
+
+The build is portable because it holds nothing about where it runs. The app
+calls `/api` relatively, so one artefact is correct on every host. Setting
+`VITE_API_BASE` at build time would bake an origin into it and end that, which
+is why nothing sets it.
+
+The cost is that source and build have to move together. A commit that changes
+`web/src` without a rebuilt `web/dist` leaves the server running the previous
+version of the app, with nothing on screen to say so. The pre-commit hook
+refuses that commit; `.gitattributes` keeps the bundle out of diffs and out of
+merges, since a conflict inside a minified chunk has no resolution but a
+rebuild.
+
+So, after changing anything under `web/src`:
 
 ```
 cd web
@@ -23,9 +44,7 @@ npm ci
 npm run build
 ```
 
-That writes `web/dist`. Without it the web server returns 404 for the front
-page, which is the correct and visible failure — an unbuilt app should not be
-papered over.
+and commit `web/dist` alongside the source.
 
 ## nginx
 

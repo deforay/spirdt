@@ -1,5 +1,8 @@
 node_modules/
-dist/
+
+# dist/ is deliberately NOT ignored. The built app is tracked, because the
+# machines it is served from do not all have node on them. See .gitattributes
+# and docs/deployment.md.
 dist-ssr/
 *.tsbuildinfo
 .vite/
