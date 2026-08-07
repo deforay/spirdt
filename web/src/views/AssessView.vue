@@ -720,6 +720,19 @@ async function onSubmit() {
                 class="scroll-thin hidden md:block md:overflow-y-auto md:pb-6"
                 :aria-label="t('checklist.sections')"
             >
+                <!-- Before the sections, because that is where it comes in the
+                     visit. It was a chip in the top corner, which on a wide
+                     screen is the furthest point from this list — and this list
+                     is where somebody looks for where a visit can be. -->
+                <button
+                    type="button"
+                    class="mb-1 flex w-full items-center gap-2.5 rounded-card px-3 py-2.5 text-left text-[14px] text-label-2 transition-colors hover:bg-surface hover:text-label"
+                    @click="editSetup"
+                >
+                    <PhBuildings :size="16" class="shrink-0" aria-hidden="true" />
+                    <span class="min-w-0 flex-1">{{ t('checklist.editSetup') }}</span>
+                </button>
+
                 <button
                     v-for="item in visibleSections"
                     :key="item.code"

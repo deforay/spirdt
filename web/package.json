@@ -5,7 +5,7 @@
     "description": "SPI-RDT assessor app. Offline first: it reads and writes locally and syncs when there is a connection.",
     "scripts": {
         "dev": "vite",
-        "build": "vue-tsc --build && vite build",
+        "build": "node scripts/clean-assets.mjs && vue-tsc --build && vite build",
         "preview": "vite preview",
         "test": "vitest run",
         "test:watch": "vitest",
