@@ -6,14 +6,19 @@ declare(strict_types=1);
 /**
  * Put a few facilities and testing sites into an organisation.
  *
- * For local work only. There is no admin interface yet, and an assessor cannot
- * start a visit without a site to assess, so this is what makes the app usable
- * end to end before the registry screens exist.
+ * For local work only. An assessor cannot start a visit without a site to
+ * assess, so this puts enough of a registry in place to use the app end to end
+ * without filling in the registry screens first.
  *
  * Idempotent: sites are matched by facility and name, so running it twice does
  * not produce a second Kanyama Clinic.
  *
+ * Run it without --org and it lists the organisations on this installation and
+ * asks which one. The code is not something anybody remembers, and refusing on
+ * a missing flag while holding the list is unhelpful on purpose.
+ *
  * Usage:
+ *   bin/dev/seed-sites                 list the organisations and ask
  *   bin/dev/seed-sites --org=demo
  *   bin/dev/seed-sites --help
  *
@@ -49,24 +54,106 @@ foreach (array_slice($argv, 1) as $argument) {
     }
 }
 
+// Connected BEFORE anything is asked or refused. The organisation code is the
+// one thing this script needs and the only place it can be looked up is here,
+// so refusing on a missing --org without having read the list means telling
+// somebody they got it wrong while knowing what right would have been.
+$env = con_read_env(con_env_path($root));
+
+try {
+    $pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+} catch (PDOException $e) {
+    con_print('error', 'Cannot reach the database: ' . $e->getMessage());
+
+    $remedy = con_db_remedy($env['DB_HOST'] ?? '', $e);
+
+    foreach (explode("\n", $remedy === '' ? 'Check DB_HOST, DB_PORT, DB_USER and DB_PASS in .env.' : $remedy) as $line) {
+        con_print('info', $line);
+    }
+
+    con_fail('Nothing was written.');
+}
+
+/**
+ * Every organisation, with what it already has.
+ *
+ * The site count is on the PROGRAMME rather than the organisation, because
+ * that is where the registry lives — two organisations sharing a programme
+ * share these sites, and seeding either one seeds both. Showing the count per
+ * organisation would report the same registry twice and read as two.
+ *
+ * @return list<array<string,mixed>>
+ */
+function seed_organizations(PDO $pdo): array
+{
+    $rows = $pdo->query(
+        'SELECT o.id, o.code, o.name, o.programme_id,
+                (SELECT COUNT(*) FROM testing_sites t WHERE t.programme_id = o.programme_id) AS sites
+         FROM organizations o
+         ORDER BY o.code',
+    );
+
+    return $rows === false ? [] : $rows->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** @param list<array<string,mixed>> $organizations */
+function seed_list(array $organizations): void
+{
+    con_print('info', 'Organisations on this installation:');
+
+    foreach ($organizations as $organization) {
+        $sites = (int) $organization['sites'];
+
+        con_print('info', sprintf(
+            '  %-20s %s (%s)',
+            (string) $organization['code'],
+            (string) $organization['name'],
+            $sites === 0 ? 'no sites yet' : $sites . ' testing site' . ($sites === 1 ? '' : 's'),
+        ));
+    }
+}
+
+$organizations = seed_organizations($pdo);
+
+if ($organizations === []) {
+    con_print('error', 'There are no organisations to seed into.');
+    con_print('info', 'Make one first: bin/dev/create-user --org=demo --email=you@example.org --name="Your Name" --role=admin');
+
+    con_fail('Nothing was written.');
+}
+
 $orgCode = trim($options['org'] ?? '');
 
-if ($orgCode === '') {
-    con_fail('--org is required. See --help.');
+$byCode = [];
+foreach ($organizations as $organization) {
+    $byCode[(string) $organization['code']] = (int) $organization['id'];
 }
 
-$env = con_read_env(con_env_path($root));
-$pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+// Asked rather than refused, and asked with the answers in view. A single
+// organisation is offered as the default, since on a development machine it
+// is nearly always the one meant.
+if ($orgCode === '' || !isset($byCode[$orgCode])) {
+    if ($orgCode !== '') {
+        con_print('error', 'No organisation ' . $orgCode . '.');
+    }
 
-$statement = $pdo->prepare('SELECT id FROM organizations WHERE code = ?');
-$statement->execute([$orgCode]);
-$organizationId = $statement->fetchColumn();
+    seed_list($organizations);
 
-if ($organizationId === false) {
-    con_fail('No organisation ' . $orgCode . '. Create one with bin/dev/create-user first.');
+    if (!con_is_interactive()) {
+        con_fail('Pass one of those as --org.');
+    }
+
+    $orgCode = trim(con_ask(
+        'Organisation code',
+        count($organizations) === 1 ? (string) $organizations[0]['code'] : '',
+    ));
 }
 
-$organizationId = (int) $organizationId;
+if (!isset($byCode[$orgCode])) {
+    con_fail('No organisation ' . ($orgCode === '' ? '(none given)' : $orgCode) . '. Nothing was written.');
+}
+
+$organizationId = $byCode[$orgCode];
 
 /** UUIDv7, matching what the devices mint. */
 function seed_uuid(): string
