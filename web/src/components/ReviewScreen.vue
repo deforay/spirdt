@@ -166,18 +166,48 @@ function groupBySection(keys: string[]) {
     return [...bySection.values()]
 }
 
-const missingBySection = computed(() => groupBySection(props.result.missing))
-
 /**
- * Gaps recorded with nothing written against them.
+ * Every section, whether or not anything is wrong with it.
  *
- * Every question in the instrument obliges a note on a Partial, a No or a Not
- * applicable. The row says so as the answer is given, but nothing stopped a
- * visit being submitted with the box empty — so the rule was advice. The
- * server refuses these now, and this is what tells the assessor before they
- * find out from a refusal.
+ * This replaced three lists — unanswered, unexplained, and the score tally —
+ * which between them showed only the sections with a problem. A section that
+ * was finished simply vanished, so the one thing the screen could not tell an
+ * assessor was how much of the visit was done.
+ *
+ * Progress first, score second. Mid-visit the question is what is left; the
+ * score is not a fact yet, because an unanswered question counts as zero
+ * against the visit until it is answered.
  */
-const unexplainedBySection = computed(() => groupBySection(props.result.missingNotes))
+const overview = computed(() => {
+    const missing = new Map<string, number>()
+    const unexplained = new Map<string, number>()
+
+    for (const entry of groupBySection(props.result.missing)) {
+        missing.set(entry.code, entry.count)
+    }
+
+    for (const entry of groupBySection(props.result.missingNotes)) {
+        unexplained.set(entry.code, entry.count)
+    }
+
+    return props.result.sections.map((tally) => {
+        const answered = tally.answered + tally.excluded
+        const outstanding = missing.get(tally.code) ?? 0
+
+        return {
+            code: tally.code,
+            number: tally.number,
+            title: text(props.template.sections.find((s) => s.code === tally.code)?.title),
+            applicable: tally.applicable,
+            answered,
+            expected: answered + outstanding,
+            outstanding,
+            needsNote: unexplained.get(tally.code) ?? 0,
+            score: tally.score,
+            possible: tally.possible,
+        }
+    })
+})
 
 /**
  * Both gates, in one place, matching what the server refuses on.
@@ -272,57 +302,66 @@ function summaryOf(gap: Gap): string {
                 </span>
             </div>
 
-            <!-- Unanswered questions block submission, so they come first. -->
-            <section v-if="missingBySection.length > 0" class="mb-4">
+            <!--
+                Every section, done or not. Tapping one goes there.
+            -->
+            <section class="mb-4">
                 <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                    {{ t('review.unanswered') }}
+                    {{ t('review.overview') }}
                 </h2>
                 <div class="overflow-hidden rounded-card bg-surface">
                     <button
-                        v-for="(section, index) in missingBySection"
-                        :key="section.code"
+                        v-for="(row, index) in overview"
+                        :key="row.code"
                         type="button"
-                        class="flex w-full items-center justify-between px-3.5 py-3 text-left"
+                        class="flex w-full items-center gap-3 px-3.5 py-3 text-left"
                         :class="index > 0 ? 'border-t border-hairline' : ''"
-                        @click="emit('jump', section.code, null)"
+                        @click="emit('jump', row.code, null)"
                     >
-                        <span class="text-[17px]">{{ section.title }}</span>
-                        <span class="tnum text-[15px] font-semibold text-no">
-                            {{ formatNumber(section.count) }}
+                        <span class="tnum shrink-0 text-[13px] font-semibold text-label-3">
+                            {{ row.number }}
+                        </span>
+
+                        <span class="min-w-0 flex-1">
+                            <span
+                                class="block truncate text-[15px]"
+                                :class="row.applicable ? '' : 'text-label-3'"
+                            >
+                                {{ row.title }}
+                            </span>
+
+                            <span v-if="!row.applicable" class="block text-[13px] text-label-3">
+                                {{ t('review.notApplicable') }}
+                            </span>
+                            <span v-else class="tnum block text-[13px] text-label-2">
+                                {{ t('checklist.answered', { answered: row.answered, total: row.expected }) }}
+                                <template v-if="row.outstanding === 0">
+                                    · {{ formatNumber(row.score) }}/{{ formatNumber(row.possible) }}
+                                </template>
+                            </span>
+                        </span>
+
+                        <!-- Only what is outstanding gets a colour. A finished
+                             section needs no mark; that it is finished is said
+                             by the count beside it. -->
+                        <span class="flex shrink-0 flex-col items-end gap-0.5">
+                            <span
+                                v-if="row.outstanding > 0"
+                                class="tnum rounded-full bg-no-soft px-2 py-0.5 text-[12px] font-semibold text-no"
+                            >
+                                {{ t('review.outstanding', { count: row.outstanding }) }}
+                            </span>
+                            <span
+                                v-if="row.needsNote > 0"
+                                class="tnum rounded-full bg-partial-soft px-2 py-0.5 text-[12px] font-semibold text-partial"
+                            >
+                                {{ t('review.noteCount', { count: row.needsNote }) }}
+                            </span>
                         </span>
                     </button>
                 </div>
-                <p class="px-1 pt-1.5 text-[13px] text-label-2">
-                    {{ t('review.unansweredNote') }}
-                </p>
             </section>
 
-            <!-- Answered, but with a gap nobody explained. A different problem
-                 from an unanswered question and a different fix, so a
-                 different list. -->
-            <section v-if="unexplainedBySection.length > 0" class="mb-4">
-                <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                    {{ t('review.needsNote') }}
-                </h2>
-                <div class="overflow-hidden rounded-card bg-surface">
-                    <button
-                        v-for="(section, index) in unexplainedBySection"
-                        :key="section.code"
-                        type="button"
-                        class="flex w-full items-center justify-between px-3.5 py-3 text-left"
-                        :class="index > 0 ? 'border-t border-hairline' : ''"
-                        @click="emit('jump', section.code, null)"
-                    >
-                        <span class="text-[17px]">{{ section.title }}</span>
-                        <span class="tnum text-[15px] font-semibold text-partial">
-                            {{ formatNumber(section.count) }}
-                        </span>
-                    </button>
-                </div>
-                <p class="px-1 pt-1.5 text-[13px] text-label-2">
-                    {{ t('review.needsNoteHint') }}
-                </p>
-            </section>
           </div>
 
           <div>
@@ -534,30 +573,6 @@ function summaryOf(gap: Gap): string {
                 :context="context"
             />
 
-            <!-- Sections, for the debrief. -->
-            <section class="mb-4">
-                <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                    {{ t('review.bySection') }}
-                </h2>
-                <div class="overflow-hidden rounded-card bg-surface">
-                    <div
-                        v-for="(tally, index) in result.sections"
-                        :key="tally.code"
-                        class="flex items-center justify-between px-3.5 py-2.5"
-                        :class="index > 0 ? 'border-t border-hairline' : ''"
-                    >
-                        <span class="text-[15px]" :class="tally.applicable ? '' : 'text-label-3'">
-                            {{ text(template.sections.find((s) => s.code === tally.code)?.title) }}
-                        </span>
-                        <span v-if="!tally.applicable" class="text-[13px] text-label-3">
-                            {{ t('review.notApplicable') }}
-                        </span>
-                        <span v-else class="tnum text-[15px] font-semibold">
-                            {{ formatNumber(tally.score) }} / {{ formatNumber(tally.possible) }}
-                        </span>
-                    </div>
-                </div>
-            </section>
           </div>
         </main>
 

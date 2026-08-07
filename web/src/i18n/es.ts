@@ -151,6 +151,15 @@ export const messages: Messages = {
         one: '{count} respuesta aún necesita una nota.',
         other: '{count} respuestas aún necesitan una nota.',
     },
+    'review.overview': 'Secciones',
+    'review.outstanding': {
+        one: 'falta {count}',
+        other: 'faltan {count}',
+    },
+    'review.noteCount': {
+        one: '{count} nota',
+        other: '{count} notas',
+    },
     'review.bySection': 'Por sección',
     'review.notApplicable': 'No aplica',
     'review.submit': 'Enviar evaluación',

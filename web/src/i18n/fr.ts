@@ -154,6 +154,15 @@ export const messages: Messages = {
         one: '{count} réponse doit encore être motivée.',
         other: '{count} réponses doivent encore être motivées.',
     },
+    'review.overview': 'Sections',
+    'review.outstanding': {
+        one: '{count} restante',
+        other: '{count} restantes',
+    },
+    'review.noteCount': {
+        one: '{count} note',
+        other: '{count} notes',
+    },
     'review.bySection': 'Par section',
     'review.notApplicable': 'Sans objet',
     'review.submit': "Soumettre l'évaluation",
