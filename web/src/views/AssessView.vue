@@ -275,7 +275,18 @@ onMounted(async () => {
     // view is not reachable without one.
     startSync()
     await loadDrafts()
-    await restorePosition()
+
+    // Guarded, so restoring does not push an entry of its own. Without this the
+    // first thing a visit did on load was duplicate the address it had just
+    // been opened at — and Back then landed on an identical URL, so the
+    // watcher saw no change and the screen did not move.
+    followingRoute.value = true
+
+    try {
+        await restorePosition()
+    } finally {
+        followingRoute.value = false
+    }
 })
 
 async function onResume(id: string) {

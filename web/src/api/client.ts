@@ -96,7 +96,13 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
 
     try {
         return await fetch(`${BASE_URL}${path}`, {
-            method: options.method ?? 'POST',
+            // A request with no body is a read. Defaulting to POST sent every
+            // list endpoint that omitted the method — the reports list among
+            // them — at a route registered for GET, which answers 405 and
+            // leaves a screen permanently empty with nothing on it explaining
+            // why. A body means something is being written, so that keeps
+            // POST; anything explicit still wins over both.
+            method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
             headers,
             body:
                 options.body === undefined
