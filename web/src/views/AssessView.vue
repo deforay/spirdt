@@ -337,6 +337,19 @@ const repeating = computed(() => {
     return { number: found?.number ?? 0, questions: found?.questions.length ?? 0 }
 })
 
+/**
+ * Leave the visit without ending it.
+ *
+ * Nothing is discarded and nothing needs saving first — every answer is
+ * already on the device. The visit reappears under Unfinished, which is why
+ * this needs no confirmation: there is nothing to lose by tapping it.
+ */
+async function leaveVisit() {
+    await assessment.flush()
+    await loadDrafts()
+    stage.value = 'site'
+}
+
 function jumpTo(sectionCode: string) {
     activeSection.value = sectionCode
     stage.value = 'checklist'
@@ -476,9 +489,22 @@ async function onSubmit() {
 
         <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3 md:px-0 md:pt-6">
             <div class="flex items-center justify-between gap-2">
-                <span class="flex-1 truncate text-[13px] text-accent">
-                    {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
-                </span>
+                <!--
+                    Out of the visit, without ending it. Everything is already
+                    written to the device, so leaving costs nothing and the
+                    visit is waiting under Unfinished when they come back.
+                    Without this the checklist is a room with no door.
+                -->
+                <button
+                    type="button"
+                    class="-ml-1 flex min-h-11 flex-1 items-center gap-1 truncate pr-1 text-left text-[13px] text-accent"
+                    @click="leaveVisit"
+                >
+                    <PhArrowLeft :size="14" class="shrink-0" aria-hidden="true" />
+                    <span class="truncate">
+                        {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
+                    </span>
+                </button>
                 <LocaleSwitcher />
                 <SyncBadge @retry="syncAll()" />
             </div>
@@ -671,8 +697,22 @@ async function onSubmit() {
             class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6"
         >
             <div class="min-w-0">
-                <div class="flex items-baseline gap-2">
-                    <span class="tnum text-[22px] font-bold tracking-tight">
+                <!--
+                    No percentage until the visit is complete.
+
+                    It is computed over ANSWERED questions only — see
+                    docs/scoring.md — so eight questions of all Yes reads 100%
+                    and eight with one Partial reads 93.75%. Neither number
+                    describes the site. Labelling it provisional was not
+                    enough: a large figure is read before the word beside it,
+                    and the one thing worse than no score is a confident wrong
+                    one shown to somebody being debriefed.
+
+                    Progress takes its place, which is the question actually
+                    being asked mid-visit — how much is left.
+                -->
+                <div class="tnum text-[22px] font-bold tracking-tight">
+                    <template v-if="progress.isComplete">
                         {{
                             assessment.result.value.percentage === null
                                 ? '—'
@@ -681,16 +721,8 @@ async function onSubmit() {
                                       assessment.result.value.roundDp,
                                   )
                         }}
-                    </span>
-                    <!--
-                        The percentage is computed over ANSWERED questions only,
-                        so a half-finished visit of all Yes reads 100%. That is
-                        correct for a running score and indefensible without
-                        this word beside it.
-                    -->
-                    <span v-if="!progress.isComplete" class="eyebrow text-label-3">
-                        {{ t('checklist.provisional') }}
-                    </span>
+                    </template>
+                    <template v-else>{{ progress.answered }} / {{ progress.total }}</template>
                 </div>
                 <div
                     :class="[
@@ -698,21 +730,18 @@ async function onSubmit() {
                         assessment.saveState.value === 'error' ? 'font-semibold text-no' : 'text-label-2',
                     ]"
                 >
-                    <template v-if="!progress.isComplete">
-                        {{
-                            t('checklist.progress', {
-                                answered: progress.answered,
-                                total: progress.total,
-                            })
-                        }}
-                        ·
-                    </template>
+                    <template v-if="!progress.isComplete">{{ t('checklist.answeredLabel') }} · </template>
                     {{ savedLabel }}
                 </div>
             </div>
 
             <div class="flex items-center gap-2">
-                <span :class="['rounded-full px-3 py-1.5 text-[13px] font-semibold', levelTone]">
+                <!-- A certification band is a claim about the site. It waits
+                     until there is a finished assessment behind it. -->
+                <span
+                    v-if="progress.isComplete"
+                    :class="['rounded-full px-3 py-1.5 text-[13px] font-semibold', levelTone]"
+                >
                     {{
                         assessment.result.value.level === null
                             ? t('score.notScorable')

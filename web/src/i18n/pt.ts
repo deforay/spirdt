@@ -107,6 +107,7 @@ export const messages: Messages = {
     'checklist.pathogens': 'Agentes patogénicos',
     'checklist.sectionScore': 'Pontuação da secção',
     'checklist.review': 'Rever',
+    'checklist.answeredLabel': 'respondidas',
     'checklist.previousSection': 'Anterior',
     'checklist.nextSection': 'Seguinte',
     'checklist.nextPathogen': 'Próximo agente patogénico',

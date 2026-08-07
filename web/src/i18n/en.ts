@@ -111,6 +111,7 @@ export const messages = {
     'checklist.pathogens': 'Pathogens',
     'checklist.sectionScore': 'Section score',
     'checklist.review': 'Review',
+    'checklist.answeredLabel': 'answered',
     'checklist.previousSection': 'Previous',
     'checklist.nextSection': 'Next',
     'checklist.nextPathogen': 'Next pathogen',
