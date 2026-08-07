@@ -78,6 +78,7 @@ export const messages = {
     'response.N': 'No',
     'response.NA': 'N/A',
 
+    'question.comment': 'Comments (optional)',
     'question.guidance': 'What to look for',
     'question.whyNotApplicable': 'Why does this not apply?',
     'question.describeGap': 'Describe the gap',
@@ -138,6 +139,7 @@ export const messages = {
     'score.notScorable': 'Not scorable',
     'score.level': 'Level {level}',
 
+    'actions.heading': 'Corrective actions',
     'review.back': 'Back to checklist',
     'review.title': 'Review',
     'review.points': '{score} of {possible} points',
@@ -150,6 +152,7 @@ export const messages = {
     'review.recommendationPlaceholder': 'Recommended action',
     'review.whoActs': 'Who acts on this',
     'review.responsiblePerson': 'Responsible person',
+    'review.notDescribed': 'Not described yet',
     'review.noGaps': 'No gaps recorded. Every answer so far is a Yes or Not applicable.',
     'review.needsNote': 'Needs a note',
     'review.needsNoteHint': 'A Partial, No or N/A has to say why. The site cannot act on a gap nobody described.',

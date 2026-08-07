@@ -1,0 +1,21 @@
+{
+    "name": "a-gap-needs-no-comment",
+    "why": "A No with nothing written against it is complete as far as the engine is concerned. The comment is optional on every question now — an observation the assessor may want to record against a Yes as readily as a No — and what a gap actually obliges is a corrective action, which the engine never sees. That rule lives in the submit gate, which does see the findings. What is pinned here is that the engine stopped asking for a comment it has no reason to require.",
+    "template": "spi-rdt-1.0.0",
+    "context": {
+        "refers_specimens": "no"
+    },
+    "pathogens": [
+        "hiv"
+    ],
+    "default_response": "Y",
+    "answers": {
+        "2.1": "N"
+    },
+    "expect": {
+        "missing_notes_count": 0,
+        "is_complete": true,
+        "total_score": 98,
+        "total_possible": 100
+    }
+}

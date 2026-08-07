@@ -1,0 +1,19 @@
+{
+    "name": "not-applicable-needs-no-comment-either",
+    "why": "Comments are optional on every response, Not applicable included. The engine asks for none of them: comment_required_for is empty in the instrument, so missing_notes is always empty and the machinery stays in place for a template that does want one. What a gap obliges is a corrective action, recorded at the end of the section, which the engine never sees.",
+    "template": "spi-rdt-1.0.0",
+    "context": {
+        "refers_specimens": "no"
+    },
+    "pathogens": [
+        "hiv"
+    ],
+    "default_response": "Y",
+    "answers": {
+        "1.7": "NA"
+    },
+    "expect": {
+        "missing_notes_count": 0,
+        "total_possible": 98
+    }
+}

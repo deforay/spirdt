@@ -77,6 +77,7 @@ export const messages: Messages = {
     'response.N': 'Non',
     'response.NA': 'S.O.',
 
+    'question.comment': 'Commentaires (facultatif)',
     'question.guidance': "Ce qu'il faut vérifier",
     'question.whyNotApplicable': "Pourquoi cela ne s'applique-t-il pas ?",
     'question.describeGap': "Décrivez l'écart",
@@ -137,6 +138,7 @@ export const messages: Messages = {
     'score.notScorable': 'Non calculable',
     'score.level': 'Niveau {level}',
 
+    'actions.heading': 'Actions correctives',
     'review.back': 'Retour à la liste',
     'review.title': 'Vérification',
     'review.points': '{score} sur {possible} points',
@@ -149,6 +151,7 @@ export const messages: Messages = {
     'review.recommendationPlaceholder': 'Action recommandée',
     'review.whoActs': 'Qui doit agir',
     'review.responsiblePerson': 'Personne responsable',
+    'review.notDescribed': 'Pas encore décrit',
     'review.noGaps': 'Aucun écart enregistré. Toutes les réponses sont Oui ou Sans objet.',
     'review.needsNote': 'Note requise',
     'review.needsNoteHint': 'Un Partiel, un Non ou un S/O doit être motivé. Le site ne peut pas agir sur un écart que personne n’a décrit.',

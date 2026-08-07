@@ -74,6 +74,7 @@ export const messages: Messages = {
     'response.N': 'No',
     'response.NA': 'N/A',
 
+    'question.comment': 'Comentarios (opcional)',
     'question.guidance': 'Qué comprobar',
     'question.whyNotApplicable': '¿Por qué no aplica?',
     'question.describeGap': 'Describa la brecha',
@@ -134,6 +135,7 @@ export const messages: Messages = {
     'score.notScorable': 'No puntuable',
     'score.level': 'Nivel {level}',
 
+    'actions.heading': 'Acciones correctivas',
     'review.back': 'Volver a la lista',
     'review.title': 'Revisión',
     'review.points': '{score} de {possible} puntos',
@@ -146,6 +148,7 @@ export const messages: Messages = {
     'review.recommendationPlaceholder': 'Acción recomendada',
     'review.whoActs': 'Quién debe actuar',
     'review.responsiblePerson': 'Persona responsable',
+    'review.notDescribed': 'Aún sin describir',
     'review.noGaps': 'No se registraron brechas. Todas las respuestas hasta ahora son Sí o No aplica.',
     'review.needsNote': 'Falta una nota',
     'review.needsNoteHint': 'Un Parcial, No o N/A debe justificarse. El sitio no puede actuar sobre una carencia que nadie describió.',

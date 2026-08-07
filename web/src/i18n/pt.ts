@@ -74,6 +74,7 @@ export const messages: Messages = {
     'response.N': 'Não',
     'response.NA': 'N/A',
 
+    'question.comment': 'Comentários (opcional)',
     'question.guidance': 'O que verificar',
     'question.whyNotApplicable': 'Porque é que não se aplica?',
     'question.describeGap': 'Descreva a lacuna',
@@ -134,6 +135,7 @@ export const messages: Messages = {
     'score.notScorable': 'Não pontuável',
     'score.level': 'Nível {level}',
 
+    'actions.heading': 'Ações corretivas',
     'review.back': 'Voltar à lista',
     'review.title': 'Revisão',
     'review.points': '{score} de {possible} pontos',
@@ -146,6 +148,7 @@ export const messages: Messages = {
     'review.recommendationPlaceholder': 'Ação recomendada',
     'review.whoActs': 'Quem deve agir',
     'review.responsiblePerson': 'Pessoa responsável',
+    'review.notDescribed': 'Ainda não descrito',
     'review.noGaps':
         'Nenhuma lacuna registada. Todas as respostas até agora são Sim ou Não aplicável.',
     'review.needsNote': 'Falta uma nota',

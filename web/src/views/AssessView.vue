@@ -11,6 +11,7 @@ import ChangePassword from '@/components/ChangePassword.vue'
 import ContextForm from '@/components/ContextForm.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
+import SectionActions from '@/components/SectionActions.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
 import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
 import { useAssessment } from '@/composables/useAssessment'
@@ -731,9 +732,6 @@ async function onSubmit() {
         @back="stage = 'checklist'"
         @edit-setup="editSetup"
         @jump="jumpTo"
-        @finding="(key, patch) => assessment.setFinding(key, patch)"
-        @add-finding="(code, pathogen) => assessment.newFinding(code, pathogen)"
-        @remove-finding="(key) => assessment.dropFinding(key)"
         @submit="onSubmit"
     />
 
@@ -915,6 +913,20 @@ async function onSubmit() {
                             </strong>
                         </div>
                     </div>
+
+                    <!-- What is to be done about this section's gaps, asked
+                         where the predecessor asked and where the debrief
+                         happens: at the end of the section, with the site in
+                         the room. -->
+                    <SectionActions
+                        :section="section"
+                        :pathogen="instance"
+                        :response-for="assessment.responseFor"
+                        :findings-for="assessment.findingsFor"
+                        @add="(code, pathogen) => assessment.newFinding(code, pathogen)"
+                        @update="(key, patch) => assessment.setFinding(key, patch)"
+                        @remove="(key) => assessment.dropFinding(key)"
+                    />
 
                     <!--
                         Moving on, where the assessor finishes rather than where

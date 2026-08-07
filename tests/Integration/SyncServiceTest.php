@@ -597,29 +597,52 @@ final class SyncServiceTest extends TestCase
     }
 
     /**
-     * Every question in the instrument obliges a note on a Partial, a No or a
-     * Not applicable. A gap with no words beside it is one nobody can act on
-     * six months later, which is the whole reason the visit is made.
+     * A comment is optional on every question, so what a gap obliges is not
+     * words but an ACTION — something described, owned and dated, which is
+     * what the site is left with when the assessor drives away. A visit
+     * recording shortfalls and no corrective actions has measured a site
+     * without helping it.
      */
-    public function testAGapWithNoNoteCannotBeSubmitted(): void
+    public function testAGapWithNoCorrectiveActionCannotBeSubmitted(): void
     {
         $payload = $this->submittablePayload();
 
-        // One answer turned into a gap, and nothing written against it.
+        // One answer turned into a gap, and nothing said about it.
         $payload['answers'][0]['response'] = 'N';
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/required note/');
+        $this->expectExceptionMessageMatches('/corrective action/');
 
         (new SyncService())->accept($payload);
     }
 
-    /** The same gap, explained, goes through. */
-    public function testAGapWithANoteIsAccepted(): void
+    /** A comment is not one. It is an observation, and optional everywhere. */
+    public function testACommentIsNotACorrectiveAction(): void
     {
         $payload = $this->submittablePayload();
         $payload['answers'][0]['response'] = 'N';
         $payload['answers'][0]['comment'] = 'No organogram displayed anywhere on site.';
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/corrective action/');
+
+        (new SyncService())->accept($payload);
+    }
+
+    /** The same gap with an action against it goes through. */
+    public function testAGapWithACorrectiveActionIsAccepted(): void
+    {
+        $payload = $this->submittablePayload();
+        $payload['answers'][0]['response'] = 'N';
+        $payload['findings'] = [
+            [
+                'id'            => self::FINDING_ID,
+                'question_code' => $payload['answers'][0]['question_code'],
+                'response'      => 'N',
+                'gap'           => 'No organogram displayed anywhere on site.',
+                'urgency'       => 'follow_up',
+            ],
+        ];
 
         $result = (new SyncService())->accept($payload);
 

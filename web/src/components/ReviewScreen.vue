@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 import SignatureSection from '@/components/SignatureSection.vue'
 import type { StoredFinding } from '@/db/database'
@@ -47,28 +47,8 @@ const emit = defineEmits<{
     /** Open Part A, so a wrong facility detail can be corrected from here too. */
     editSetup: []
     jump: [sectionCode: string, pathogen: string | null]
-    /** Edit one finding, by its own id. */
-    finding: [key: string, patch: Partial<Omit<StoredFinding, 'key' | 'assessmentId'>>]
-    /** Start another one against this answer. */
-    addFinding: [questionCode: string, pathogen: string | null]
-    removeFinding: [key: string]
     submit: []
 }>()
-
-const open = ref<string | null>(null)
-
-const URGENCY = [
-    { key: 'immediate', label: 'urgency.immediate' },
-    { key: 'follow_up', label: 'urgency.followUp' },
-] as const
-
-const RESPONSIBILITY = [
-    { key: 'site', label: 'responsibility.site' },
-    { key: 'facility', label: 'responsibility.facility' },
-    { key: 'district', label: 'responsibility.district' },
-    { key: 'regional', label: 'responsibility.regional' },
-    { key: 'national', label: 'responsibility.national' },
-] as const
 
 /** Question text by code, so a gap reads as a sentence rather than a number. */
 const questionText = computed(() => {
@@ -222,6 +202,15 @@ const overview = computed(() => {
 const submittable = computed(
     () => props.result.isComplete && props.result.missingNotes.length === 0,
 )
+
+/** Which section a question belongs to, so a row can jump to it. */
+function sectionOf(questionCode: string): string {
+    return (
+        props.template.sections.find((section) =>
+            section.questions.some((question) => question.code === questionCode),
+        )?.code ?? ''
+    )
+}
 
 function findingsOf(gap: Gap): StoredFinding[] {
     return props.findings.get(gap.key) ?? []
@@ -379,11 +368,19 @@ function summaryOf(gap: Gap): string {
           </div>
 
           <div>
-            <!-- Gaps: every Partial and No, described for the site. -->
+            <!--
+                What was found, read-only.
+
+                The gaps are described at the end of each section now, where
+                the assessor is standing when they find them. This screen used
+                to collect them, which meant the same shortfall was written
+                twice — once as a comment under the question and again here —
+                and meant a visit with fifty gaps arrived at a page carrying
+                fifty editors. Reading them back before signing is a different
+                job from writing them, and it is the one this screen has.
+            -->
             <section class="mb-4">
-                <h2
-                    class="flex items-baseline justify-between px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2"
-                >
+                <h2 class="flex items-baseline justify-between px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
                     <span>{{ t('review.gaps') }}</span>
                     <span class="tnum normal-case">
                         {{ t('review.described', { described, total: gaps.length }) }}
@@ -391,194 +388,47 @@ function summaryOf(gap: Gap): string {
                 </h2>
 
                 <div v-if="gaps.length > 0" class="overflow-hidden rounded-card bg-surface">
-                    <div
+                    <button
                         v-for="(gap, index) in gaps"
                         :key="gap.key"
+                        type="button"
+                        class="flex w-full items-start gap-2.5 px-3.5 py-3 text-left"
                         :class="index > 0 ? 'border-t border-hairline' : ''"
+                        @click="emit('jump', sectionOf(gap.questionCode), gap.pathogen)"
                     >
-                        <button
-                            type="button"
-                            class="flex w-full items-start gap-2.5 px-3.5 py-3 text-left"
-                            @click="open = open === gap.key ? null : gap.key"
+                        <span
+                            class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold"
+                            :class="gap.response === 'N' ? 'bg-no-soft text-no' : 'bg-partial-soft text-partial'"
                         >
+                            {{ gap.response }}
+                        </span>
+                        <span class="tnum shrink-0 pt-0.5 font-mono text-xs text-label-3">
+                            {{ gap.questionCode }}
+                        </span>
+
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-[15px] leading-snug">
+                                {{ questionText.get(gap.questionCode) }}
+                            </span>
+
+                            <!-- The action itself, or the absence of one. An
+                                 undescribed gap is the thing worth showing. -->
                             <span
-                                class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold"
-                                :class="
-                                    gap.response === 'N'
-                                        ? 'bg-no-soft text-no'
-                                        : 'bg-partial-soft text-partial'
-                                "
+                                v-if="summaryOf(gap) !== ''"
+                                class="mt-0.5 block text-[13px] text-label-2"
                             >
-                                {{ gap.response }}
+                                {{ summaryOf(gap) }}
                             </span>
-                            <span class="flex-1">
-                                <span class="tnum text-[13px] text-label-2">
-                                    {{ gap.questionCode }}<template v-if="gap.pathogen">
-                                        · {{ gap.pathogen }}</template
-                                    >
-                                </span>
-                                <span class="block text-[15px] leading-snug">
-                                    {{ questionText.get(gap.questionCode) }}
-                                </span>
-                                <span
-                                    v-if="summaryOf(gap) !== ''"
-                                    class="mt-1 block text-[13px] text-label-2"
-                                >
-                                    {{ summaryOf(gap) }}
-                                </span>
-                                <span v-else class="mt-1 block text-[13px] font-medium text-accent">
-                                    {{ t('question.describeGap') }}
-                                </span>
+                            <span v-else class="mt-0.5 block text-[13px] font-medium text-no">
+                                {{ t('review.notDescribed') }}
                             </span>
-                        </button>
-
-                        <!-- One block per finding. A single No can hide more
-                             than one problem, and each needs its own action,
-                             owner and date. -->
-                        <div v-if="open === gap.key" class="flex flex-col gap-4 px-3.5 pb-3.5">
-                            <div
-                                v-for="(finding, index) in findingsOf(gap)"
-                                :key="finding.key"
-                                class="flex flex-col gap-2.5"
-                                :class="index > 0 ? 'border-t border-hairline pt-3.5' : ''"
-                            >
-                                <div class="flex items-center justify-between">
-                                    <span class="text-[12px] font-semibold uppercase tracking-wide text-label-2">
-                                        {{ t('review.gapNumber', { number: index + 1 }) }}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        class="text-[13px] text-no"
-                                        @click="emit('removeFinding', finding.key)"
-                                    >
-                                        {{ t('action.remove') }}
-                                    </button>
-                                </div>
-
-                                <textarea
-                                    :value="finding.gap"
-                                    rows="2"
-                                    :placeholder="t('review.gapPlaceholder')"
-                                    class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-                                    @change="
-                                        emit('finding', finding.key, {
-                                            gap: ($event.target as HTMLTextAreaElement).value,
-                                        })
-                                    "
-                                ></textarea>
-
-                                <textarea
-                                    :value="finding.recommendation"
-                                    rows="2"
-                                    :placeholder="t('review.recommendationPlaceholder')"
-                                    class="scroll-thin w-full resize-none rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-                                    @change="
-                                        emit('finding', finding.key, {
-                                            recommendation: ($event.target as HTMLTextAreaElement).value,
-                                        })
-                                    "
-                                ></textarea>
-
-                                <!-- When. A separate axis from who, and from the
-                                     due date: "immediate" means before the
-                                     assessor leaves, which a date cannot say.
-                                     Nothing is preselected, because a default
-                                     would invent a judgement. -->
-                                <div>
-                                    <span class="mb-1 block px-0.5 text-[13px] text-label-2">
-                                        {{ t('review.howUrgent') }}
-                                    </span>
-                                    <div class="flex gap-1.5">
-                                        <button
-                                            v-for="option in URGENCY"
-                                            :key="option.key"
-                                            type="button"
-                                            class="rounded-full px-3 py-1.5 text-[13px] font-medium"
-                                            :class="
-                                                finding.urgency === option.key
-                                                    ? 'bg-accent text-white'
-                                                    : 'bg-ground text-label-2'
-                                            "
-                                            @click="
-                                                emit('finding', finding.key, {
-                                                    urgency:
-                                                        finding.urgency === option.key ? null : option.key,
-                                                })
-                                            "
-                                        >
-                                            {{ t(option.label) }}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <span class="mb-1 block px-0.5 text-[13px] text-label-2">
-                                        {{ t('review.whoActs') }}
-                                    </span>
-                                    <div class="scroll-thin flex gap-1.5 overflow-x-auto">
-                                        <button
-                                            v-for="level in RESPONSIBILITY"
-                                            :key="level.key"
-                                            type="button"
-                                            class="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium"
-                                            :class="
-                                                finding.responsibilityLevel === level.key
-                                                    ? 'bg-accent text-white'
-                                                    : 'bg-ground text-label-2'
-                                            "
-                                            @click="
-                                                emit('finding', finding.key, {
-                                                    responsibilityLevel: level.key,
-                                                })
-                                            "
-                                        >
-                                            {{ t(level.label) }}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="flex gap-2">
-                                    <input
-                                        :value="finding.responsiblePerson"
-                                        type="text"
-                                        :placeholder="t('review.responsiblePerson')"
-                                        class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
-                                        @change="
-                                            emit('finding', finding.key, {
-                                                responsiblePerson: ($event.target as HTMLInputElement).value,
-                                            })
-                                        "
-                                    />
-                                    <input
-                                        :value="finding.dueDate ?? ''"
-                                        type="date"
-                                        class="tnum shrink-0 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none"
-                                        @change="
-                                            emit('finding', finding.key, {
-                                                dueDate: ($event.target as HTMLInputElement).value || null,
-                                            })
-                                        "
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                class="rounded-lg bg-ground py-2.5 text-[14px] font-medium text-accent"
-                                @click="emit('addFinding', gap.questionCode, gap.pathogen)"
-                            >
-                                {{
-                                    findingsOf(gap).length === 0
-                                        ? t('review.describeThisGap')
-                                        : t('review.addAnotherGap')
-                                }}
-                            </button>
-                        </div>
-                    </div>
+                        </span>
+                    </button>
                 </div>
 
                 <p v-else class="px-1 text-[15px] text-label-2">{{ t('review.noGaps') }}</p>
             </section>
+
 
             <!-- Signed after the gaps have been read out, not before. -->
             <SignatureSection

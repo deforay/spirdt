@@ -90,7 +90,7 @@ final class SyncService
 
             $score = $this->snapshotScore($assessment, $template, $organizationId);
 
-            $this->requireSubmittable($assessment, $score);
+            $this->requireSubmittable($assessment, $score, $payload);
 
             return [
                 'assessment_id'     => $assessmentId,
@@ -570,11 +570,19 @@ final class SyncService
      * incomplete" sends somebody back through fifty-nine questions.
      *
      * @param  array<string,mixed>      $score
+     * @param  array<string,mixed>      $payload
      * @throws InvalidArgumentException
      */
-    private function requireSubmittable(Assessment $assessment, array $score): void
+    private function requireSubmittable(Assessment $assessment, array $score, array $payload): void
     {
-        if ((string) $assessment->status !== 'submitted') {
+        // What THIS payload claims, not what the assessment already is. A
+        // draft arriving after the submission it precedes — a retry from a
+        // device that was offline — must not be re-judged against rules the
+        // visit already satisfied when it was submitted. And it cannot be used
+        // to slip past them either: a payload saying draft leaves the status
+        // where it is, so becoming submitted still means saying so and being
+        // checked for it.
+        if (($payload['status'] ?? null) !== 'submitted') {
             return;
         }
 
@@ -596,6 +604,13 @@ final class SyncService
             $problems[] = count($violations) . ' not permitted: ' . $this->firstFew($violations);
         }
 
+        $unaddressed = $this->gapsWithNoAction($payload);
+
+        if ($unaddressed !== []) {
+            $problems[] = count($unaddressed)
+                . ' with no corrective action: ' . $this->firstFew($unaddressed);
+        }
+
         if ($problems === []) {
             return;
         }
@@ -603,6 +618,57 @@ final class SyncService
         throw new InvalidArgumentException(
             'This visit cannot be submitted yet — ' . implode('; ', $problems) . '.',
         );
+    }
+
+    /**
+     * Partials and Nos that nobody has said what to do about.
+     *
+     * A comment is optional on every question — an observation against a Yes
+     * is as worth recording as one against a No — so what a gap obliges is not
+     * words but an ACTION: something described, owned and dated, which is what
+     * the site is left with when the assessor drives away. A visit that
+     * records twenty shortfalls and no corrective actions has measured a site
+     * without helping it, and the whole point of the instrument is the second
+     * part.
+     *
+     * Read from the payload rather than from the database because a device
+     * sends only what is dirty: the findings already stored are not
+     * necessarily in this request, so this checks what has arrived against
+     * what has arrived. The device applies the same rule before enabling its
+     * button, and the two agree because both read the answers beside the
+     * findings.
+     *
+     * @param  array<string,mixed> $payload
+     * @return list<string>        natural keys, for the message
+     */
+    private function gapsWithNoAction(array $payload): array
+    {
+        $described = [];
+
+        foreach (is_array($payload['findings'] ?? null) ? $payload['findings'] : [] as $row) {
+            if (!is_array($row) || trim((string) ($row['gap'] ?? '')) === '') {
+                continue;
+            }
+
+            $key = (string) ($row['question_code'] ?? '') . '|' . (string) ($row['pathogen'] ?? '');
+            $described[$key] = true;
+        }
+
+        $unaddressed = [];
+
+        foreach (is_array($payload['answers'] ?? null) ? $payload['answers'] : [] as $row) {
+            if (!is_array($row) || !in_array($row['response'] ?? '', ['P', 'N'], true)) {
+                continue;
+            }
+
+            $key = (string) ($row['question_code'] ?? '') . '|' . (string) ($row['pathogen'] ?? '');
+
+            if (!isset($described[$key])) {
+                $unaddressed[] = $key;
+            }
+        }
+
+        return $unaddressed;
     }
 
     /**

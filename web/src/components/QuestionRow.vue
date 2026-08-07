@@ -17,10 +17,20 @@ import type { Question, ResponseCode } from '@/scoring/types'
  *   Offering it everywhere would let a site certify by declaring questions
  *   inapplicable, since every Not applicable narrows the denominator.
  *
- *   Partial, No and Not applicable oblige a note, and the row says so until
- *   one is written. The checklist asks the assessor to describe the gap, or to
- *   state why the question does not apply. Saying it here, at the moment of
- *   the decision, beats saying it at submit when the site visit is over.
+ *   A comment may be written against ANY response, and none of them is
+ *   obliged. The instrument prints a comments box beside every question and
+ *   the predecessor tool showed one on every screen, because an observation
+ *   worth recording against a Yes — a practice seen, a name, a lot number — is
+ *   as useful as one against a No.
+ *
+ * What a gap obliges is a corrective action, and that is asked for at the end
+ * of the section rather than here. Describing the same shortfall twice, once
+ * under the question and once where it can be given an owner and a date, is
+ * the thing this arrangement exists to avoid.
+ *
+ * The requirement is still read from the template — comment_required_for is
+ * empty in this instrument and the machinery stays, so a country that does
+ * want a mandatory comment gets one without a deploy.
  */
 
 const props = defineProps<{ question: Question }>()
@@ -32,14 +42,16 @@ const emit = defineEmits<{ guidance: [Question] }>()
 
 const text = computed(() => localised(props.question.text))
 
-const needsComment = computed(() =>
+const commentRequiredHere = computed(() =>
     commentRequired(response.value, props.question.comment_required_for),
 )
 
-const commentMissing = computed(() => needsComment.value && comment.value.trim() === '')
+const commentMissing = computed(
+    () => commentRequiredHere.value && comment.value.trim() === '',
+)
 
 const placeholder = computed(() =>
-    response.value === 'NA' ? t('question.whyNotApplicable') : t('question.describeGap'),
+    response.value === 'NA' ? t('question.whyNotApplicable') : t('question.comment'),
 )
 
 // Any translation counts, not only one in the current language: the button
@@ -74,7 +86,7 @@ const hasGuidance = computed(() => Object.keys(props.question.guidance ?? {}).le
             />
         </div>
 
-        <div v-if="needsComment" class="ml-[35px]">
+        <div class="ml-[35px]">
             <input
                 v-model="comment"
                 type="text"
