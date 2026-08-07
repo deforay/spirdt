@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhArrowLeft, PhArrowRight, PhBuildings } from '@phosphor-icons/vue'
+import { PhArrowLeft, PhArrowRight, PhBuildings, PhCheck } from '@phosphor-icons/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
@@ -403,6 +403,49 @@ const visibleSections = computed(() =>
 
 /** Section 4 repeats per pathogen; every other section is answered once. */
 const instance = computed(() => (section.value.scope === 'pathogen' ? activePathogen.value : null))
+
+/**
+ * How much of each section is answered, for the rail.
+ *
+ * The rail is the map of the visit and could only say where the assessor was
+ * standing. What is left is the question it gets looked at to answer, and
+ * answering it there saves a trip to the review screen to find out.
+ *
+ * Counts rather than colour. Green, amber and red mean a response in this
+ * application, and a navigation list lit up in them would be the loudest thing
+ * on a screen whose actual content is the questions. The review screen carries
+ * the badges; this carries the arithmetic.
+ */
+const sectionProgress = computed(() => {
+    const outstanding = new Map<string, number>()
+
+    for (const key of assessment.result.value.missing) {
+        const code = template.sections.find((entry) =>
+            entry.questions.some((question) => question.code === key.split('|')[0]),
+        )?.code
+
+        if (code !== undefined) {
+            outstanding.set(code, (outstanding.get(code) ?? 0) + 1)
+        }
+    }
+
+    const progress = new Map<string, { answered: number; expected: number; done: boolean }>()
+
+    for (const tally of assessment.result.value.sections) {
+        const answered = tally.answered + tally.excluded
+        const expected = answered + (outstanding.get(tally.code) ?? 0)
+
+        progress.set(tally.code, {
+            answered,
+            expected,
+            // A section nobody has started is not finished. Without this an
+            // inapplicable section and an untouched one both read as done.
+            done: expected > 0 && answered === expected,
+        })
+    }
+
+    return progress
+})
 
 const sectionTally = computed(() =>
     assessment.result.value.sections.find((s) => s.code === section.value.code),
@@ -852,6 +895,22 @@ async function onSubmit() {
                 >
                     <span class="tnum shrink-0 font-semibold">{{ item.number }}</span>
                     <span class="min-w-0 flex-1">{{ text(item.title) }}</span>
+
+                    <!-- A tick when there is nothing left, the count when there
+                         is. Both in the faintest label colour: this is the
+                         answer to a question the assessor asked, not something
+                         demanding to be read. -->
+                    <PhCheck
+                        v-if="sectionProgress.get(item.code)?.done"
+                        :size="14"
+                        class="mt-0.5 shrink-0 self-start text-label-3"
+                        :aria-label="t('checklist.sectionDone')"
+                    />
+                    <span v-else class="tnum shrink-0 self-start text-[12px] text-label-3">
+                        {{ sectionProgress.get(item.code)?.answered ?? 0 }}/{{
+                            sectionProgress.get(item.code)?.expected ?? 0
+                        }}
+                    </span>
                 </button>
             </nav>
 

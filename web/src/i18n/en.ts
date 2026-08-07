@@ -123,6 +123,7 @@ export const messages = {
     'checklist.pathogens': 'Pathogens',
     'checklist.sectionScore': 'Section score',
     'checklist.editSetup': 'Site details',
+    'checklist.sectionDone': 'Complete',
     'checklist.review': 'Review',
     'checklist.answeredLabel': 'answered',
     'checklist.previousSection': 'Previous',
