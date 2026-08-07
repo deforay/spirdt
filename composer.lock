@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "220b9b2cf310408ce0431ff69d5d692d",
+    "content-hash": "599d5f86e34848d7dc661fd65ce68e5a",
     "packages": [
         {
             "name": "amitdugar/archiveutil",
@@ -62,16 +62,16 @@
         },
         {
             "name": "amitdugar/db-tools",
-            "version": "3.1.0",
+            "version": "3.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/amitdugar/db-tools.git",
-                "reference": "f80eb51b9f57c91f31b7eb3e902f1d7e24f1432f"
+                "reference": "f8d8b13034e7640687cd7160b77c198b2624bc05"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/amitdugar/db-tools/zipball/f80eb51b9f57c91f31b7eb3e902f1d7e24f1432f",
-                "reference": "f80eb51b9f57c91f31b7eb3e902f1d7e24f1432f",
+                "url": "https://api.github.com/repos/amitdugar/db-tools/zipball/f8d8b13034e7640687cd7160b77c198b2624bc05",
+                "reference": "f8d8b13034e7640687cd7160b77c198b2624bc05",
                 "shasum": ""
             },
             "require": {
@@ -82,6 +82,7 @@
                 "symfony/process": "^8.1"
             },
             "require-dev": {
+                "phpstan/phpstan": "^2.2",
                 "phpunit/phpunit": "^13.1"
             },
             "bin": [
@@ -116,7 +117,7 @@
                 "issues": "https://github.com/amitdugar/db-tools/issues",
                 "source": "https://github.com/amitdugar/db-tools"
             },
-            "time": "2026-06-15T11:03:21+00:00"
+            "time": "2026-08-07T14:12:08+00:00"
         },
         {
             "name": "brick/math",

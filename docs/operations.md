@@ -16,36 +16,39 @@ db-tools does considerably more than dump:
 vendor/bin/db-tools list       # restore, verify, pitr, export, import, size, clean
 ```
 
-!!! danger "Check the size. A backup can be empty and still report success"
+!!! note "A silent empty backup is fixed, and here is what to check if it returns"
     On 2026-08-07 `composer db:backup` printed `✓ Backup created` and wrote a
-    13-byte archive containing nothing at all. The dump had failed.
+    13-byte archive containing nothing. It had two causes, both now closed.
 
-    The cause is a privilege, not a bug in the dump: MySQL 8's `mysqldump`
-    reads `INFORMATION_SCHEMA.FILES` to record tablespaces, and that needs the
-    **global `PROCESS`** privilege. An application user granted `ALL ON
-    spirdt.*` does not have it. `mysqldump` then errors — and exits `0`, so
-    nothing downstream can tell.
-
-    Grant it wherever the app user was created:
+    **The privilege.** MySQL 8's `mysqldump` reads `INFORMATION_SCHEMA.FILES`
+    to record tablespaces, which needs the global `PROCESS` privilege. An
+    application user granted `ALL ON spirdt.*` does not have it. Grant it
+    wherever the app user was created:
 
     ```sql
     GRANT PROCESS ON *.* TO 'spirdt'@'127.0.0.1';
     FLUSH PRIVILEGES;
     ```
 
-    Read the consequence in full, because it is the part that matters: the
-    upgrade path below promises to abort if the backup fails. It cannot. A
-    backup that fails *this* way succeeds, so the guard never fires and the
-    migration proceeds with no restore point. **Verify the archive is a
-    plausible size before trusting an upgrade to it**, until db-tools refuses
-    to write an empty dump:
+    **The option file.** A `~/.my.cnf` carrying `[client]` credentials beat the
+    password db-tools supplies. MySQL ranks option files above environment
+    variables, and `MYSQL_PWD` is where a password belongs because it stays out
+    of `ps`. The connection went out with the configured user and somebody
+    else's password. Fixed in db-tools 3.3.0, which passes `--no-defaults`
+    whenever a password is configured.
+
+    Neither failure was visible, because a shell pipeline reports only its last
+    stage and `zstd` compresses an empty stream perfectly happily. db-tools
+    3.2.3 fixed that half: a failing dump now stops the command and prints the
+    reason. Both halves had to land before the upgrade guard below meant
+    anything.
+
+    Verifying the size costs nothing and catches the next failure of this
+    shape:
 
     ```bash
     zstd -dc var/backups/db/<archive>.sql.zst | wc -c
     ```
-
-    This is the second failure of the same shape — see the encryption note
-    below. The pattern is what to watch for, not the individual cause.
 
 !!! warning "Backups are currently unencrypted"
     db-tools encrypts by default, but supplying an encryption password currently produces **no archive at all** while still exiting 0. `--no-encrypt` is therefore passed explicitly — a backup step that silently writes nothing is far worse than an unencrypted one.
@@ -83,7 +86,7 @@ Two design points worth understanding:
 
 **The backup is not optional.** If it fails, the upgrade stops before anything else changes. An upgrade with no restore point is how a bad migration becomes an incident rather than an inconvenience. `--skip-backup` exists for when one was just taken by other means.
 
-That guard is only as good as what "fails" means, and twice now db-tools has written nothing while exiting `0` — see the warnings under [Backups](#backups). The step stops an upgrade that *errors*, not one that produces an empty archive. Until the tool distinguishes the two, check the size of the archive before relying on it.
+That guard is only as good as what "fails" means, and db-tools twice wrote nothing while exiting `0` — see the note under [Backups](#backups). Both causes are fixed, and so is the reporting that hid them, so the guard now fires on a failed dump rather than on an errored command. Checking the archive size before relying on it still costs nothing.
 
 **Migrations run unconditionally**, unlike in `bin/refresh`. A previously failed run can leave pending work that the current pull's diff says nothing about, so gating on the diff would skip it.
 
