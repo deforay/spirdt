@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { PhInfo } from '@phosphor-icons/vue'
-import { computed } from 'vue'
+import { PhInfo, PhX } from '@phosphor-icons/vue'
+import { computed, ref } from 'vue'
 
 import type { StorageReport } from '@/db/storage'
 import type { SaveState } from '@/composables/useAssessment'
@@ -29,7 +29,11 @@ const tone = computed(() => {
     if (!props.storage) return 'none'
     if (props.storage.risk === 'broken') return 'error'
     if (props.storage.risk === 'at-risk') return 'warn'
-    if (props.storage.risk === 'advisory') return 'note'
+
+    if (props.storage.risk === 'advisory') {
+        return props.storage.messageKey === dismissed.value ? 'none' : 'note'
+    }
+
     return 'none'
 })
 
@@ -43,6 +47,51 @@ const tone = computed(() => {
  * everybody, every time, is one nobody reads on the day it matters.
  */
 const alerting = computed(() => tone.value === 'error' || tone.value === 'warn')
+
+/**
+ * A note is said once. A problem is said until it stops being true.
+ *
+ * The advisory sat above every screen of a fifty-nine question form, saying
+ * the same sentence for the whole visit. It is worth reading once — the work
+ * is on this device and syncing is what gets it off — and after that it is a
+ * row of the screen spent on something the reader has already dealt with. A
+ * notice nobody can dismiss is a notice everybody stops seeing, including on
+ * the day it changes.
+ *
+ * Dismissal is remembered against the MESSAGE, not against the component, so
+ * a device whose situation changes — storage filling up, persistence lost —
+ * says the new thing rather than staying quiet because something else was
+ * dismissed once.
+ *
+ * Only the advisory can be dismissed. A device that is not saving is not a
+ * preference.
+ */
+const DISMISSED_KEY = 'spirdt.storage.dismissed'
+
+const dismissed = ref(read())
+
+function read(): string {
+    try {
+        return localStorage.getItem(DISMISSED_KEY) ?? ''
+    } catch {
+        // Private browsing, which is itself one of the things worth warning
+        // about — so fail towards showing the notice.
+        return ''
+    }
+}
+
+function dismiss(): void {
+    const key = props.storage?.messageKey ?? ''
+
+    dismissed.value = key
+
+    try {
+        localStorage.setItem(DISMISSED_KEY, key)
+    } catch {
+        // It stays dismissed for this tab and returns on the next load, which
+        // is the right way round for a device that cannot remember anything.
+    }
+}
 
 const message = computed(() => {
     if (props.saveState === 'error') {
@@ -81,5 +130,15 @@ const message = computed(() => {
         <span v-if="alerting" aria-hidden="true" class="mt-px font-semibold">!</span>
         <PhInfo v-else :size="15" class="mt-px shrink-0 text-label-3" aria-hidden="true" />
         <p class="flex-1">{{ message }}</p>
+
+        <button
+            v-if="!alerting"
+            type="button"
+            class="-my-1 -mr-1 shrink-0 rounded-full p-1 text-label-3 transition-colors hover:text-label"
+            :aria-label="t('action.dismiss')"
+            @click="dismiss"
+        >
+            <PhX :size="14" aria-hidden="true" />
+        </button>
     </div>
 </template>

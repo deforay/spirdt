@@ -247,7 +247,7 @@ function summaryOf(gap: Gap): string {
         causing it.
     -->
     <div
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground min-[900px]:max-w-[1100px] min-[900px]:px-6"
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground min-[900px]:max-w-[1280px] min-[900px]:px-6"
     >
         <header class="px-4 pb-3 pt-4 min-[900px]:px-0 min-[900px]:pt-6">
             <div class="mb-2 flex items-center gap-3">
@@ -270,7 +270,7 @@ function summaryOf(gap: Gap): string {
         </header>
 
         <main
-            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 min-[900px]:grid min-[900px]:grid-cols-[19rem_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6 min-[900px]:px-0"
+            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 min-[900px]:grid min-[900px]:grid-cols-[21rem_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6 min-[900px]:px-0"
         >
           <div class="min-[900px]:sticky min-[900px]:top-0">
             <!-- The score, stated once and plainly. -->

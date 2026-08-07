@@ -14,6 +14,7 @@ export const plural = (count: number): 'one' | 'other' => (count === 1 ? 'one' :
 export const messages: Messages = {
     'action.add': 'Añadir',
     'action.remove': 'Quitar',
+    'action.dismiss': 'Descartar',
     'action.cancel': 'Cancelar',
 
     'signIn.subtitle': 'Inicie sesión para comenzar una evaluación.',

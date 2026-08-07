@@ -536,7 +536,7 @@ async function onSubmit() {
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
         v-else-if="stage === 'setup'"
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[960px] md:px-6"
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1120px] md:px-6"
     >
         <StorageNotice
             :storage="assessment.storage.value"
@@ -644,7 +644,7 @@ async function onSubmit() {
         same list; only one is in the accessibility tree at a time, because two
         copies of the same navigation is two things to tab through.
     -->
-    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1040px] md:px-6">
+    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1280px] md:px-6">
         <StorageNotice
             :storage="assessment.storage.value"
             :save-state="assessment.saveState.value"
@@ -718,7 +718,7 @@ async function onSubmit() {
             </button>
         </nav>
 
-        <div class="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[13rem_minmax(0,1fr)] md:gap-6">
+        <div class="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:gap-6">
             <!--
                 The same navigation with the titles restored. A number alone is
                 a thing to count through; a title is a thing to choose. The

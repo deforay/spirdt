@@ -69,7 +69,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 <template>
     <div class="flex min-h-screen flex-col bg-ground">
         <header class="border-b border-hairline bg-surface">
-            <div class="mx-auto flex w-full max-w-[1040px] items-center gap-3 px-4 py-2 sm:px-6">
+            <div class="mx-auto flex w-full max-w-[1280px] items-center gap-3 px-4 py-2 sm:px-6">
                 <span class="text-[15px] font-bold tracking-tight">SPI-RDT</span>
 
                 <span class="flex-1"></span>

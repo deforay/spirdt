@@ -20,6 +20,7 @@ export const plural = (count: number): 'one' | 'other' => (count === 1 ? 'one' :
 export const messages = {
     'action.add': 'Add',
     'action.remove': 'Remove',
+    'action.dismiss': 'Dismiss',
     'action.cancel': 'Cancel',
 
     'signIn.subtitle': 'Sign in to start an assessment.',
