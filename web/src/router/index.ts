@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
-import { can, PERMISSION, type PermissionKey } from '@/auth/permissions'
+import { can, landing, PERMISSION, type PermissionKey } from '@/auth/permissions'
 import { session } from '@/auth/session'
 
 /**
@@ -174,8 +174,9 @@ const routes: RouteRecordRaw[] = [
     },
 
     // Deliberately carries no permission of its own. It is where an account
-    // that can open nothing else is sent, so a guard on it would send that
-    // account somewhere that sends it back here.
+    // that can open nothing else is sent, so a REQUIREMENT on it would send
+    // that account somewhere that sends it back here. It gets a guard of the
+    // opposite kind below instead — see the beforeEach.
     {
         path: '/no-access',
         name: 'no-access',
@@ -224,6 +225,23 @@ router.beforeEach((to) => {
         return true
     }
 
+    // THE DEAD END HAS TO BE LEAVEABLE. /no-access asks for no permission, so
+    // without this the guard has nothing to check and simply renders it — for
+    // ever, and for anybody. An account that reached it once while its
+    // permissions were unknown, or that was granted access afterwards, or that
+    // merely has the URL in its history, stayed on a screen saying it could do
+    // nothing while holding every permission there is. Reloading did not help,
+    // because the reason it was sent there is not re-examined by arriving.
+    //
+    // Checked against landing() rather than against a permission, so the two
+    // cannot disagree: landing() returns 'no-access' only when there is
+    // genuinely nowhere to go, and that is exactly when this must not fire.
+    if (to.name === 'no-access') {
+        const home = landing()
+
+        return home === 'no-access' ? true : { name: home }
+    }
+
     const required = to.meta.permission as PermissionKey | undefined
 
     if (required !== undefined && !can(required)) {
@@ -237,37 +255,3 @@ router.beforeEach((to) => {
     return true
 })
 
-/** The best screen this account can actually open. */
-function landing(): string {
-    if (can(PERMISSION.reportsRead)) {
-        return 'admin-dashboard'
-    }
-
-    if (can(PERMISSION.registryRead)) {
-        return 'admin-places'
-    }
-
-    if (can(PERMISSION.usersManage)) {
-        return 'admin-users'
-    }
-
-    if (can(PERMISSION.rolesManage)) {
-        return 'admin-roles'
-    }
-
-    if (can(PERMISSION.auditRead)) {
-        return 'admin-audit'
-    }
-
-    if (can(PERMISSION.organizationsManage)) {
-        return 'admin-organizations'
-    }
-
-    if (can(PERMISSION.assessmentsSubmit)) {
-        return 'assess'
-    }
-
-    // Holds nothing. Anywhere else would refuse and send them back here, which
-    // is a redirect loop rather than a message.
-    return 'no-access'
-}

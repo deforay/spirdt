@@ -87,5 +87,51 @@ export function canManage(): boolean {
     )
 }
 
+/**
+ * The best screen this account can actually open.
+ *
+ * Lives here rather than in the router because it is a question about
+ * permissions, not about routing — and because the router cannot be tested
+ * without a DOM, while both bugs this app has had in its navigation were in
+ * exactly this decision. The first sent an account with nothing anywhere and
+ * back again until vue-router gave up; the second sent one to a dead end it
+ * then had no way to leave.
+ *
+ * Returns 'no-access' ONLY when there is genuinely nowhere to go. The guard
+ * that lets somebody off that screen keys off the same answer, so the two
+ * cannot disagree about whether the dead end is warranted.
+ */
+export function landing(): string {
+    if (can(PERMISSION.reportsRead)) {
+        return 'admin-dashboard'
+    }
+
+    if (can(PERMISSION.registryRead)) {
+        return 'admin-places'
+    }
+
+    if (can(PERMISSION.usersManage)) {
+        return 'admin-users'
+    }
+
+    if (can(PERMISSION.rolesManage)) {
+        return 'admin-roles'
+    }
+
+    if (can(PERMISSION.auditRead)) {
+        return 'admin-audit'
+    }
+
+    if (can(PERMISSION.organizationsManage)) {
+        return 'admin-organizations'
+    }
+
+    if (can(PERMISSION.assessmentsSubmit)) {
+        return 'assess'
+    }
+
+    return 'no-access'
+}
+
 /** The same, for templates, so a change of account re-renders the navigation. */
 export const permissions = computed(() => held())
