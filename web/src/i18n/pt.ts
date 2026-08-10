@@ -216,6 +216,9 @@ export const messages: Messages = {
     'admin.users': 'Pessoas',
     'admin.usersSubtitle': 'Quem pode iniciar sessão, e como.',
     'admin.signOut': 'Terminar sessão',
+    'nav.registry': 'Registo',
+    'nav.access': 'Acesso',
+    'nav.menu': 'Menu',
     'admin.addUser': 'Adicionar pessoa',
     'admin.fullName': 'Nome completo',
     'admin.email': 'Endereço de e-mail',
@@ -289,6 +292,7 @@ export const messages: Messages = {
     'action.assessment.submitted': 'Submeteu uma avaliação',
     'action.facility.merged': 'Fundiu dois estabelecimentos',
 
+    'dash.eyebrow': 'Visão geral',
     'dash.title': 'Painel',
     'dash.subtitle': 'A situação do país, segundo as visitas submetidas até agora.',
     'dash.assessments': 'Avaliações submetidas',
