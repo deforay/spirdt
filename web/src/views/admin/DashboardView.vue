@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { type DashboardSummary, loadDashboard } from '@/api/admin'
@@ -111,6 +111,12 @@ function assessedOn(value: string): string {
 }
 
 onMounted(load)
+
+// The band and section names come from the instrument, so they are rendered by
+// the server in the language asked for. App strings re-render on a locale
+// change by themselves; these do not, and would sit in the previous language
+// until the next navigation. ReportView reloads for the same reason.
+watch(locale, () => load())
 </script>
 
 <template>

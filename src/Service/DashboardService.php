@@ -59,6 +59,10 @@ final class DashboardService
             'sections' => $this->sections($locale),
             'latest'   => $this->latest(),
             'bands'    => $this->bands($locale),
+            // More than one means the counts pool visits judged by different
+            // definitions of the same band. Reported so the screen can say so
+            // rather than presenting a number that reads as comparable.
+            'mixed_versions' => $this->versionsInScope() > 1,
         ];
     }
 
@@ -339,7 +343,49 @@ final class DashboardService
     }
 
     /**
-     * The band labels, from the published template.
+     * The instrument these figures were actually answered against.
+     *
+     * NOT SIMPLY THE PUBLISHED ONE. An assessment pins the template version it
+     * answered, and the bands are part of that version: if a programme is ever
+     * allowed to raise Level 4 from 90% to 95%, a visit that scored 91% stays
+     * stored as Level 4, and labelling its count with the new threshold would
+     * report it against a rule it was never judged by.
+     *
+     * Taken from the most recent scored visit in scope, falling back to the
+     * published template when there are none — a dashboard with no data still
+     * has to name its bands.
+     *
+     * A caveat this cannot fix, and which is why `mixed_versions` is reported:
+     * once two versions with different bands are both in scope, the counts
+     * themselves are ill-defined, because "how many at Level 4" is being asked
+     * of two different definitions of Level 4. That is the open question in
+     * docs/todo.md about whether band thresholds may be customised at all. This
+     * says so rather than quietly picking one.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function instrument(): ?array
+    {
+        $query = $this->scored();
+        $query->getQuery()->orderByDesc('assessments.assessed_on')->orderByDesc('assessments.id');
+
+        $pinned = $query->limit(1)->value('assessments.template_id');
+
+        $definition = $pinned === null
+            ? Template::published(TenantContext::requireOrganizationId())?->definition
+            : Template::query()->where('templates.id', (int) $pinned)->first()?->definition;
+
+        return is_array($definition) ? $definition : null;
+    }
+
+    /** How many distinct instrument versions the figures above pool together. */
+    private function versionsInScope(): int
+    {
+        return $this->scored()->distinct()->count('assessments.template_id');
+    }
+
+    /**
+     * The band labels, from the instrument the visits answered.
      *
      * Read rather than hard-coded, for the same reason the registry's option
      * lists are: the thresholds are the instrument's own and a country may be
@@ -352,8 +398,8 @@ final class DashboardService
     {
         // `definition` is cast to an array on the model, so it arrives
         // decoded. Decoding it again turns a 96 KB structure into null.
-        $definition = Template::published(TenantContext::requireOrganizationId())?->definition;
-        $bands = is_array($definition) ? ($definition['scoring']['bands'] ?? null) : null;
+        $definition = $this->instrument();
+        $bands = $definition === null ? null : ($definition['scoring']['bands'] ?? null);
 
         if (!is_array($bands)) {
             return [];
@@ -385,8 +431,8 @@ final class DashboardService
     /** @return array<string,string> section code => its name in this locale */
     private function sectionNames(string $locale): array
     {
-        $definition = Template::published(TenantContext::requireOrganizationId())?->definition;
-        $sections = is_array($definition) ? ($definition['sections'] ?? null) : null;
+        $definition = $this->instrument();
+        $sections = $definition === null ? null : ($definition['sections'] ?? null);
 
         if (!is_array($sections)) {
             return [];

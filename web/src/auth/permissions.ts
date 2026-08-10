@@ -36,12 +36,30 @@ export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION]
 /**
  * Absent rather than empty on a session saved before this shipped.
  *
- * Treated as holding nothing, which hides every link until the next sign-in
- * refreshes the session. Hiding a link somebody has is recoverable in one
- * sign-in. Showing one they do not have sends them to a screen that refuses.
+ * Treated as holding nothing, because showing a link somebody does not have
+ * sends them to a screen that refuses. But "absent" and "empty" are different
+ * facts and only one of them is a decision — see permissionsUnknown().
  */
 function held(): readonly string[] {
     return session.value?.user.permissions ?? []
+}
+
+/**
+ * Signed in, on a session that predates permissions existing.
+ *
+ * THE UPGRADE CASE, and it is not hypothetical: every session open at the
+ * moment this shipped carries no permission list, so every one of them read as
+ * holding nothing and landed on the no-access screen — including a superadmin
+ * holding all nine. The account was fine; the copy of it in localStorage was
+ * from a version that had never heard of the field.
+ *
+ * Distinguishing absent from empty is what lets the app repair itself: a
+ * session with no list can be refreshed into one, whereas a session with an
+ * empty list is an account that genuinely holds nothing and refreshing it
+ * would change nothing.
+ */
+export function permissionsUnknown(): boolean {
+    return session.value !== null && session.value.user.permissions === undefined
 }
 
 export function can(permission: PermissionKey): boolean {

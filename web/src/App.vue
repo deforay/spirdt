@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { refresh } from '@/api/client'
+import { permissionsUnknown } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import ChangePassword from '@/components/ChangePassword.vue'
 import SignIn from '@/components/SignIn.vue'
@@ -23,6 +25,31 @@ import { router } from '@/router'
  */
 
 const signedIn = computed(() => session.value !== null)
+
+/**
+ * Repair a session saved before permissions existed.
+ *
+ * Every session open when that shipped carries no permission list, and the app
+ * reads a missing list as holding nothing — so a superadmin holding all nine
+ * landed on the no-access screen. The account was never the problem; the copy
+ * of it in localStorage was.
+ *
+ * Refreshing rebuilds the session from the server, which now returns the list.
+ * Done here, before any route decides anything, because the alternative is
+ * telling everybody with an open session to sign out and in again — which
+ * works, and which nobody should have to be told.
+ *
+ * Failure is silent on purpose. A refresh that cannot reach the server leaves
+ * the session exactly as it was, and an assessor with unsynced work on a
+ * device with no signal must not be signed out by a repair.
+ */
+if (permissionsUnknown()) {
+    void refresh().then((ok) => {
+        if (ok) {
+            void router.replace({ name: 'home' })
+        }
+    })
+}
 
 /**
  * Signed in, but the server will refuse everything except changing the

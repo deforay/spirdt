@@ -51,6 +51,46 @@ final class GrantsMatchTheMigrationTest extends TestCase
         }
     }
 
+    /**
+     * A superadmin holds everything, by construction rather than by memory.
+     *
+     * Every permission added so far has needed a migration granting it and a
+     * line in Roles::GRANTS, and both are easy to half-do. The failure is quiet
+     * in the worst way: the organisation's own owner opens a screen the release
+     * added and is refused by it, with no indication that anything is missing
+     * rather than forbidden.
+     *
+     * So the rule is asserted instead of remembered. Adding a permission and
+     * not giving it to the superadmin now fails the build.
+     */
+    public function testASuperadminHoldsEveryPermissionThereIs(): void
+    {
+        $held = Roles::grantsFor('superadmin');
+        sort($held);
+
+        $catalogue = Permission::all();
+        sort($catalogue);
+
+        self::assertSame($catalogue, $held, 'superadmin must hold the whole catalogue');
+    }
+
+    /**
+     * And an administrator holds everything except the one that reaches across
+     * tenants. That exception is the distinction between the two roles, so it
+     * is written down here rather than left to whoever adds the next
+     * permission.
+     */
+    public function testAnAdministratorHoldsEverythingExceptTheCrossTenantOne(): void
+    {
+        $held = Roles::grantsFor('admin');
+        sort($held);
+
+        $expected = array_values(array_diff(Permission::all(), [Permission::ORGANIZATIONS_MANAGE]));
+        sort($expected);
+
+        self::assertSame($expected, $held);
+    }
+
     /** And every role either side names has to be one that gets created. */
     public function testNoGrantNamesARoleThatIsNeverSeeded(): void
     {
