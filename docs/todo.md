@@ -1,6 +1,6 @@
 # What is left
 
-State as of 7 August 2026. Written
+State as of 10 August 2026. Written
 so work can resume cold.
 
 ## Decided but not built
@@ -47,6 +47,26 @@ Still open, and deliberately left until the shape is clearer: whether a country
 needs its own settings screen, whether organisations need types (ministry
 versus partner), and **whether organisation A may see organisation B's score on
 a site they both audit** — today, no.
+
+### The audit trail — done
+`audit_log` existed since 0.1.4 and held eight rows, every one written by
+`bin/recover-access`. It now records sign-in, sign-out, a replayed refresh
+token, a password change, the four user-administration actions, both
+organisation ones, a facility merge and a submitted assessment. `/admin/audit`
+reads it back, behind `audit.read`.
+
+Three decisions worth knowing. The actor is never passed in: `record()` takes
+it from the tenant context that authentication established, so a caller cannot
+name somebody else. The exception is `asUser()`, used only by sign-in and
+sign-out, which run on routes that establish no tenant. And a failed write
+never fails the action — a full audit table must not refuse a password reset
+for somebody locked out at a clinic. That trade is only defensible because it
+is loud, so the failure goes to the file log naming the action it lost.
+
+Reading is deliberately not audited, and neither are ordinary registry edits.
+`api_logs` already has both. A merge is the exception because it moves every
+site and assessment off one facility and cannot be undone from the screen that
+did it.
 
 ### Permissions — done for the five system roles
 Routes require a capability rather than a role name, `role_permissions` is

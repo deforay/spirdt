@@ -91,6 +91,12 @@ const routes: RouteRecordRaw[] = [
         meta: { permission: PERMISSION.registryRead },
     },
     {
+        path: '/admin/audit',
+        name: 'admin-audit',
+        component: () => import('@/views/admin/AuditView.vue'),
+        meta: { permission: PERMISSION.auditRead },
+    },
+    {
         path: '/admin/roles',
         name: 'admin-roles',
         component: () => import('@/views/admin/RolesView.vue'),
@@ -238,6 +244,10 @@ function landing(): string {
 
     if (can(PERMISSION.rolesManage)) {
         return 'admin-roles'
+    }
+
+    if (can(PERMISSION.auditRead)) {
+        return 'admin-audit'
     }
 
     if (can(PERMISSION.organizationsManage)) {

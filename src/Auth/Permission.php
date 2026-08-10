@@ -45,6 +45,16 @@ final class Permission
     public const USERS_MANAGE = 'users.manage';
 
     /**
+     * Read the audit trail: who did what, and when.
+     *
+     * Separate from the actions it records. Somebody who may reset passwords
+     * is not automatically somebody who may read the history of everybody
+     * else's, and an organisation may want the reverse — a compliance reader
+     * who changes nothing and sees everything.
+     */
+    public const AUDIT_READ = 'audit.read';
+
+    /**
      * Change what a role may do.
      *
      * Kept apart from `users.manage`, which is the right to decide who holds a
@@ -75,6 +85,7 @@ final class Permission
             self::REPORTS_READ,
             self::USERS_MANAGE,
             self::ROLES_MANAGE,
+            self::AUDIT_READ,
             self::ORGANIZATIONS_MANAGE,
         ];
     }

@@ -206,3 +206,7 @@ Verified against MySQL 8.4: duplicate assessment-scoped answers are rejected, wh
 `audit_log.organization_id` is nullable, and it is the only tenant table where that is true: platform-admin actions belong in the audit trail but sit above any tenant. The global scope must treat this table specially — a platform row is invisible to every organisation, which is the intent.
 
 `api_logs.request_body` is redacted before it is written, and truncated rather than storing a multi-megabyte sync payload. The full payload already lives in `submissions_raw`.
+
+What `audit_log` records is narrow on purpose. `api_logs` already holds every request; this table answers "who did this, and when" about the actions where the answer has consequences — somebody's access, somebody's account, or a submitted assessment. Reading is not audited, because recording every list view would bury a dozen meaningful entries under a hundred thousand saying nothing happened.
+
+Both tables carry the same `session_hash`, minted once at sign-in and carried across every token rotation. That is what turns two lists of rows into one account of an afternoon. IP is not enough on its own — carrier-grade NAT puts a whole district behind one address.

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditLog;
 use App\Auth\Roles;
 use App\Exception\AuthException;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\RequestContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 /**
@@ -111,7 +114,16 @@ final class AuthService
         $this->rehashIfNeeded($user, $password);
         $this->record($email, $ip, true, $organizationId);
 
-        return $this->issue($user, $deviceId, $userAgent);
+        // Issued first, then recorded. The session hash is minted in issue()
+        // and it is the whole value of this row: login_attempts already counts
+        // sign-ins for throttling, but only this carries the identifier every
+        // later row for the session shares, which is what turns a list of
+        // actions into "what that person did that afternoon".
+        $pair = $this->issue($user, $deviceId, $userAgent);
+
+        AuditLog::asUser((int) $user->id, $organizationId, AuditAction::SIGNED_IN);
+
+        return $pair;
     }
 
     /**
@@ -138,6 +150,23 @@ final class AuthService
 
         if ($row->revoked_at !== null) {
             $this->revokeAllFor((int) $row->user_id);
+
+            // Nobody did this on purpose, which is why it is worth a permanent
+            // row: a token presented twice means a copy exists, and every
+            // session for the account has just been ended because of it.
+            // Taken from the token row: this route runs outside
+            // authentication, so nothing has established a session, and the
+            // session being ended is the fact worth recording.
+            RequestContext::setSessionHash(
+                $row->session_hash === null ? null : (string) $row->session_hash,
+            );
+
+            AuditLog::asUser(
+                (int) $row->user_id,
+                $this->organizationOf((int) $row->user_id),
+                AuditAction::TOKEN_REPLAYED,
+                metadata: ['device_id' => $row->device_id],
+            );
 
             throw AuthException::refreshRejected();
         }
@@ -171,10 +200,41 @@ final class AuthService
     /** Signing out is best effort: an unknown token is already not usable. */
     public function logout(string $refreshToken): void
     {
+        $hash = hash('sha256', $refreshToken);
+
+        // Read before the update, because afterwards there is nothing to
+        // distinguish the row this call revoked from one revoked last week.
+        $row = Capsule::table('refresh_tokens')
+            ->where('token_hash', $hash)
+            ->whereNull('revoked_at')
+            ->first();
+
         Capsule::table('refresh_tokens')
-            ->where('token_hash', hash('sha256', $refreshToken))
+            ->where('token_hash', $hash)
             ->whereNull('revoked_at')
             ->update(['revoked_at' => gmdate('Y-m-d H:i:s')]);
+
+        if ($row === null || $row->user_id === null) {
+            return;
+        }
+
+        RequestContext::setSessionHash(
+            $row->session_hash === null ? null : (string) $row->session_hash,
+        );
+
+        AuditLog::asUser(
+            (int) $row->user_id,
+            $this->organizationOf((int) $row->user_id),
+            AuditAction::SIGNED_OUT,
+        );
+    }
+
+    /** The organisation an account belongs to, for the routes with no tenant. */
+    private function organizationOf(int $userId): ?int
+    {
+        $id = User::acrossOrganizations()->where('users.id', $userId)->value('organization_id');
+
+        return $id === null ? null : (int) $id;
     }
 
     /**
@@ -255,6 +315,12 @@ final class AuthService
             $this->revokeAllFor((int) $user->id);
         });
 
+        AuditLog::asUser(
+            $userId,
+            (int) $user->organization_id,
+            AuditAction::PASSWORD_CHANGED,
+        );
+
         // Re-read so the pair below is minted from the stored state rather than
         // from the in-memory copy, which still says the password must change.
         $updated = User::acrossOrganizations()->where('users.id', $userId)->first();
@@ -304,6 +370,12 @@ final class AuthService
          * cannot be used to become one.
          */
         $sessionHash ??= bin2hex(random_bytes(32));
+
+        // Published to the shared context, not only to the token. The request
+        // logger and the audit trail both write rows for this request, and
+        // without this the sign-in — the one row that names the session — was
+        // the only one in it with no session to name.
+        RequestContext::setSessionHash($sessionHash);
 
         $organizationId = (int) $user->organization_id;
 

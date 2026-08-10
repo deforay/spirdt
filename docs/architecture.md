@@ -67,6 +67,7 @@ Platform admins live in a **separate table** from users, not as a flag. That mak
 | `reports.read` | Read collected assessments and their scores |
 | `users.manage` | Create accounts, change roles, reset passwords, deactivate |
 | `roles.manage` | Change what a role may do |
+| `audit.read` | Read the trail of who did what |
 | `organizations.manage` | Add organisations to the programme |
 
 The difference matters when an organisation wants something the five roles do not express. Naming roles in routes makes a new capability a new role, and every route that should have included it has to be found and edited. Naming the capability moves the grant and leaves the routes alone.

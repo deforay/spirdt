@@ -66,6 +66,58 @@ export async function updateRolePermissions(
     return body.role
 }
 
+export interface AuditRow {
+    id: number
+    action: string
+    actor_type: string
+    actor_id: number | null
+    actor_name: string | null
+    actor_email: string | null
+    entity_type: string | null
+    entity_id: string | null
+    metadata: Record<string, unknown> | null
+    ip_address: string | null
+    platform: string | null
+    browser: string | null
+    /** First eight characters, for comparing rows by eye. */
+    session: string | null
+    session_hash: string | null
+    created_at: string
+}
+
+export interface AuditPage {
+    rows: AuditRow[]
+    total: number
+    page: number
+    per_page: number
+    /** Every action this server can write, so the filter is not built from history. */
+    actions: string[]
+}
+
+export interface AuditFilters {
+    action?: string
+    from?: string
+    to?: string
+    session_hash?: string
+    page?: number
+}
+
+export async function listAudit(filters: AuditFilters = {}): Promise<AuditPage> {
+    const query = new URLSearchParams()
+
+    for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== '' && value !== null) {
+            query.set(key, String(value))
+        }
+    }
+
+    const suffix = query.toString()
+
+    return apiRequest<AuditPage>(`/admin/audit${suffix === '' ? '' : `?${suffix}`}`, {
+        method: 'GET',
+    })
+}
+
 export interface NewUser {
     email: string
     full_name: string

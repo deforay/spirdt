@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditLog;
 use App\Auth\Permission;
 use App\Auth\Roles;
 use App\Models\Role;
@@ -177,6 +179,15 @@ final class RoleAdminService
                 ));
             }
         });
+
+        // The difference rather than the resulting set. Somebody reading this
+        // months later wants to know what changed, and a list of seven
+        // permissions does not say which of them is new.
+        AuditLog::record(AuditAction::ROLE_PERMISSIONS_CHANGED, 'role', $roleId, [
+            'role'    => $roleKey,
+            'granted' => $added,
+            'revoked' => $removed,
+        ]);
 
         return $this->one($role, $actorRole);
     }

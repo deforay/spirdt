@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Action\Admin\AssignmentsAction;
+use App\Http\Action\Admin\AuditAction;
 use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\ReportsAction;
@@ -93,6 +94,14 @@ return static function (App $app): void {
         $group->post('/users/{id}/password', [UsersAction::class, 'resetPassword']);
     })
         ->add(new RequirePermissionMiddleware(Permission::USERS_MANAGE))
+        ->add(new AuthMiddleware());
+
+    // Who did what. Read-only: rows are written by the services that perform
+    // the actions, from an actor taken off a verified token.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->get('/audit', [AuditAction::class, 'index']);
+    })
+        ->add(new RequirePermissionMiddleware(Permission::AUDIT_READ))
         ->add(new AuthMiddleware());
 
     // What a role may do, as opposed to who holds it. A separate permission

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditLog;
 use App\Models\Facility;
 use App\Models\GeoUnit;
 use App\Models\Template;
@@ -508,6 +510,16 @@ final class RegistryService
                     'is_active'      => 0,
                 ]);
         });
+
+        // The only registry action in the audit trail. Adding and correcting a
+        // record is ordinary work that api_logs already covers; this moves
+        // every testing site and every assessment off one facility and cannot
+        // be undone from the screen that did it.
+        AuditLog::record(AuditAction::FACILITY_MERGED, 'facility', $winnerId, [
+            'merged'      => $loserId,
+            'merged_name' => (string) $loser->name,
+            'kept_name'   => (string) $winner->name,
+        ]);
 
         return $this->oneFacility($winnerId);
     }

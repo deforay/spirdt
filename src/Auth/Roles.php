@@ -64,6 +64,7 @@ final class Roles
             Permission::REPORTS_READ,
             Permission::USERS_MANAGE,
             Permission::ROLES_MANAGE,
+            Permission::AUDIT_READ,
             Permission::ORGANIZATIONS_MANAGE,
         ],
         'admin' => [
@@ -74,6 +75,7 @@ final class Roles
             Permission::REPORTS_READ,
             Permission::USERS_MANAGE,
             Permission::ROLES_MANAGE,
+            Permission::AUDIT_READ,
         ],
         'assessor' => [
             Permission::ASSESSMENTS_SUBMIT,

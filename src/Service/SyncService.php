@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditLog;
 use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\AssessmentPathogen;
@@ -135,7 +137,10 @@ final class SyncService
         // Stamped once, when the visit is actually submitted. Re-stamping on
         // every retry would make the audit trail say the visit was submitted
         // whenever the device last had a signal.
-        if ($status === 'submitted' && ($assessment === null || $assessment->submitted_at === null)) {
+        $newlySubmitted = $status === 'submitted'
+            && ($assessment === null || $assessment->submitted_at === null);
+
+        if ($newlySubmitted) {
             $attributes['submitted_at'] = gmdate('Y-m-d H:i:s');
         }
 
@@ -146,6 +151,17 @@ final class SyncService
 
         $assessment->fill($attributes);
         $assessment->save();
+
+        // On the transition only, for the same reason submitted_at is stamped
+        // once. A device with no signal retries the same payload until it
+        // lands, and a row per attempt would report one visit as submitted
+        // five times on five different days.
+        if ($newlySubmitted) {
+            AuditLog::record(AuditAction::ASSESSMENT_SUBMITTED, 'assessment', $assessmentId, [
+                'testing_site_id' => $payload['testing_site_id'] ?? null,
+                'assessed_on'     => $payload['assessed_on'] ?? null,
+            ]);
+        }
 
         return $assessment;
     }

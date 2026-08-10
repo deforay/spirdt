@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
+use App\Audit\AuditAction;
 use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\AssessmentPathogen;
@@ -468,6 +469,31 @@ final class SyncServiceTest extends TestCase
         self::assertNotNull($after);
         self::assertSame('submitted', $after->status);
         self::assertSame($submittedAt, (string) $after->submitted_at, 'the submission time is not restamped');
+    }
+
+    /**
+     * One submission, however many times the device sends it.
+     *
+     * An assessor works in a building with no signal and the device retries
+     * until the payload lands. A row per attempt would report one visit as
+     * submitted five times on five different days, which is worse than no
+     * record: it is a record that disagrees with itself.
+     */
+    public function testASubmissionIsAuditedOnceHoweverOftenItIsRetried(): void
+    {
+        Capsule::table('audit_log')->delete();
+
+        $sync = new SyncService();
+        $payload = $this->submittablePayload();
+
+        $sync->accept($payload);
+        $sync->accept($payload);
+        $sync->accept($payload);
+
+        self::assertSame(
+            1,
+            Capsule::table('audit_log')->where('action', AuditAction::ASSESSMENT_SUBMITTED)->count(),
+        );
     }
 
     public function testRunningTheSamePayloadTwiceChangesNothing(): void

@@ -35,6 +35,7 @@ const links = computed(() =>
         { to: { name: 'admin-reports' }, label: t('reports.title'), need: PERMISSION.reportsRead },
         { to: { name: 'admin-users' }, label: t('admin.users'), need: PERMISSION.usersManage },
         { to: { name: 'admin-roles' }, label: t('roles.title'), need: PERMISSION.rolesManage },
+        { to: { name: 'admin-audit' }, label: t('audit.title'), need: PERMISSION.auditRead },
         { to: { name: 'admin-places' }, label: t('places.title'), need: PERMISSION.registryRead },
         { to: { name: 'admin-facilities' }, label: t('facilities.title'), need: PERMISSION.registryRead },
         { to: { name: 'admin-sites' }, label: t('sitesAdmin.title'), need: PERMISSION.registryRead },

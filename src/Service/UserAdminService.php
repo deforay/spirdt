@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditLog;
 use App\Models\Role;
 use App\Models\User;
 use App\Tenancy\TenantContext;
@@ -151,6 +153,11 @@ final class UserAdminService
         ]);
         $user->save();
 
+        AuditLog::aboutUser(AuditAction::USER_CREATED, (int) $user->id, [
+            'email' => (string) $user->email,
+            'role'  => $roleKey,
+        ]);
+
         return ['user' => $this->one((int) $user->id), 'password' => $password];
     }
 
@@ -201,6 +208,22 @@ final class UserAdminService
 
         if ($attributes !== []) {
             User::query()->where('users.id', $userId)->update($attributes);
+
+            // Which fields changed, and — for the two that matter — what to.
+            // Listing the field names is the default because a rule that
+            // depends on remembering which values are safe to keep breaks the
+            // first time somebody adds a field.
+            $detail = ['changed' => array_keys($attributes)];
+
+            if (array_key_exists('role_id', $attributes)) {
+                $detail['role'] = trim((string) ($input['role'] ?? ''));
+            }
+
+            if (array_key_exists('is_active', $attributes)) {
+                $detail['is_active'] = (bool) $attributes['is_active'];
+            }
+
+            AuditLog::aboutUser(AuditAction::USER_UPDATED, $userId, $detail);
         }
 
         return $this->one($userId);
@@ -238,6 +261,10 @@ final class UserAdminService
                 ->whereNull('revoked_at')
                 ->update(['revoked_at' => gmdate('Y-m-d H:i:s')]);
         });
+
+        // The account has changed hands: somebody else chose the password and
+        // has seen it. That is the fact this row exists to preserve.
+        AuditLog::aboutUser(AuditAction::USER_PASSWORD_RESET, $userId);
 
         return ['user' => $this->one($userId), 'password' => $password];
     }

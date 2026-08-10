@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Audit\AuditAction;
+use App\Audit\AuditLog;
 use App\Auth\Roles;
 use App\Models\Organization;
 use App\Models\Programme;
@@ -188,6 +190,11 @@ final class OrganizationAdminService
             return $newId;
         });
 
+        AuditLog::record(AuditAction::ORGANIZATION_CREATED, 'organization', $organizationId, [
+            'code'        => $code,
+            'admin_email' => $adminEmail,
+        ]);
+
         return ['organization' => $this->one($organizationId), 'password' => $password];
     }
 
@@ -243,6 +250,17 @@ final class OrganizationAdminService
 
         if ($attributes !== []) {
             Organization::query()->where('id', $organizationId)->update($attributes);
+
+            $detail = ['changed' => array_keys($attributes)];
+
+            // Deactivation is the one that stops everybody in that
+            // organisation signing in, so it is named rather than left as a
+            // field in a list.
+            if (array_key_exists('is_active', $attributes)) {
+                $detail['is_active'] = (bool) $attributes['is_active'];
+            }
+
+            AuditLog::record(AuditAction::ORGANIZATION_UPDATED, 'organization', $organizationId, $detail);
         }
 
         return $this->one($organizationId);
