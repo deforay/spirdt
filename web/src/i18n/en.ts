@@ -315,6 +315,17 @@ export const messages = {
     'dash.mean': 'mean {value}%',
     'dash.viewAll': 'All assessments',
 
+    'dash.allTime': 'All time',
+    'dash.trend': 'Last 180 days',
+    'dash.radar': 'Section profile',
+    'dash.radarHelp': 'Mean score per section. A dent is where a country is losing points.',
+    'dash.map': 'Where visits happened',
+    'dash.mapEmpty': 'No assessment carries a position yet. Coordinates are recorded when an assessor files a visit, and fall back to the facility when the registry has one.',
+    'dash.showThese': 'Show these',
+    'map.inherited': 'Position from the facility record, not from the visit',
+    'map.device': 'Recorded on the visit',
+    'map.facility': 'From the facility record',
+
     'registry.title': 'Registry',
     'registry.subtitle': 'Places, facilities, and the testing sites inside them.',
     'registry.place': 'Place',

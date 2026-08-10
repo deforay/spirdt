@@ -42,6 +42,12 @@ final class DashboardService
 
     private const RECENT_DAYS = 30;
 
+    /** The second horizon. One window shows noise; two show a direction. */
+    private const TREND_DAYS = 180;
+
+    /** A country's worth of pins is fine; a country's worth of rows is not. */
+    private const MAP_POINTS = 500;
+
     private const MONTHS = 12;
 
     private const LATEST = 8;
@@ -55,9 +61,11 @@ final class DashboardService
             'totals'   => $this->totals(),
             'levels'   => $this->levels(),
             'recent'   => $this->levels(since: gmdate('Y-m-d', strtotime('-' . self::RECENT_DAYS . ' days'))),
+            'trend'    => $this->levels(since: gmdate('Y-m-d', strtotime('-' . self::TREND_DAYS . ' days'))),
             'months'   => $this->byMonth(),
             'sections' => $this->sections($locale),
             'latest'   => $this->latest(),
+            'map'      => $this->map(),
             'bands'    => $this->bands($locale),
             // More than one means the counts pool visits judged by different
             // definitions of the same band. Reported so the screen can say so
@@ -340,6 +348,78 @@ final class DashboardService
         }
 
         return ['facilities' => $facilities, 'sites' => $sites];
+    }
+
+    /**
+     * Where the visits happened, for the map.
+     *
+     * An assessment carries its own coordinates: the device records a fix when
+     * one is available and the server falls back to the facility's registered
+     * position when it is not, recording which in `location_source` so a
+     * reader can tell evidence of a visit from an administrator's best guess.
+     * Both are plotted; only one of them proves anybody was there.
+     *
+     * Bounded, because a country's registry runs to thousands and a map with
+     * three thousand markers on it is a coloured rectangle. Newest first, so
+     * the bound drops the oldest rather than an arbitrary set.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function map(): array
+    {
+        $query = $this->scored();
+
+        // Shaped on the underlying query, executed through Eloquent, for the
+        // reason scored() spells out: whereNotNull reaches Eloquent through
+        // __call and hands back the query builder, and running it there drops
+        // the tenant scope.
+        $query->getQuery()
+            ->whereNotNull('assessments.latitude')
+            ->whereNotNull('assessments.longitude')
+            ->orderByDesc('assessments.assessed_on');
+
+        $visits = $query->limit(self::MAP_POINTS)->get([
+            'assessments.id',
+            'assessments.facility_id',
+            'assessments.testing_site_id',
+            'assessments.latitude',
+            'assessments.longitude',
+            'assessments.accuracy_m',
+            'assessments.location_source',
+            'assessments.assessed_on',
+            'assessment_scores.percentage',
+            'assessment_scores.level',
+        ]);
+
+        $names = $this->namesFor(
+            array_filter($visits->pluck('facility_id')->all()),
+            array_filter($visits->pluck('testing_site_id')->all()),
+        );
+
+        $points = [];
+
+        foreach ($visits as $visit) {
+            $siteId = $visit->testing_site_id === null ? null : (string) $visit->testing_site_id;
+            $facilityId = $visit->facility_id === null ? null : (string) $visit->facility_id;
+
+            $points[] = [
+                'id'          => (string) $visit->id,
+                'lat'         => (float) $visit->latitude,
+                'lng'         => (float) $visit->longitude,
+                'accuracy_m'  => $visit->accuracy_m === null ? null : (int) $visit->accuracy_m,
+                // 'device' is where the assessor stood. 'facility' is what the
+                // registry claims. A map that does not distinguish them invites
+                // a dispute about a visit to be settled with a guess.
+                'source'      => $visit->location_source === null ? null : (string) $visit->location_source,
+                'site'        => $siteId === null ? null : ($names['sites'][$siteId] ?? null),
+                'facility'    => $facilityId === null ? null : ($names['facilities'][$facilityId] ?? null),
+                'assessed_on' => $visit->assessed_on?->format('Y-m-d') ?? '',
+                'percentage'  => $visit->percentage === null ? null : (float) $visit->percentage,
+                'level'       => $visit->level === null ? null : (int) $visit->level,
+            ];
+        }
+
+        return $points;
     }
 
     /**

@@ -1,9 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 
 import { type DashboardSummary, loadDashboard } from '@/api/admin'
 import AdminShell from '@/components/admin/AdminShell.vue'
+import EChart from '@/components/admin/EChart.vue'
+
+/**
+ * Leaflet arrives only when there is something to plot.
+ *
+ * The map is rendered behind a v-if on having any points at all, and an
+ * ordinary import would still pull the library into this chunk for every
+ * installation — including the many where no assessment carries a position
+ * yet, which is all of them today. Asynchronous, so the cost is paid by the
+ * screens that draw a map and by nobody else.
+ */
+const AuditMap = defineAsyncComponent(() => import('@/components/admin/AuditMap.vue'))
 import ScoreBadge from '@/components/admin/ScoreBadge.vue'
 import { locale, t } from '@/i18n'
 
@@ -15,7 +27,19 @@ import { locale, t } from '@/i18n'
  * levels, whether that is moving, and which part of the standard is dragging
  * the scores down.
  *
- * THE CHARTS ARE HAND-DRAWN rather than a library, and that is a size decision
+ * TWO KINDS OF CHART, AND THE SPLIT IS DELIBERATE. The distribution bars and
+ * the month columns stay hand-drawn: they are a rectangle and a row of
+ * rectangles, and a library adds nothing to either. The radar and the map are
+ * not — a polygon on five axes and a tile map are exactly what a library is
+ * for, and writing them by hand would be worse in every way that matters.
+ *
+ * Neither reaches the assessor. Every management route is a dynamic import, so
+ * ECharts and Leaflet land in admin chunks and a phone in a clinic never
+ * downloads them. That is what changed since the first version of this screen
+ * argued against a library on weight — the weight was never going to be
+ * shared, and the argument was wrong about which bundle it lands in.
+ *
+ * The remaining hand-drawn panels are as they were rather than a library, and that is a size decision
  * rather than a purist one. Two shapes are needed — a distribution bar and a
  * column series — and the smallest capable library is around seventy
  * kilobytes. This is one application, so that weight would also land on the
@@ -38,6 +62,8 @@ import { locale, t } from '@/i18n'
  * a new installation is mostly zeroes, and zeroes with no explanation read as
  * a broken screen rather than as a country that has not started yet.
  */
+
+const router = useRouter()
 
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
@@ -119,6 +145,78 @@ function assessedOn(value: string): string {
         : parsed.toLocaleDateString(locale.value, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+const trendScored = computed(() =>
+    (summary.value?.trend ?? []).reduce((sum, band) => sum + band.count, 0),
+)
+
+/**
+ * The radar, as ECharts wants it.
+ *
+ * Sections come back weakest first, which is right for a list and wrong for a
+ * radar: a polygon whose axes are sorted by value is a spiral, and the shape
+ * stops being comparable between two countries or two rounds. Ordered by
+ * section code here, so the same section is always in the same place.
+ */
+const radar = computed(() => {
+    const sections = [...(summary.value?.sections ?? [])].sort((a, b) =>
+        a.code.localeCompare(b.code, undefined, { numeric: true }),
+    )
+
+    return {
+        tooltip: { trigger: 'item' },
+        radar: {
+            indicator: sections.map((section) => ({ name: section.name, max: 100 })),
+            radius: '68%',
+            axisName: { color: 'rgba(110,110,118,1)', fontSize: 11 },
+            splitArea: { areaStyle: { color: ['rgba(118,118,128,0.04)', 'transparent'] } },
+            axisLine: { lineStyle: { color: 'rgba(60,60,67,0.18)' } },
+            splitLine: { lineStyle: { color: 'rgba(60,60,67,0.18)' } },
+        },
+        series: [
+            {
+                type: 'radar',
+                name: t('dash.radar'),
+                symbolSize: 4,
+                lineStyle: { width: 2, color: '#0A6ECB' },
+                itemStyle: { color: '#0A6ECB' },
+                areaStyle: { color: 'rgba(10,110,203,0.14)' },
+                data: [
+                    {
+                        value: sections.map((section) => section.mean),
+                        name: t('dash.radar'),
+                    },
+                ],
+            },
+        ],
+    }
+})
+
+/**
+ * Drill into the reports list rather than into the panel.
+ *
+ * That screen already filters, searches and paginates properly, and its
+ * filters live in the URL — so a band or a month is a link to a question
+ * somebody can bookmark, rather than a second implementation of filtering that
+ * has to be kept in step with the first.
+ */
+function showLevel(level: number): void {
+    void router.push({ name: 'admin-reports', query: { level: String(level) } })
+}
+
+function showMonth(month: string): void {
+    const [year, index] = month.split('-').map(Number)
+    const last = new Date(Date.UTC(year!, index!, 0)).getUTCDate()
+
+    void router.push({
+        name: 'admin-reports',
+        query: { from: `${month}-01`, to: `${month}-${String(last).padStart(2, '0')}` },
+    })
+}
+
+function showAssessment(id: string): void {
+    void router.push({ name: 'admin-report', params: { id } })
+}
+
 /** Weakest first, so the bar is a ranking rather than a rainbow. */
 function sectionTone(mean: number): string {
     if (mean < 60) {
@@ -181,7 +279,7 @@ watch(locale, () => load())
             </div>
 
             <div class="mb-4 grid gap-4 lg:grid-cols-2">
-                <!-- Certification levels -->
+                <!-- Certification levels, over three horizons -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
                     <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
                         {{ t('dash.levels') }}
@@ -192,84 +290,86 @@ watch(locale, () => load())
                     </p>
 
                     <template v-else>
-                        <div class="mt-4 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full">
+                        <div class="mt-4 flex flex-col gap-3">
                             <div
-                                v-for="band in summary.levels.filter((row) => row.count > 0)"
-                                :key="band.level"
-                                class="h-full first:rounded-l-full last:rounded-r-full"
-                                :style="{
-                                    width: `${share(band.count, scored)}%`,
-                                    background: TONE[band.level]!.fill,
-                                    opacity: TONE[band.level]!.alpha,
-                                }"
-                                :title="`${bandLabel(band.level)}: ${band.count}`"
-                            ></div>
+                                v-for="horizon in [
+                                    { key: 'all', label: t('dash.allTime'), rows: summary.levels, total: scored },
+                                    { key: 'trend', label: t('dash.trend'), rows: summary.trend, total: trendScored },
+                                    { key: 'recent', label: t('dash.levelsRecent'), rows: summary.recent, total: recentScored },
+                                ]"
+                                :key="horizon.key"
+                            >
+                                <div class="mb-1 flex items-baseline justify-between gap-3">
+                                    <span class="text-[12px] text-label-3">{{ horizon.label }}</span>
+                                    <span class="tnum text-[12px] text-label-3">{{ horizon.total }}</span>
+                                </div>
+
+                                <div
+                                    v-if="horizon.total > 0"
+                                    class="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full"
+                                >
+                                    <button
+                                        v-for="band in horizon.rows.filter((row) => row.count > 0)"
+                                        :key="band.level"
+                                        type="button"
+                                        class="h-full first:rounded-l-full last:rounded-r-full"
+                                        :style="{
+                                            width: `${share(band.count, horizon.total)}%`,
+                                            background: TONE[band.level]!.fill,
+                                            opacity: TONE[band.level]!.alpha,
+                                        }"
+                                        :title="`${bandLabel(band.level)}: ${band.count}`"
+                                        @click="showLevel(band.level)"
+                                    ></button>
+                                </div>
+                                <div v-else class="h-2.5 w-full rounded-full bg-track"></div>
+                            </div>
                         </div>
 
-                        <ul class="mt-4">
+                        <ul class="mt-5">
                             <li
                                 v-for="band in summary.levels"
                                 :key="band.level"
-                                class="flex items-center gap-2.5 border-b border-hairline py-2 text-[14px] last:border-0"
-                                :class="band.count === 0 ? 'text-label-3' : ''"
+                                class="border-b border-hairline last:border-0"
                             >
-                                <span
-                                    class="size-2 shrink-0 rounded-full"
-                                    :style="{
-                                        background: TONE[band.level]!.fill,
-                                        opacity: band.count === 0 ? 0.25 : TONE[band.level]!.alpha,
-                                    }"
-                                ></span>
-                                <span class="flex-1">{{ bandLabel(band.level) }}</span>
-                                <span class="tnum font-medium">{{ band.count }}</span>
+                                <button
+                                    type="button"
+                                    class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-card px-2 py-2 text-left text-[14px] hover:bg-accent-soft"
+                                    :class="band.count === 0 ? 'text-label-3' : ''"
+                                    :disabled="band.count === 0"
+                                    @click="showLevel(band.level)"
+                                >
+                                    <span
+                                        class="size-2 shrink-0 rounded-full"
+                                        :style="{
+                                            background: TONE[band.level]!.fill,
+                                            opacity: band.count === 0 ? 0.25 : TONE[band.level]!.alpha,
+                                        }"
+                                    ></span>
+                                    <span class="flex-1">{{ bandLabel(band.level) }}</span>
+                                    <span class="tnum font-medium">{{ band.count }}</span>
+                                </button>
                             </li>
                         </ul>
                     </template>
                 </section>
 
-                <!-- The same, recently -->
+                <!-- Section profile -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
-                        {{ t('dash.levelsRecent') }}
-                    </h2>
+                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ t('dash.radar') }}</h2>
+                    <p class="mt-1 text-[13px] text-label-3">{{ t('dash.radarHelp') }}</p>
 
-                    <p v-if="recentScored === 0" class="mt-3 text-[14px] text-label-2">
-                        {{ t('dash.nothingRecent') }}
+                    <p v-if="summary.sections.length < 3" class="mt-3 text-[14px] text-label-2">
+                        {{ t('dash.noSections') }}
                     </p>
 
-                    <template v-else>
-                        <div class="mt-4 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full">
-                            <div
-                                v-for="band in summary.recent.filter((row) => row.count > 0)"
-                                :key="band.level"
-                                class="h-full first:rounded-l-full last:rounded-r-full"
-                                :style="{
-                                    width: `${share(band.count, recentScored)}%`,
-                                    background: TONE[band.level]!.fill,
-                                    opacity: TONE[band.level]!.alpha,
-                                }"
-                                :title="`${bandLabel(band.level)}: ${band.count}`"
-                            ></div>
-                        </div>
-
-                        <ul class="mt-4">
-                            <li
-                                v-for="band in summary.recent.filter((row) => row.count > 0)"
-                                :key="band.level"
-                                class="flex items-center gap-2.5 border-b border-hairline py-2 text-[14px] last:border-0"
-                            >
-                                <span
-                                    class="size-2 shrink-0 rounded-full"
-                                    :style="{
-                                        background: TONE[band.level]!.fill,
-                                        opacity: TONE[band.level]!.alpha,
-                                    }"
-                                ></span>
-                                <span class="flex-1">{{ bandLabel(band.level) }}</span>
-                                <span class="tnum font-medium">{{ band.count }}</span>
-                            </li>
-                        </ul>
-                    </template>
+                    <EChart
+                        v-else
+                        :option="radar"
+                        height="300px"
+                        :aria-label="t('dash.radar')"
+                        class="mt-2"
+                    />
                 </section>
             </div>
 
@@ -280,15 +380,18 @@ watch(locale, () => load())
                 </h2>
 
                 <div class="mt-5 flex items-end gap-2" style="height: 132px">
-                    <div
+                    <button
                         v-for="month in months"
                         :key="month.month"
-                        class="group flex h-full flex-1 flex-col justify-end"
+                        type="button"
+                        class="flex h-full flex-1 flex-col justify-end rounded-t disabled:cursor-default"
+                        :disabled="month.count === 0"
                         :title="
                             month.count === 0
                                 ? `${month.month}: 0`
                                 : `${month.month}: ${month.count} · ${t('dash.mean', { value: month.mean ?? 0 })}`
                         "
+                        @click="showMonth(month.month)"
                     >
                         <span
                             v-if="month.count > 0"
@@ -296,12 +399,14 @@ watch(locale, () => load())
                         >
                             {{ month.count }}
                         </span>
-                        <div
-                            class="rounded-md"
+                        <span
+                            class="block rounded-md"
                             :class="month.count === 0 ? 'bg-track' : 'bg-accent'"
-                            :style="{ height: month.count === 0 ? '4px' : `${columnHeight(month.count)}%` }"
-                        ></div>
-                    </div>
+                            :style="{
+                                height: month.count === 0 ? '4px' : `${columnHeight(month.count)}%`,
+                            }"
+                        ></span>
+                    </button>
                 </div>
 
                 <div class="mt-2 flex gap-2 border-t border-hairline pt-2">
@@ -313,6 +418,32 @@ watch(locale, () => load())
                         {{ monthLabel(month.month) }}
                     </span>
                 </div>
+            </section>
+
+            <!-- Where the visits happened -->
+            <section class="mb-4 rounded-surface border border-hairline bg-surface px-5 py-5">
+                <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ t('dash.map') }}</h2>
+
+                <p v-if="summary.map.length === 0" class="mt-3 text-[14px] text-label-2">
+                    {{ t('dash.mapEmpty') }}
+                </p>
+
+                <template v-else>
+                    <AuditMap class="mt-4" :points="summary.map" @pick="showAssessment" />
+
+                    <div class="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-label-3">
+                        <span class="inline-flex items-center gap-1.5">
+                            <span class="size-2.5 rounded-full bg-label-3"></span>
+                            {{ t('map.device') }}
+                        </span>
+                        <span class="inline-flex items-center gap-1.5">
+                            <span
+                                class="size-2.5 rounded-full border-2 border-label-3"
+                            ></span>
+                            {{ t('map.facility') }}
+                        </span>
+                    </div>
+                </template>
             </section>
 
             <div class="grid gap-4 lg:grid-cols-2">

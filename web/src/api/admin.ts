@@ -76,6 +76,8 @@ export interface DashboardSummary {
     }
     levels: Array<{ level: number; count: number }>
     recent: Array<{ level: number; count: number }>
+    /** The second horizon: one window shows noise, two show a direction. */
+    trend: Array<{ level: number; count: number }>
     months: Array<{ month: string; count: number; mean: number | null }>
     sections: Array<{ code: string; name: string; mean: number; assessments: number }>
     latest: Array<{
@@ -86,8 +88,23 @@ export interface DashboardSummary {
         percentage: number | null
         level: number | null
     }>
+    map: Array<{
+        id: string
+        lat: number
+        lng: number
+        accuracy_m: number | null
+        /** 'device' is where the assessor stood; 'facility' is what the registry claims. */
+        source: string | null
+        site: string | null
+        facility: string | null
+        assessed_on: string
+        percentage: number | null
+        level: number | null
+    }>
     /** Band labels from the published instrument, not from this bundle. */
     bands: Array<{ level: number; label: string; min_percent: number }>
+    /** True when the figures pool visits judged by different band definitions. */
+    mixed_versions?: boolean
 }
 
 export async function loadDashboard(locale: string): Promise<DashboardSummary> {

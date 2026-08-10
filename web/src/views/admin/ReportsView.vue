@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { type AssessmentRow, listAssessments } from '@/api/reports'
 import { type GeoTree, listGeoUnits } from '@/api/registry'
@@ -21,6 +21,12 @@ import { formatPercent, t } from '@/i18n'
  * A draft with no score yet still appears. An assessment that stayed invisible
  * until it was finished would be missing in exactly the state somebody is
  * chasing it in.
+ *
+ * THE FILTERS LIVE IN THE URL. That is what makes this screen the place the
+ * dashboard drills into — a band, a section or a month becomes a link rather
+ * than a second implementation of filtering — and it is also what makes a
+ * filtered view something somebody can bookmark or send to a colleague, which
+ * a set of controls holding their state in memory never is.
  */
 
 const tree = ref<GeoTree>({ units: [], paths: {} })
@@ -29,12 +35,18 @@ const total = ref(0)
 const page = ref(1)
 const perPage = ref(50)
 
-const geoUnitId = ref<number | null>(null)
-const search = ref('')
-const status = ref('')
-const level = ref<string>('')
-const from = ref('')
-const to = ref('')
+const route = useRoute()
+const router = useRouter()
+
+/** Seeded from the URL, so arriving from a chart lands on the same question. */
+const geoUnitId = ref<number | null>(
+    typeof route.query.place === 'string' ? Number(route.query.place) : null,
+)
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const status = ref(typeof route.query.status === 'string' ? route.query.status : '')
+const level = ref<string>(typeof route.query.level === 'string' ? route.query.level : '')
+const from = ref(typeof route.query.from === 'string' ? route.query.from : '')
+const to = ref(typeof route.query.to === 'string' ? route.query.to : '')
 
 const loading = ref(true)
 const error = ref('')
@@ -68,8 +80,42 @@ async function load(): Promise<void> {
 
 let timer: ReturnType<typeof setTimeout> | undefined
 
+/**
+ * Keep the address bar honest.
+ *
+ * Replaced rather than pushed: typing in the search box should not fill the
+ * history with one entry per keystroke, and Back from here should leave the
+ * screen rather than undo a character.
+ */
+function syncUrl(): void {
+    const query: Record<string, string> = {}
+
+    if (geoUnitId.value !== null) {
+        query.place = String(geoUnitId.value)
+    }
+    if (search.value !== '') {
+        query.q = search.value
+    }
+    if (status.value !== '') {
+        query.status = status.value
+    }
+    // Level 0 is a real band, so only the empty string means "any".
+    if (level.value !== '') {
+        query.level = level.value
+    }
+    if (from.value !== '') {
+        query.from = from.value
+    }
+    if (to.value !== '') {
+        query.to = to.value
+    }
+
+    void router.replace({ query })
+}
+
 watch([search, geoUnitId, status, level, from, to], () => {
     page.value = 1
+    syncUrl()
     clearTimeout(timer)
     timer = setTimeout(load, 250)
 })

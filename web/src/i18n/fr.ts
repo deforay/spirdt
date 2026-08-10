@@ -315,6 +315,17 @@ export const messages: Messages = {
     'dash.mean': 'moyenne {value} %',
     'dash.viewAll': 'Toutes les évaluations',
 
+    'dash.allTime': 'Depuis le début',
+    'dash.trend': '180 derniers jours',
+    'dash.radar': 'Profil par section',
+    'dash.radarHelp': 'Score moyen par section. Un creux indique où le pays perd des points.',
+    'dash.map': 'Lieux des visites',
+    'dash.mapEmpty': 'Aucune évaluation ne porte encore de position. Les coordonnées sont enregistrées lors de la visite, à défaut celles de l’établissement.',
+    'dash.showThese': 'Afficher',
+    'map.inherited': 'Position issue de la fiche de l’établissement, pas de la visite',
+    'map.device': 'Enregistrée lors de la visite',
+    'map.facility': 'Issue de la fiche de l’établissement',
+
     'registry.title': 'Répertoire',
     'registry.subtitle': 'Lieux, établissements, et les sites de test qu\'ils contiennent.',
     'registry.place': 'Lieu',
