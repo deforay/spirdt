@@ -214,6 +214,15 @@ async function exchange(): Promise<boolean> {
         return false
     }
 
+    // Signed out while this was in flight, so there is nothing to refresh into.
+    // A refresh takes a round trip, and a sign-out during one used to resolve
+    // afterwards and write the session back — putting somebody straight back
+    // into the account they had just left. Checked after the await rather than
+    // before, because the whole window is the await.
+    if (session.value === null) {
+        return false
+    }
+
     const body = (await response.json()) as {
         access_token: string
         refresh_token: string
