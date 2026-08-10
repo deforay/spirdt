@@ -45,6 +45,7 @@ const emit = defineEmits<{ pick: [id: string] }>()
 const host = ref<HTMLElement | null>(null)
 let map: L.Map | null = null
 let layer: L.LayerGroup | null = null
+let observer: ResizeObserver | null = null
 
 /** Matches ScoreBadge: 0 and 1 need remediation, 2 partial, 3 and 4 certifiable. */
 function colour(level: number | null): string {
@@ -125,11 +126,25 @@ onMounted(() => {
     }).addTo(map)
 
     draw()
+
+    /**
+     * Tell Leaflet the size of the box it is in, whenever that changes.
+     *
+     * Leaflet measures its container once, at init. This component is loaded
+     * asynchronously and mounts into a panel the browser has not finished
+     * laying out, so it measured a box of nearly no height — and then drew a
+     * full map at that size, spilling tiles over the panel above and taking
+     * the month chart's labels with them. invalidateSize is how Leaflet is
+     * told to measure again, and a ResizeObserver is what knows when to ask.
+     */
+    observer = new ResizeObserver(() => map?.invalidateSize())
+    observer.observe(host.value)
 })
 
 watch(() => props.points, draw, { deep: true })
 
 onBeforeUnmount(() => {
+    observer?.disconnect()
     layer?.remove()
     map?.remove()
     map = null
@@ -137,9 +152,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+    <!-- The height is on the element Leaflet measures, not on a wrapper, and
+         isolate keeps its stacking context to itself: Leaflet's own panes carry
+         z-index values that otherwise compete with the page chrome. -->
     <div
         ref="host"
-        class="w-full overflow-hidden rounded-card"
+        class="isolate w-full overflow-hidden rounded-card"
         :style="{ height: props.height ?? '380px' }"
     ></div>
 </template>

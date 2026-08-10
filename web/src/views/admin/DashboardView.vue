@@ -345,8 +345,19 @@ const radar = computed(() => {
         tooltip: { trigger: 'item' },
         radar: {
             indicator: sections.map((section) => ({ name: section.name, max: 100 })),
-            radius: '68%',
-            axisName: { color: palette.value.label3, fontSize: 11 },
+            // Small enough that the longest section name fits beside it.
+            // "Physical Facility and Equipment" was being clipped to
+            // "hysical Facility and Equipment", which is worse than a smaller
+            // polygon.
+            radius: '58%',
+            center: ['50%', '54%'],
+            axisName: {
+                color: palette.value.label3,
+                fontSize: 11,
+                overflow: 'break',
+                width: 96,
+                lineHeight: 14,
+            },
             splitArea: { areaStyle: { color: ['rgba(118,118,128,0.04)', 'transparent'] } },
             axisLine: { lineStyle: { color: palette.value.hairline } },
             splitLine: { lineStyle: { color: palette.value.hairline } },
@@ -785,7 +796,10 @@ watch(locale, () => load())
                 </template>
             </section>
 
-            <div class="grid gap-4 lg:grid-cols-2">
+            <!-- Full width, because the panel beside it moved up to sit with
+                 the radar and half an empty row reads as something failing to
+                 load rather than as a layout. -->
+            <div class="grid gap-4">
                 <!-- Latest -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
                     <div class="flex items-baseline justify-between gap-3">
