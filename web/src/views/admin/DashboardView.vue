@@ -183,11 +183,6 @@ function bandLabel(level: number): string {
     return summary.value?.bands.find((band) => band.level === level)?.label ?? `Level ${level}`
 }
 
-/** Share of the distribution bar. A band nobody reached takes no width. */
-function share(count: number, total: number): number {
-    return total === 0 ? 0 : (count / total) * 100
-}
-
 const months = computed(() => summary.value?.months ?? [])
 
 const busiestMonth = computed(() =>
@@ -221,6 +216,94 @@ function assessedOn(value: string): string {
 const trendScored = computed(() =>
     (summary.value?.trend ?? []).reduce((sum, band) => sum + band.count, 0),
 )
+
+/**
+ * A distribution as a doughnut, which is the shape people arrive expecting.
+ *
+ * The predecessor put three of these across the top of its dashboard and that
+ * is what a country's team has been reading for years. The legend carries the
+ * share AND the count, because a percentage on its own is unreadable at small
+ * numbers — "20%" of five visits is one laboratory, and a plan made from the
+ * percentage alone would be a plan for a fifth of the country.
+ *
+ * Empty bands are dropped from the ring and kept in the legend beneath it, so
+ * the shape stays honest while the scale stays visible.
+ */
+function donut(rows: Array<{ level: number; count: number }>, total: number) {
+    return {
+        tooltip: {
+            trigger: 'item',
+            formatter: (params: { name?: string; value?: number; percent?: number }) =>
+                `${params.name ?? ''}<br><strong>${params.value ?? 0}</strong> (${params.percent ?? 0}%)`,
+        },
+        toolbox: {
+            right: 0,
+            top: 0,
+            feature: { saveAsImage: { title: t('dash.saveImage'), pixelRatio: 2 } },
+            iconStyle: { borderColor: 'rgba(110,110,118,0.9)' },
+        },
+        series: [
+            {
+                type: 'pie',
+                radius: ['54%', '78%'],
+                center: ['50%', '52%'],
+                avoidLabelOverlap: true,
+                label: { show: false },
+                labelLine: { show: false },
+                itemStyle: { borderColor: 'transparent', borderWidth: 2 },
+                data: rows
+                    .filter((row) => row.count > 0)
+                    .map((row) => ({
+                        name: bandLabel(row.level),
+                        value: row.count,
+                        level: row.level,
+                        itemStyle: {
+                            color: TONE[row.level]!.fill,
+                            opacity: TONE[row.level]!.alpha,
+                        },
+                    })),
+            },
+        ],
+        // Kept so an empty period draws an empty ring rather than nothing at
+        // all, which reads as a chart that failed to load.
+        graphic:
+            total === 0
+                ? [
+                      {
+                          type: 'circle',
+                          left: 'center',
+                          top: 'middle',
+                          shape: { r: 46 },
+                          style: { fill: 'transparent', stroke: 'rgba(118,118,128,0.18)', lineWidth: 14 },
+                      },
+                  ]
+                : [],
+    }
+}
+
+/**
+ * What the panel beside it is actually showing.
+ *
+ * The predecessor printed the from date, the to date and the number of audits
+ * under every distribution, and it is the most quietly useful thing on that
+ * screen: a percentage with no denominator and no period is a number somebody
+ * will quote in a meeting.
+ */
+function windowFor(days: number | null): { from: string; to: string } {
+    if (days === null) {
+        return { from: from.value === '' ? t('dash.beginning') : from.value, to: to.value === '' ? t('dash.today') : to.value }
+    }
+
+    const start = new Date()
+    start.setDate(start.getDate() - days)
+
+    const floor = from.value === '' ? start : new Date(Math.max(start.getTime(), new Date(from.value).getTime()))
+
+    return {
+        from: floor.toISOString().slice(0, 10),
+        to: to.value === '' ? t('dash.today') : to.value,
+    }
+}
 
 /**
  * The radar, as ECharts wants it.
@@ -310,6 +393,25 @@ function showMonth(month: string): void {
 
 function showAssessment(id: string): void {
     void router.push({ name: 'admin-report', params: { id } })
+}
+
+/** "View data" on a panel: the same rows, in the screen built to list them. */
+function showAll(days: number | null): void {
+    const query = drillQuery({})
+
+    if (days !== null) {
+        const start = new Date()
+        start.setDate(start.getDate() - days)
+        query.from = start.toISOString().slice(0, 10)
+        query.to = new Date().toISOString().slice(0, 10)
+    }
+
+    void router.push({ name: 'admin-reports', query })
+}
+
+/** A band's share of its own window, for the legend beside the ring. */
+function percent(count: number, total: number): string {
+    return total === 0 ? '0%' : `${Math.round((count / total) * 1000) / 10}%`
 }
 
 /** Weakest first, so the bar is a ranking rather than a rainbow. */
@@ -442,82 +544,87 @@ watch(locale, () => load())
                 </div>
             </div>
 
-            <div class="mb-4 grid gap-4 lg:grid-cols-2">
-                <!-- Certification levels, over three horizons -->
-                <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
-                        {{ t('dash.levels') }}
-                    </h2>
+            <!-- Three horizons, the shape a country's team already reads -->
+            <div class="mb-4 grid gap-4 lg:grid-cols-3">
+                <section
+                    v-for="horizon in [
+                        { key: 'all', label: t('dash.allTime'), rows: summary.levels, total: scored, days: null },
+                        { key: 'trend', label: t('dash.trend'), rows: summary.trend, total: trendScored, days: 180 },
+                        { key: 'recent', label: t('dash.levelsRecent'), rows: summary.recent, total: recentScored, days: 30 },
+                    ]"
+                    :key="horizon.key"
+                    class="flex flex-col rounded-surface border border-hairline bg-surface px-5 py-5"
+                >
+                    <div class="flex items-baseline justify-between gap-3">
+                        <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ horizon.label }}</h2>
+                        <button
+                            type="button"
+                            class="text-[13px] font-medium text-accent disabled:text-label-3"
+                            :disabled="horizon.total === 0"
+                            @click="showAll(horizon.days)"
+                        >
+                            {{ t('dash.viewData') }}
+                        </button>
+                    </div>
 
-                    <p v-if="scored === 0" class="mt-3 text-[14px] text-label-2">
-                        {{ t('dash.nothing') }}
-                    </p>
+                    <EChart
+                        :option="donut(horizon.rows, horizon.total)"
+                        height="190px"
+                        :aria-label="horizon.label"
+                        class="mt-1"
+                    />
 
-                    <template v-else>
-                        <div class="mt-4 flex flex-col gap-3">
-                            <div
-                                v-for="horizon in [
-                                    { key: 'all', label: t('dash.allTime'), rows: summary.levels, total: scored },
-                                    { key: 'trend', label: t('dash.trend'), rows: summary.trend, total: trendScored },
-                                    { key: 'recent', label: t('dash.levelsRecent'), rows: summary.recent, total: recentScored },
-                                ]"
-                                :key="horizon.key"
+                    <ul class="mt-1">
+                        <li
+                            v-for="band in horizon.rows"
+                            :key="band.level"
+                            class="flex items-center gap-2 py-[3px] text-[12.5px]"
+                            :class="band.count === 0 ? 'text-label-3' : ''"
+                        >
+                            <span
+                                class="size-2 shrink-0 rounded-full"
+                                :style="{
+                                    background: TONE[band.level]!.fill,
+                                    opacity: band.count === 0 ? 0.25 : TONE[band.level]!.alpha,
+                                }"
+                            ></span>
+                            <button
+                                type="button"
+                                class="flex-1 truncate text-left hover:text-accent disabled:hover:text-label-3"
+                                :disabled="band.count === 0"
+                                @click="showLevel(band.level)"
                             >
-                                <div class="mb-1 flex items-baseline justify-between gap-3">
-                                    <span class="text-[12px] text-label-3">{{ horizon.label }}</span>
-                                    <span class="tnum text-[12px] text-label-3">{{ horizon.total }}</span>
-                                </div>
+                                {{ bandLabel(band.level) }}
+                            </button>
+                            <span class="tnum shrink-0 tabular-nums">
+                                {{ percent(band.count, horizon.total) }}
+                            </span>
+                            <span class="tnum w-8 shrink-0 text-right font-medium">{{ band.count }}</span>
+                        </li>
+                    </ul>
 
-                                <div
-                                    v-if="horizon.total > 0"
-                                    class="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full"
-                                >
-                                    <button
-                                        v-for="band in horizon.rows.filter((row) => row.count > 0)"
-                                        :key="band.level"
-                                        type="button"
-                                        class="h-full first:rounded-l-full last:rounded-r-full"
-                                        :style="{
-                                            width: `${share(band.count, horizon.total)}%`,
-                                            background: TONE[band.level]!.fill,
-                                            opacity: TONE[band.level]!.alpha,
-                                        }"
-                                        :title="`${bandLabel(band.level)}: ${band.count}`"
-                                        @click="showLevel(band.level)"
-                                    ></button>
-                                </div>
-                                <div v-else class="h-2.5 w-full rounded-full bg-track"></div>
-                            </div>
+                    <!-- What this panel is actually showing. A percentage with
+                         no denominator and no period gets quoted in a meeting. -->
+                    <div
+                        class="mt-4 grid grid-cols-3 gap-2 border-t border-hairline pt-3 text-[11px] text-label-3"
+                    >
+                        <div>
+                            <p class="eyebrow">{{ t('dash.fromDate') }}</p>
+                            <p class="tnum mt-0.5 truncate">{{ windowFor(horizon.days).from }}</p>
                         </div>
-
-                        <ul class="mt-5">
-                            <li
-                                v-for="band in summary.levels"
-                                :key="band.level"
-                                class="border-b border-hairline last:border-0"
-                            >
-                                <button
-                                    type="button"
-                                    class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-card px-2 py-2 text-left text-[14px] hover:bg-accent-soft"
-                                    :class="band.count === 0 ? 'text-label-3' : ''"
-                                    :disabled="band.count === 0"
-                                    @click="showLevel(band.level)"
-                                >
-                                    <span
-                                        class="size-2 shrink-0 rounded-full"
-                                        :style="{
-                                            background: TONE[band.level]!.fill,
-                                            opacity: band.count === 0 ? 0.25 : TONE[band.level]!.alpha,
-                                        }"
-                                    ></span>
-                                    <span class="flex-1">{{ bandLabel(band.level) }}</span>
-                                    <span class="tnum font-medium">{{ band.count }}</span>
-                                </button>
-                            </li>
-                        </ul>
-                    </template>
+                        <div>
+                            <p class="eyebrow">{{ t('dash.toDate') }}</p>
+                            <p class="tnum mt-0.5 truncate">{{ windowFor(horizon.days).to }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="eyebrow">{{ t('dash.auditCount') }}</p>
+                            <p class="tnum mt-0.5 font-semibold text-label">{{ horizon.total }}</p>
+                        </div>
+                    </div>
                 </section>
+            </div>
 
+            <div class="mb-4 grid gap-4 lg:grid-cols-2">
                 <!-- Section profile -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
                     <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ t('dash.radar') }}</h2>
@@ -534,6 +641,36 @@ watch(locale, () => load())
                         :aria-label="t('dash.radar')"
                         class="mt-2"
                     />
+                </section>
+
+                <!-- Weakest sections -->
+                <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
+                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
+                        {{ t('dash.sections') }}
+                    </h2>
+                    <p class="mt-1 text-[13px] text-label-3">{{ t('dash.sectionsHelp') }}</p>
+
+                    <p v-if="summary.sections.length === 0" class="mt-3 text-[14px] text-label-2">
+                        {{ t('dash.noSections') }}
+                    </p>
+
+                    <ul v-else class="mt-4 flex flex-col gap-3.5">
+                        <li v-for="section in summary.sections" :key="section.code">
+                            <div class="mb-1.5 flex items-baseline gap-3 text-[14px]">
+                                <span class="min-w-0 flex-1 truncate">{{ section.name }}</span>
+                                <span class="tnum font-semibold">{{ section.mean }}%</span>
+                            </div>
+                            <div class="h-1.5 w-full overflow-hidden rounded-full bg-track">
+                                <div
+                                    class="h-full rounded-full"
+                                    :style="{
+                                        width: `${section.mean}%`,
+                                        background: sectionTone(section.mean),
+                                    }"
+                                ></div>
+                            </div>
+                        </li>
+                    </ul>
                 </section>
             </div>
 
@@ -611,36 +748,6 @@ watch(locale, () => load())
             </section>
 
             <div class="grid gap-4 lg:grid-cols-2">
-                <!-- Weakest sections -->
-                <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
-                        {{ t('dash.sections') }}
-                    </h2>
-                    <p class="mt-1 text-[13px] text-label-3">{{ t('dash.sectionsHelp') }}</p>
-
-                    <p v-if="summary.sections.length === 0" class="mt-3 text-[14px] text-label-2">
-                        {{ t('dash.noSections') }}
-                    </p>
-
-                    <ul v-else class="mt-4 flex flex-col gap-3.5">
-                        <li v-for="section in summary.sections" :key="section.code">
-                            <div class="mb-1.5 flex items-baseline gap-3 text-[14px]">
-                                <span class="min-w-0 flex-1 truncate">{{ section.name }}</span>
-                                <span class="tnum font-semibold">{{ section.mean }}%</span>
-                            </div>
-                            <div class="h-1.5 w-full overflow-hidden rounded-full bg-track">
-                                <div
-                                    class="h-full rounded-full"
-                                    :style="{
-                                        width: `${section.mean}%`,
-                                        background: sectionTone(section.mean),
-                                    }"
-                                ></div>
-                            </div>
-                        </li>
-                    </ul>
-                </section>
-
                 <!-- Latest -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
                     <div class="flex items-baseline justify-between gap-3">

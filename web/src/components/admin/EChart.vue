@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { RadarChart } from 'echarts/charts'
-import { TooltipComponent } from 'echarts/components'
+import { PieChart, RadarChart } from 'echarts/charts'
+import { LegendComponent, ToolboxComponent, TooltipComponent } from 'echarts/components'
 import * as echarts from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
@@ -35,11 +35,20 @@ const props = defineProps<{
 
 const emit = defineEmits<{ pick: [params: { name: string; seriesName?: string; dataIndex: number }] }>()
 
-// Exactly what is drawn, and nothing else. The distribution bars and the
-// month columns are hand-drawn, so no cartesian grid is registered — adding a
-// bar chart here later is a deliberate act with a visible cost, which is the
-// point of importing piece by piece rather than the whole library.
-echarts.use([RadarChart, TooltipComponent, CanvasRenderer])
+// Exactly what is drawn, and nothing else. The month columns are hand-drawn,
+// so no cartesian grid is registered — adding a bar chart here later is a
+// deliberate act with a visible cost, which is the point of importing piece by
+// piece rather than the whole library. The toolbox is here for one reason: a
+// chart in a dashboard gets pasted into a report, and asking somebody to
+// screenshot it is asking for a blurry screenshot.
+echarts.use([
+    PieChart,
+    RadarChart,
+    LegendComponent,
+    ToolboxComponent,
+    TooltipComponent,
+    CanvasRenderer,
+])
 
 const host = ref<HTMLElement | null>(null)
 const chart = shallowRef<echarts.ECharts | null>(null)

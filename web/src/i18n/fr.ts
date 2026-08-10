@@ -315,6 +315,13 @@ export const messages: Messages = {
     'dash.mean': 'moyenne {value} %',
     'dash.viewAll': 'Toutes les évaluations',
 
+    'dash.viewData': 'Voir les données',
+    'dash.fromDate': 'Du',
+    'dash.toDate': 'Au',
+    'dash.auditCount': 'Évaluations',
+    'dash.beginning': 'Le début',
+    'dash.today': 'Aujourd’hui',
+    'dash.saveImage': 'Enregistrer l’image',
     'dash.range': 'Période',
     'dash.rangeAll': 'Depuis le début',
     'dash.range30': '30 derniers jours',

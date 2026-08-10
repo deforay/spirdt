@@ -312,6 +312,13 @@ export const messages: Messages = {
     'dash.mean': 'media {value} %',
     'dash.viewAll': 'Todas las evaluaciones',
 
+    'dash.viewData': 'Ver datos',
+    'dash.fromDate': 'Desde',
+    'dash.toDate': 'Hasta',
+    'dash.auditCount': 'Evaluaciones',
+    'dash.beginning': 'El principio',
+    'dash.today': 'Hoy',
+    'dash.saveImage': 'Guardar imagen',
     'dash.range': 'Periodo',
     'dash.rangeAll': 'Desde el inicio',
     'dash.range30': 'Últimos 30 días',
