@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Action\Admin\AssignmentsAction;
 use App\Http\Action\Admin\AuditAction;
+use App\Http\Action\Admin\DashboardAction;
 use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\ReportsAction;
@@ -167,6 +168,10 @@ return static function (App $app): void {
     // of them is performing, and somebody may need the first without the
     // second.
     $app->group('/admin', function (RouteCollectorProxy $group): void {
+        // The whole summary in one request. Six panels reading six endpoints
+        // would be six round trips before anything renders.
+        $group->get('/dashboard', DashboardAction::class);
+
         $group->get('/reports/assessments', [ReportsAction::class, 'index']);
         $group->get('/reports/assessments/{id}', [ReportsAction::class, 'show']);
     })

@@ -48,6 +48,31 @@ needs its own settings screen, whether organisations need types (ministry
 versus partner), and **whether organisation A may see organisation B's score on
 a site they both audit** — today, no.
 
+### Dashboard — done, without the map
+`/dashboard` is where a management account now lands. It answers the question
+the predecessor's dashboard answered and this tool could not: how many
+laboratories have been audited, how they sit across the certification levels,
+whether that is moving, and which section of the standard is dragging the
+scores down. Submitted visits only, everywhere — a draft is a visit somebody is
+part-way through, and counting one would report a laboratory at 12% because
+eleven of fifty-nine questions have been answered.
+
+The charts are hand-drawn SVG rather than a library. Two shapes are needed and
+the smallest capable library is around seventy kilobytes, which in a single
+application would also land on the assessor's phone. If the panels ever need
+drill-down, zoom or export, a library becomes the right answer.
+
+**The map is deliberately not built.** The predecessor plotted one marker per
+audit, and it was the most useful thing it produced. Today no assessment
+carries a fix and one facility of 3,005 has coordinates, so the map would draw
+an empty country. It needs the GPS capture exercised first, and a bulk import
+of facility coordinates behind it.
+
+Not built either: the predecessor's nine filters. `/dashboard` shows the whole
+organisation and `/admin/reports` is where a question gets narrowed. Worth
+revisiting once a country has enough visits for the unfiltered view to be too
+coarse.
+
 ### The audit trail — done
 `audit_log` existed since 0.1.4 and held eight rows, every one written by
 `bin/recover-access`. It now records sign-in, sign-out, a replayed refresh

@@ -32,6 +32,7 @@ const user = computed(() => session.value?.user ?? null)
 
 const links = computed(() =>
     [
+        { to: { name: 'admin-dashboard' }, label: t('dash.title'), need: PERMISSION.reportsRead },
         { to: { name: 'admin-reports' }, label: t('reports.title'), need: PERMISSION.reportsRead },
         { to: { name: 'admin-users' }, label: t('admin.users'), need: PERMISSION.usersManage },
         { to: { name: 'admin-roles' }, label: t('roles.title'), need: PERMISSION.rolesManage },

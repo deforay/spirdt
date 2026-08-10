@@ -99,7 +99,8 @@ final class AuditTrailTest extends TestCase
         $in = $this->latest(AuditAction::SIGNED_IN);
         $out = $this->latest(AuditAction::SIGNED_OUT);
 
-        self::assertNotNull($out);
+        // latest() fails the test when the row is missing, so reaching here is
+        // already the assertion that it was recorded at all.
         self::assertSame((string) $in->session_hash, (string) $out->session_hash);
     }
 
@@ -118,10 +119,7 @@ final class AuditTrailTest extends TestCase
         $this->request('POST', '/api/auth/refresh', ['refresh_token' => $login['refresh_token']]);
         $this->request('POST', '/api/auth/refresh', ['refresh_token' => $login['refresh_token']]);
 
-        $row = $this->latest(AuditAction::TOKEN_REPLAYED);
-
-        self::assertNotNull($row);
-        self::assertSame($this->boss, (int) $row->actor_id);
+        self::assertSame($this->boss, (int) $this->latest(AuditAction::TOKEN_REPLAYED)->actor_id);
     }
 
     public function testChangingYourOwnPasswordIsRecorded(): void

@@ -40,6 +40,15 @@ const routes: RouteRecordRaw[] = [
         meta: { permission: PERMISSION.assessmentsSubmit },
     },
     {
+        // A short path rather than /admin/dashboard, because it is the address
+        // somebody types and the one that goes in a bookmark. The API for it
+        // sits under /admin like the rest.
+        path: '/dashboard',
+        name: 'admin-dashboard',
+        component: () => import('@/views/admin/DashboardView.vue'),
+        meta: { permission: PERMISSION.reportsRead },
+    },
+    {
         path: '/admin/users',
         name: 'admin-users',
         component: () => import('@/views/admin/UsersView.vue'),
@@ -231,7 +240,7 @@ router.beforeEach((to) => {
 /** The best screen this account can actually open. */
 function landing(): string {
     if (can(PERMISSION.reportsRead)) {
-        return 'admin-reports'
+        return 'admin-dashboard'
     }
 
     if (can(PERMISSION.registryRead)) {

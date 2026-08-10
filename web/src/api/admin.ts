@@ -66,6 +66,36 @@ export async function updateRolePermissions(
     return body.role
 }
 
+export interface DashboardSummary {
+    totals: {
+        assessments: number
+        sites: number
+        facilities: number
+        drafts: number
+        known_sites: number
+    }
+    levels: Array<{ level: number; count: number }>
+    recent: Array<{ level: number; count: number }>
+    months: Array<{ month: string; count: number; mean: number | null }>
+    sections: Array<{ code: string; name: string; mean: number; assessments: number }>
+    latest: Array<{
+        id: string
+        facility: string | null
+        site: string | null
+        assessed_on: string
+        percentage: number | null
+        level: number | null
+    }>
+    /** Band labels from the published instrument, not from this bundle. */
+    bands: Array<{ level: number; label: string; min_percent: number }>
+}
+
+export async function loadDashboard(locale: string): Promise<DashboardSummary> {
+    return apiRequest<DashboardSummary>(`/admin/dashboard?locale=${encodeURIComponent(locale)}`, {
+        method: 'GET',
+    })
+}
+
 export interface AuditRow {
     id: number
     action: string
