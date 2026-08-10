@@ -335,6 +335,7 @@ export const messages: Messages = {
     'dash.trend': 'Últimos 180 dias',
     'dash.radar': 'Perfil por secção',
     'dash.radarHelp': 'Pontuação média por secção. Uma reentrância mostra onde o país perde pontos.',
+    'dash.radarTooFew': "Um perfil precisa de pelo menos três secções com pontuação. Por agora há {count}.",
     'dash.map': 'Onde ocorreram as visitas',
     'dash.mapEmpty': 'Nenhuma avaliação tem posição ainda. As coordenadas são registadas na visita e, na sua falta, vêm do estabelecimento.',
     'dash.showThese': 'Mostrar',

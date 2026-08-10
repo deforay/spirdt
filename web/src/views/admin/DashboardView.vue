@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { type DashboardSummary, loadDashboard } from '@/api/admin'
@@ -160,14 +160,37 @@ async function load(): Promise<void> {
  * the bands: 0 and 1 need remediation, 2 is partial, 3 and 4 are certifiable.
  * Two levels share each colour, separated by weight rather than by inventing
  * a fifth hue nobody could name.
+ *
+ * RESOLVED TO A REAL COLOUR, NOT LEFT AS `var(--color-no)`. The tokens work
+ * everywhere in this application except one place: a canvas. ECharts paints
+ * to one, and a canvas fill cannot parse a custom property — it silently falls
+ * back to black, which is how three doughnuts came out as solid black rings
+ * while every hand-drawn bar beside them was the right colour. The dark theme
+ * changes these, so they are read once at mount and again when it changes
+ * rather than baked in at build time.
  */
-const TONE: Record<number, { fill: string; alpha: number }> = {
-    0: { fill: 'var(--color-no)', alpha: 1 },
-    1: { fill: 'var(--color-no)', alpha: 0.5 },
-    2: { fill: 'var(--color-partial)', alpha: 1 },
-    3: { fill: 'var(--color-yes)', alpha: 0.5 },
-    4: { fill: 'var(--color-yes)', alpha: 1 },
+const palette = ref<Record<string, string>>({})
+
+function readPalette(): void {
+    const style = getComputedStyle(document.documentElement)
+
+    palette.value = {
+        no: style.getPropertyValue('--color-no').trim() || '#B3261E',
+        partial: style.getPropertyValue('--color-partial').trim() || '#9A5B00',
+        yes: style.getPropertyValue('--color-yes').trim() || '#1E7B34',
+        accent: style.getPropertyValue('--color-accent').trim() || '#0A6ECB',
+        label3: style.getPropertyValue('--color-label-3').trim() || '#6E6E76',
+        hairline: style.getPropertyValue('--color-hairline').trim() || 'rgba(60,60,67,0.2)',
+    }
 }
+
+const TONE = computed<Record<number, { fill: string; alpha: number }>>(() => ({
+    0: { fill: palette.value.no ?? '#B3261E', alpha: 1 },
+    1: { fill: palette.value.no ?? '#B3261E', alpha: 0.5 },
+    2: { fill: palette.value.partial ?? '#9A5B00', alpha: 1 },
+    3: { fill: palette.value.yes ?? '#1E7B34', alpha: 0.5 },
+    4: { fill: palette.value.yes ?? '#1E7B34', alpha: 1 },
+}))
 
 const totals = computed(() => summary.value?.totals ?? null)
 
@@ -258,8 +281,8 @@ function donut(rows: Array<{ level: number; count: number }>, total: number) {
                         value: row.count,
                         level: row.level,
                         itemStyle: {
-                            color: TONE[row.level]!.fill,
-                            opacity: TONE[row.level]!.alpha,
+                            color: TONE.value[row.level]!.fill,
+                            opacity: TONE.value[row.level]!.alpha,
                         },
                     })),
             },
@@ -323,18 +346,18 @@ const radar = computed(() => {
         radar: {
             indicator: sections.map((section) => ({ name: section.name, max: 100 })),
             radius: '68%',
-            axisName: { color: 'rgba(110,110,118,1)', fontSize: 11 },
+            axisName: { color: palette.value.label3, fontSize: 11 },
             splitArea: { areaStyle: { color: ['rgba(118,118,128,0.04)', 'transparent'] } },
-            axisLine: { lineStyle: { color: 'rgba(60,60,67,0.18)' } },
-            splitLine: { lineStyle: { color: 'rgba(60,60,67,0.18)' } },
+            axisLine: { lineStyle: { color: palette.value.hairline } },
+            splitLine: { lineStyle: { color: palette.value.hairline } },
         },
         series: [
             {
                 type: 'radar',
                 name: t('dash.radar'),
                 symbolSize: 4,
-                lineStyle: { width: 2, color: '#0A6ECB' },
-                itemStyle: { color: '#0A6ECB' },
+                lineStyle: { width: 2, color: palette.value.accent },
+                itemStyle: { color: palette.value.accent },
                 areaStyle: { color: 'rgba(10,110,203,0.14)' },
                 data: [
                     {
@@ -423,7 +446,16 @@ function sectionTone(mean: number): string {
     return mean < 80 ? 'var(--color-partial)' : 'var(--color-yes)'
 }
 
+let scheme: MediaQueryList | null = null
+
 onMounted(async () => {
+    readPalette()
+
+    // The tokens change with the theme, and a chart painted in the light
+    // palette does not repaint itself when the system switches at dusk.
+    scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    scheme.addEventListener('change', readPalette)
+
     try {
         tree.value = await listGeoUnits()
     } catch {
@@ -436,6 +468,8 @@ onMounted(async () => {
 })
 
 watch([from, to, place], () => void load())
+
+onBeforeUnmount(() => scheme?.removeEventListener('change', readPalette))
 
 // Band and section names are rendered by the server in the language asked for.
 // App strings re-render on a locale change by themselves; these do not.
@@ -631,7 +665,11 @@ watch(locale, () => load())
                     <p class="mt-1 text-[13px] text-label-3">{{ t('dash.radarHelp') }}</p>
 
                     <p v-if="summary.sections.length < 3" class="mt-3 text-[14px] text-label-2">
-                        {{ t('dash.noSections') }}
+                        {{
+                            summary.sections.length === 0
+                                ? t('dash.noSections')
+                                : t('dash.radarTooFew', { count: summary.sections.length })
+                        }}
                     </p>
 
                     <EChart

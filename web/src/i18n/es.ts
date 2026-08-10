@@ -334,6 +334,7 @@ export const messages: Messages = {
     'dash.trend': 'Últimos 180 días',
     'dash.radar': 'Perfil por sección',
     'dash.radarHelp': 'Puntuación media por sección. Una hendidura indica dónde pierde puntos el país.',
+    'dash.radarTooFew': "Un perfil necesita al menos tres secciones con puntuación. Por ahora hay {count}.",
     'dash.map': 'Dónde se hicieron las visitas',
     'dash.mapEmpty': 'Ninguna evaluación tiene posición todavía. Las coordenadas se registran en la visita y, en su defecto, se toman del establecimiento.',
     'dash.showThese': 'Mostrar',

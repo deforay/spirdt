@@ -337,6 +337,7 @@ export const messages: Messages = {
     'dash.trend': '180 derniers jours',
     'dash.radar': 'Profil par section',
     'dash.radarHelp': 'Score moyen par section. Un creux indique où le pays perd des points.',
+    'dash.radarTooFew': "Un profil nécessite au moins trois sections notées. Il y en a {count} pour l’instant.",
     'dash.map': 'Lieux des visites',
     'dash.mapEmpty': 'Aucune évaluation ne porte encore de position. Les coordonnées sont enregistrées lors de la visite, à défaut celles de l’établissement.',
     'dash.showThese': 'Afficher',

@@ -1,0 +1,317 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Fill an organisation with plausible submitted assessments.
+ *
+ * For local work and demonstrations only. A dashboard with one visit on it
+ * cannot be judged: every distribution is 100% of one band, every trend is a
+ * single column, the radar has two axes, and the map is empty — so the screen
+ * looks broken when it is merely empty, and a real defect in it would be
+ * invisible.
+ *
+ * SCORED BY THE REAL ENGINE, NOT FABRICATED. Every visit is built as a sync
+ * payload and pushed through SyncService, exactly as a device would, so the
+ * answers, the section breakdown, the percentage and the band all come out of
+ * the same code the application uses. Writing rows into assessment_scores
+ * directly would be quicker and would produce a dashboard that agrees with
+ * nothing — including with itself, once somebody re-scored a visit.
+ *
+ * Every row it writes carries device_id = 'dev-seed', which is how --clear
+ * finds them again. Nothing else is touched.
+ *
+ * Usage:
+ *   bin/dev/seed-assessments --org=demo
+ *   bin/dev/seed-assessments --org=demo --count=120
+ *   bin/dev/seed-assessments --org=demo --clear
+ *
+ * Options:
+ *   --org      Organisation code. Required.
+ *   --count    How many visits. Default 60.
+ *   --months   Spread them over this many months back. Default 12.
+ *   --centre   "lat,lng" the coordinates scatter around. Default Lusaka.
+ *   --clear    Remove previously seeded visits and write nothing.
+ *
+ * Exit codes: 0 done, 1 refused.
+ */
+
+require __DIR__ . '/../lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/../lib/console.php';
+
+$root = dirname(__DIR__, 2);
+chdir($root);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    con_fail('vendor/ missing — run composer install.');
+}
+
+require $root . '/vendor/autoload.php';
+
+use App\Bootstrap;
+use App\Scoring\ScoringEngine;
+use App\Service\SyncService;
+use App\Support\BinaryUuid;
+use App\Tenancy\TenantContext;
+use Illuminate\Database\Capsule\Manager as Capsule;
+
+// Bootstrap reads its configuration from the environment, and a CLI process
+// starts with none of it. Loaded the same way bin/preflight and bin/migrate do,
+// rather than reading .env by hand into a second shape of the same values.
+Dotenv\Dotenv::createImmutable($root)->safeLoad();
+
+/** The marker that makes seeded data removable. Never used by a real device. */
+const SEED_DEVICE = 'dev-seed';
+
+$options = [];
+foreach (array_slice($argv, 1) as $argument) {
+    if (preg_match('/^--([a-z-]+)(?:=(.*))?$/', $argument, $matches) === 1) {
+        $options[$matches[1]] = $matches[2] ?? '1';
+    }
+}
+
+$orgCode = trim($options['org'] ?? '');
+
+Bootstrap::createApp();
+
+if ($orgCode === '') {
+    con_print('info', 'Organisations on this installation:');
+
+    foreach (Capsule::table('organizations')->orderBy('code')->get(['code', 'name']) as $row) {
+        con_print('info', sprintf('  %-20s %s', $row->code, $row->name));
+    }
+
+    con_fail('Pass one of those as --org.');
+}
+
+$organization = Capsule::table('organizations')->where('code', $orgCode)->first();
+
+if ($organization === null) {
+    con_fail('No organisation ' . $orgCode . '.');
+}
+
+$organizationId = (int) $organization->id;
+$programmeId = (int) $organization->programme_id;
+
+// Any account in the organisation. The tenant context wants an actor, and a
+// seeded visit is not anybody's work in particular.
+$userId = Capsule::table('users')->where('organization_id', $organizationId)->value('id');
+
+TenantContext::set($organizationId, $userId === null ? null : (int) $userId, true, $programmeId);
+
+// ─── clearing ───
+
+if (isset($options['clear'])) {
+    $ids = Capsule::table('assessments')
+        ->where('organization_id', $organizationId)
+        ->where('device_id', SEED_DEVICE)
+        ->pluck('id')
+        ->all();
+
+    if ($ids === []) {
+        con_print('info', 'Nothing seeded here.');
+        exit(0);
+    }
+
+    Capsule::connection()->transaction(function () use ($ids): void {
+        foreach (
+            ['assessment_scores', 'findings', 'answers', 'assessment_pathogens', 'submissions_raw'] as $table
+        ) {
+            try {
+                Capsule::table($table)->whereIn('assessment_id', $ids)->delete();
+            } catch (Throwable) {
+                // Not every table has that column on every version. The
+                // assessments themselves are what matter, and the foreign keys
+                // clean up the rest.
+            }
+        }
+
+        Capsule::table('assessments')->whereIn('id', $ids)->delete();
+    });
+
+    con_print('success', count($ids) . ' seeded assessments removed.');
+    exit(0);
+}
+
+// ─── seeding ───
+
+$count = max(1, (int) ($options['count'] ?? 60));
+$months = max(1, (int) ($options['months'] ?? 12));
+
+[$centreLat, $centreLng] = array_map(
+    'floatval',
+    explode(',', trim($options['centre'] ?? '-15.4167,28.2833')) + [1 => '28.2833'],
+);
+
+// The model's own lookup, which knows that the platform's base instrument has
+// no organisation and that a fork outranks it. A hand-written whereIn here
+// would miss the base template, because SQL's IN never matches NULL.
+$template = App\Models\Template::published($organizationId);
+
+if ($template === null) {
+    con_fail('No published template for ' . $orgCode . '. Run: composer template:publish');
+}
+
+$definition = $template->definition;
+
+$sites = Capsule::table('testing_sites')
+    ->where('programme_id', $programmeId)
+    ->where('is_active', 1)
+    ->inRandomOrder()
+    ->limit($count)
+    ->get(['id', 'facility_id']);
+
+if ($sites->isEmpty()) {
+    con_fail('No testing sites in this programme. Run: bin/dev/seed-sites --org=' . $orgCode);
+}
+
+con_print('info', 'Seeding ' . $count . ' assessments across ' . $months . ' months…');
+
+$engine = new ScoringEngine();
+$sync = new SyncService();
+
+/**
+ * A weighting that produces a spread rather than a wall.
+ *
+ * Real SPI-RDT data is not uniform: most sites cluster in the middle bands and
+ * the extremes are rare. Seeding a flat distribution would make every chart
+ * look the same and hide the one thing the distribution panels exist to show.
+ *
+ * @return float the probability that any one question scores full marks
+ */
+function seed_quality(): float
+{
+    $roll = random_int(1, 100);
+
+    return match (true) {
+        $roll <= 8  => 0.25,  // Level 0, rare
+        $roll <= 22 => 0.48,  // Level 1
+        $roll <= 55 => 0.68,  // Level 2, the bulk
+        $roll <= 85 => 0.86,  // Level 3
+        default     => 0.95,  // Level 4
+    };
+}
+
+/** Metres, roughly, converted to degrees. Good enough to scatter a country. */
+function seed_jitter(float $degrees): float
+{
+    return $degrees + (random_int(-450, 450) / 1000);
+}
+
+$made = 0;
+$failed = 0;
+
+foreach ($sites as $index => $site) {
+    $quality = seed_quality();
+
+    $assessedOn = date(
+        'Y-m-d',
+        strtotime('-' . random_int(0, $months * 30) . ' days'),
+    );
+
+    $pathogens = random_int(0, 1) === 1
+        ? [['key' => 'hiv', 'name' => 'HIV']]
+        : [['key' => 'hiv', 'name' => 'HIV'], ['key' => 'syphilis', 'name' => 'Syphilis']];
+
+    $context = [
+        'refers_specimens' => random_int(0, 1) === 1 ? 'yes' : 'no',
+        'poc_site_count'   => random_int(1, 6),
+    ];
+
+    $answers = [];
+    $findings = [];
+
+    foreach (
+        $engine->expectedQuestions(
+            $definition,
+            $context,
+            array_map(static fn (array $row): string => (string) $row['key'], $pathogens),
+        ) as $question
+    ) {
+        // Y, P or N, weighted by this site's quality. A partial is what makes
+        // a section score land anywhere other than 0 or 100.
+        $roll = random_int(1, 100) / 100;
+
+        $response = match (true) {
+            $roll <= $quality        => 'Y',
+            $roll <= $quality + 0.18 => 'P',
+            default                  => 'N',
+        };
+
+        $answers[] = [
+            'question_code' => $question->questionCode,
+            'pathogen'      => $question->pathogen,
+            'response'      => $response,
+            // A gap needs a note. The server refuses a submission without one,
+            // which is the rule the corrective-action redesign exists to
+            // enforce — so a seeder that skipped it would be seeding data the
+            // application would never have accepted.
+            ...($response === 'Y' ? [] : ['comment' => 'Observed during the visit.']),
+        ];
+
+        if ($response === 'Y') {
+            continue;
+        }
+
+        $findings[] = [
+            'id'                   => BinaryUuid::v7(),
+            'question_code'        => $question->questionCode,
+            'pathogen'             => $question->pathogen,
+            'response'             => $response,
+            'gap'                  => $response === 'N'
+                ? 'Not in place at the time of the visit.'
+                : 'Partially in place; not consistently applied.',
+            'recommendation'       => 'Agree an action with the site focal point and review at the next visit.',
+            'responsibility_level' => random_int(1, 4) === 1 ? 'national' : 'site',
+            'urgency'              => ['immediate', 'short_term', 'long_term'][random_int(0, 2)],
+            'due_date'             => date('Y-m-d', strtotime($assessedOn . ' +' . random_int(30, 120) . ' days')),
+        ];
+    }
+
+    $payload = [
+        'id'               => BinaryUuid::v7(),
+        'testing_site_id'  => BinaryUuid::toString((string) $site->id),
+        'facility_id'      => BinaryUuid::toString((string) $site->facility_id),
+        'template_code'    => (string) $template->code,
+        'template_version' => (string) $template->version,
+        'assessed_on'      => $assessedOn,
+        'status'           => 'submitted',
+        'context'          => $context,
+        'device_id'        => SEED_DEVICE,
+        'started_at'       => $assessedOn . 'T08:00:00Z',
+        'pathogens'        => $pathogens,
+        'answers'          => $answers,
+        'findings'         => $findings,
+        // Four in five carry a device fix. The rest fall back to the facility,
+        // which is what the map draws hollow — a demo that showed only one
+        // kind of pin would hide the distinction the map exists to make.
+        ...(random_int(1, 5) > 1
+            ? [
+                'latitude'   => round(seed_jitter($centreLat), 6),
+                'longitude'  => round(seed_jitter($centreLng), 6),
+                'accuracy_m' => random_int(4, 60),
+                'located_at' => $assessedOn . 'T08:30:00Z',
+            ]
+            : []),
+    ];
+
+    try {
+        $sync->accept($payload);
+        ++$made;
+    } catch (Throwable $e) {
+        ++$failed;
+
+        if ($failed <= 3) {
+            con_print('warn', 'Skipped one: ' . $e->getMessage());
+        }
+    }
+
+    if ($made > 0 && $made % 20 === 0) {
+        con_print('info', '  ' . $made . '…');
+    }
+}
+
+con_print('success', $made . ' assessments seeded' . ($failed > 0 ? ', ' . $failed . ' skipped' : '') . '.');
+con_print('info', 'Remove them again with: bin/dev/seed-assessments --org=' . $orgCode . ' --clear');

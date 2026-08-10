@@ -337,6 +337,7 @@ export const messages = {
     'dash.trend': 'Last 180 days',
     'dash.radar': 'Section profile',
     'dash.radarHelp': 'Mean score per section. A dent is where a country is losing points.',
+    'dash.radarTooFew': "A profile needs at least three sections with a score. There are {count} so far.",
     'dash.map': 'Where visits happened',
     'dash.mapEmpty': 'No assessment carries a position yet. Coordinates are recorded when an assessor files a visit, and fall back to the facility when the registry has one.',
     'dash.showThese': 'Show these',
