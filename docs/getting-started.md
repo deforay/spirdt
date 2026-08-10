@@ -113,6 +113,12 @@ In `.env`, set `APP_URL` to the vhost and leave `CORS_ALLOWED_ORIGINS` **empty**
 
 Two things go wrong here, and both are quiet:
 
+**A JSON 404 at `/` while `/api/health` works** means Apache reached `index.php` for the bare root. Slim's base path is `/api`, so it has no route for `/` and says so in JSON. The rewrite in `public/.htaccess` now serves `index.html` for `/` explicitly, so the remaining cause is that `index.html` is not there. Run `php bin/preflight`, which checks for it by name, and rebuild if it is missing.
+
+**Set `DirectoryIndex index.html` in the vhost.** Without it Apache uses the global default, which on Ubuntu tries `index.html`, `index.cgi`, `index.pl` and then `index.php` — so a missing build silently serves the API front controller at the site's own address instead of failing.
+
+**Use `Require all granted`, not `Order allow,deny`.** The latter is Apache 2.2 syntax and works on 2.4 only while `mod_access_compat` happens to be enabled.
+
 **`DocumentRoot` is `public/`, not the checkout.** Everything is served from there — the API through `index.php`, the app through `index.html`, and `public/.htaccess` decides which. Point it at the checkout instead and every path rewrites until Apache gives up with `Request exceeded the limit of 10 internal redirects`. The shipped `.htaccess` guards against the loop, so the same mistake becomes a 404 naming the missing file. To trace it where that guard is absent: `LogLevel alert rewrite:trace3`.
 
 **Apache runs as `www-data`, which did not clone the repository.** Hence the `chown` above. `composer preflight` cannot prove this either way — it runs as you — but it warns when `var/` is not group-writable, and that warning is a near-certainty rather than a hint.

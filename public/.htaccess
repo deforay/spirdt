@@ -37,6 +37,22 @@ Options -Indexes
     # and must survive as far as PHP.
     RewriteRule ^api(/.*)?$ index.php [QSA,L]
 
+    # The bare root, explicitly.
+    #
+    # `/` is a directory, so the catch-all below skips it on the !-d test and
+    # Apache falls through to DirectoryIndex — whose ORDER is the host's
+    # business, not ours. Ubuntu ships index.html first, but a machine set up
+    # for PHP often has index.php first, and then `/` reaches the Slim front
+    # controller instead. Slim's base path is /api, so it has no route for `/`
+    # and answers a JSON 404: the site is dead at its own address while every
+    # deep link and the whole API work perfectly.
+    #
+    # Done with a rewrite rather than by setting DirectoryIndex here on
+    # purpose. DirectoryIndex belongs to the Indexes override class, so an
+    # installation with AllowOverride FileInfo — enough for everything else in
+    # this file — would answer 500 for every request instead.
+    RewriteRule ^$ index.html [L]
+
     # Everything else is the app. Without this, reloading on any screen but the
     # first returns 404 — and a reload is exactly what somebody does when a
     # screen looks wrong.
