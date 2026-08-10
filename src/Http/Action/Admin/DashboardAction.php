@@ -29,9 +29,18 @@ final class DashboardAction
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $locale = (string) ($request->getQueryParams()['locale'] ?? 'en');
+        $query = $request->getQueryParams();
+        $locale = (string) ($query['locale'] ?? 'en');
 
-        $response->getBody()->write((string) json_encode($this->dashboard->summary($locale)));
+        // The same names the reports list uses, so a filter carries from one
+        // screen to the other as a URL rather than as a translation step.
+        $filters = [
+            'from'        => $query['from'] ?? null,
+            'to'          => $query['to'] ?? null,
+            'geo_unit_id' => $query['place'] ?? null,
+        ];
+
+        $response->getBody()->write((string) json_encode($this->dashboard->summary($locale, $filters)));
 
         return $response->withHeader('Content-Type', 'application/json');
     }

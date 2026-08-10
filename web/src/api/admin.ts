@@ -107,10 +107,30 @@ export interface DashboardSummary {
     mixed_versions?: boolean
 }
 
-export async function loadDashboard(locale: string): Promise<DashboardSummary> {
-    return apiRequest<DashboardSummary>(`/admin/dashboard?locale=${encodeURIComponent(locale)}`, {
-        method: 'GET',
-    })
+export interface DashboardFilters {
+    from?: string
+    to?: string
+    /** Geographic unit id. Matches its whole subtree, as the registry does. */
+    place?: number | null
+}
+
+export async function loadDashboard(
+    locale: string,
+    filters: DashboardFilters = {},
+): Promise<DashboardSummary> {
+    const query = new URLSearchParams({ locale })
+
+    if (filters.from) {
+        query.set('from', filters.from)
+    }
+    if (filters.to) {
+        query.set('to', filters.to)
+    }
+    if (filters.place !== null && filters.place !== undefined) {
+        query.set('place', String(filters.place))
+    }
+
+    return apiRequest<DashboardSummary>(`/admin/dashboard?${query.toString()}`, { method: 'GET' })
 }
 
 export interface AuditRow {

@@ -3,8 +3,10 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { type DashboardSummary, loadDashboard } from '@/api/admin'
+import { type GeoTree, listGeoUnits } from '@/api/registry'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import EChart from '@/components/admin/EChart.vue'
+import PlacePicker from '@/components/admin/PlacePicker.vue'
 
 /**
  * Leaflet arrives only when there is something to plot.
@@ -66,19 +68,90 @@ import { locale, t } from '@/i18n'
 const router = useRouter()
 
 const summary = ref<DashboardSummary | null>(null)
+const tree = ref<GeoTree>({ units: [], paths: {} })
 const loading = ref(true)
 const error = ref('')
 
+/**
+ * The period, as a named window rather than two dates.
+ *
+ * "Last 90 days" is the question people actually ask, and making them pick two
+ * dates to express it is how a filter goes unused. The two dates are still
+ * there for the case a preset cannot express — a quarter, a campaign, the
+ * window somebody is writing a report about.
+ */
+const RANGES: Array<{ key: string; days: number | null }> = [
+    { key: 'dash.rangeAll', days: null },
+    { key: 'dash.range30', days: 30 },
+    { key: 'dash.range90', days: 90 },
+    { key: 'dash.range180', days: 180 },
+    { key: 'dash.range365', days: 365 },
+]
+
+const range = ref('dash.rangeAll')
+const from = ref('')
+const to = ref('')
+const place = ref<number | null>(null)
+
+function applyRange(key: string): void {
+    range.value = key
+
+    const days = RANGES.find((entry) => entry.key === key)?.days ?? null
+
+    if (days === null) {
+        from.value = ''
+        to.value = ''
+
+        return
+    }
+
+    const start = new Date()
+    start.setDate(start.getDate() - days)
+
+    from.value = start.toISOString().slice(0, 10)
+    to.value = new Date().toISOString().slice(0, 10)
+}
+
+const filtered = computed(() => from.value !== '' || to.value !== '' || place.value !== null)
+
+function clearFilters(): void {
+    range.value = 'dash.rangeAll'
+    from.value = ''
+    to.value = ''
+    place.value = null
+}
+
+/** Which load is current, so a slow one cannot overwrite a newer answer. */
+let generation = 0
+
 async function load(): Promise<void> {
+    const mine = ++generation
+
     loading.value = true
     error.value = ''
 
     try {
-        summary.value = await loadDashboard(locale.value)
+        const body = await loadDashboard(locale.value, {
+            from: from.value,
+            to: to.value,
+            place: place.value,
+        })
+
+        if (mine !== generation) {
+            return
+        }
+
+        summary.value = body
     } catch (caught) {
+        if (mine !== generation) {
+            return
+        }
+
         error.value = caught instanceof Error ? caught.message : t('admin.loadFailed')
     } finally {
-        loading.value = false
+        if (mine === generation) {
+            loading.value = false
+        }
     }
 }
 
@@ -199,8 +272,27 @@ const radar = computed(() => {
  * somebody can bookmark, rather than a second implementation of filtering that
  * has to be kept in step with the first.
  */
+/** The screen's own filters travel with the drill, or it answers a wider question. */
+function drillQuery(extra: Record<string, string>): Record<string, string> {
+    const query: Record<string, string> = { ...extra }
+
+    if (place.value !== null) {
+        query.place = String(place.value)
+    }
+
+    if (from.value !== '' && extra.from === undefined) {
+        query.from = from.value
+    }
+
+    if (to.value !== '' && extra.to === undefined) {
+        query.to = to.value
+    }
+
+    return query
+}
+
 function showLevel(level: number): void {
-    void router.push({ name: 'admin-reports', query: { level: String(level) } })
+    void router.push({ name: 'admin-reports', query: drillQuery({ level: String(level) }) })
 }
 
 function showMonth(month: string): void {
@@ -209,7 +301,10 @@ function showMonth(month: string): void {
 
     void router.push({
         name: 'admin-reports',
-        query: { from: `${month}-01`, to: `${month}-${String(last).padStart(2, '0')}` },
+        query: drillQuery({
+            from: `${month}-01`,
+            to: `${month}-${String(last).padStart(2, '0')}`,
+        }),
     })
 }
 
@@ -226,7 +321,19 @@ function sectionTone(mean: number): string {
     return mean < 80 ? 'var(--color-partial)' : 'var(--color-yes)'
 }
 
-onMounted(load)
+onMounted(async () => {
+    try {
+        tree.value = await listGeoUnits()
+    } catch {
+        // The place filter simply will not offer anything. Every other panel
+        // still works, and a dashboard that refuses to draw because one
+        // control could not populate is worse than one filter short.
+    }
+
+    await load()
+})
+
+watch([from, to, place], () => void load())
 
 // Band and section names are rendered by the server in the language asked for.
 // App strings re-render on a locale change by themselves; these do not.
@@ -239,6 +346,63 @@ watch(locale, () => load())
         :title="t('dash.title')"
         :subtitle="t('dash.subtitle')"
     >
+        <!-- Filters. Every panel below answers the question these ask. -->
+        <div class="mb-6 flex flex-wrap items-end gap-3">
+            <div class="flex flex-col gap-1.5">
+                <span class="eyebrow text-label-3">{{ t('dash.range') }}</span>
+                <div class="inline-flex rounded-full border border-hairline bg-surface p-0.5">
+                    <button
+                        v-for="entry in RANGES"
+                        :key="entry.key"
+                        type="button"
+                        class="rounded-full px-3 py-1.5 text-[13px] font-medium"
+                        :class="
+                            range === entry.key
+                                ? 'bg-accent-soft text-accent'
+                                : 'text-label-2 hover:text-label'
+                        "
+                        @click="applyRange(entry.key)"
+                    >
+                        {{ t(entry.key as 'dash.rangeAll') }}
+                    </button>
+                </div>
+            </div>
+
+            <label class="flex flex-col gap-1.5">
+                <span class="eyebrow text-label-3">{{ t('audit.from') }}</span>
+                <input
+                    v-model="from"
+                    type="date"
+                    class="rounded-card border border-hairline bg-surface px-3 py-2 text-[14px] outline-none"
+                    @change="range = 'dash.rangeCustom'"
+                />
+            </label>
+
+            <label class="flex flex-col gap-1.5">
+                <span class="eyebrow text-label-3">{{ t('audit.to') }}</span>
+                <input
+                    v-model="to"
+                    type="date"
+                    class="rounded-card border border-hairline bg-surface px-3 py-2 text-[14px] outline-none"
+                    @change="range = 'dash.rangeCustom'"
+                />
+            </label>
+
+            <div class="flex min-w-[240px] flex-col gap-1.5">
+                <span class="eyebrow text-label-3">{{ t('dash.place') }}</span>
+                <PlacePicker v-model="place" :tree="tree" :placeholder="t('dash.everywhere')" />
+            </div>
+
+            <button
+                v-if="filtered"
+                type="button"
+                class="rounded-full px-3 py-2 text-[13px] font-medium text-accent"
+                @click="clearFilters"
+            >
+                {{ t('dash.clear') }}
+            </button>
+        </div>
+
         <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
 
         <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>

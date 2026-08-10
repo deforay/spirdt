@@ -245,6 +245,39 @@ final class DashboardServiceTest extends TestCase
         self::assertSame([0.0, 40.0, 60.0, 80.0, 90.0], array_column($bands, 'min_percent'));
     }
 
+    /**
+     * A date range narrows EVERY figure, not the charts alone.
+     *
+     * The failure this guards is quiet: a headline count that ignores the
+     * filter sitting beside a chart that honours it. Both look authoritative
+     * and only one answers what was asked, which is worse than having no
+     * filter at all.
+     */
+    public function testADateRangeNarrowsEveryFigureOnTheScreen(): void
+    {
+        $this->submitted('2026-03-10', percentage: 90.0, level: 4, sections: [
+            ['code' => '1', 'score' => 9, 'possible' => 10, 'applicable' => true],
+        ]);
+        $this->submitted('2026-08-10', percentage: 40.0, level: 1, sections: [
+            ['code' => '1', 'score' => 4, 'possible' => 10, 'applicable' => true],
+        ]);
+        $this->draft('2026-03-11');
+        $this->draft('2026-08-11');
+
+        $summary = (new DashboardService())->summary('en', [
+            'from' => '2026-08-01',
+            'to'   => '2026-08-31',
+        ]);
+
+        self::assertSame(1, $summary['totals']['assessments'], 'headline count');
+        self::assertSame(1, $summary['totals']['drafts'], 'drafts follow the same range');
+        self::assertSame(1, $summary['totals']['sites'], 'distinct sites');
+        self::assertSame(0, $summary['levels'][4]['count'], 'March is outside the range');
+        self::assertSame(1, $summary['levels'][1]['count']);
+        self::assertSame(40.0, $summary['sections'][0]['mean'], 'sections too, not just counts');
+        self::assertCount(1, $summary['latest']);
+    }
+
     public function testAnEmptyOrganisationReportsZeroesRatherThanFailing(): void
     {
         $summary = (new DashboardService())->summary();

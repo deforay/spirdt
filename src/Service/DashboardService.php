@@ -37,6 +37,20 @@ use App\Tenancy\TenantContext;
  */
 final class DashboardService
 {
+    /**
+     * What every figure on the screen is narrowed to.
+     *
+     * Held on the instance rather than threaded through nine private methods,
+     * because the one thing that must never happen is a panel answering a
+     * different question from the one beside it. A dashboard whose headline
+     * count is filtered and whose section scores are not is worse than one
+     * with no filters at all: both numbers look authoritative and only one of
+     * them answers what was asked.
+     *
+     * @var array<string,mixed>
+     */
+    private array $filters = [];
+
     /** Levels 0 to 4, so a band nobody has reached still appears as zero. */
     private const LEVELS = [0, 1, 2, 3, 4];
 
@@ -52,11 +66,18 @@ final class DashboardService
 
     private const LATEST = 8;
 
+    public function __construct(private readonly RegistryService $registry = new RegistryService())
+    {
+    }
+
     /**
+     * @param  array<string,mixed> $filters
      * @return array<string,mixed>
      */
-    public function summary(string $locale = 'en'): array
+    public function summary(string $locale = 'en', array $filters = []): array
     {
+        $this->filters = $filters;
+
         return [
             'totals'   => $this->totals(),
             'levels'   => $this->levels(),
@@ -92,11 +113,26 @@ final class DashboardService
             'assessments' => (clone $submitted)->count(),
             'sites'       => (clone $submitted)->distinct()->count('assessments.testing_site_id'),
             'facilities'  => (clone $submitted)->distinct()->count('assessments.facility_id'),
-            'drafts'      => Assessment::query()->where('assessments.status', 'draft')->count(),
+            'drafts'      => $this->drafts(),
             // What the registry holds, for the denominator. Programme-wide, so
             // it is the same number every organisation in the country sees.
             'known_sites' => TestingSite::query()->where('is_active', 1)->count(),
         ];
+    }
+
+    /**
+     * Started and not finished, narrowed the same way as everything else.
+     *
+     * Filtered too, or the one figure on the screen that ignores the date
+     * range sits beside four that do not, and reads as authoritative.
+     */
+    private function drafts(): int
+    {
+        $query = Assessment::query()->where('assessments.status', 'draft');
+
+        $this->narrow($query);
+
+        return $query->count();
     }
 
     /**
@@ -550,7 +586,45 @@ final class DashboardService
      */
     private function submitted(): \Illuminate\Database\Eloquent\Builder
     {
-        return Assessment::query()->where('assessments.status', 'submitted');
+        $query = Assessment::query()->where('assessments.status', 'submitted');
+
+        $this->narrow($query);
+
+        return $query;
+    }
+
+    /**
+     * Apply the screen's filters. One place, so no panel can miss one.
+     *
+     * A place filter matches the SUBTREE rather than the unit, because
+     * facilities hang off districts and asking for a province by exact id
+     * matches nothing — the same bug the registry screens had, and the reason
+     * RegistryService owns the subtree walk rather than each caller repeating
+     * it.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder<Assessment> $query
+     */
+    private function narrow(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $inner = $query->getQuery();
+
+        $from = trim((string) ($this->filters['from'] ?? ''));
+        $to = trim((string) ($this->filters['to'] ?? ''));
+
+        if ($from !== '') {
+            $inner->where('assessments.assessed_on', '>=', $from);
+        }
+
+        if ($to !== '') {
+            $inner->where('assessments.assessed_on', '<=', $to);
+        }
+
+        $place = $this->filters['geo_unit_id'] ?? null;
+
+        if (is_numeric($place)) {
+            $inner->join('facilities', 'facilities.id', '=', 'assessments.facility_id')
+                ->whereIn('facilities.geo_unit_id', $this->registry->subtree((int) $place));
+        }
     }
 
     /**
