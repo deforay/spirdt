@@ -28,9 +28,19 @@ import { t, type MessageKey } from '@/i18n'
 const rows = ref<AuditRow[]>([])
 const actions = ref<string[]>([])
 const total = ref(0)
-const page = ref(1)
 const loading = ref(true)
 const error = ref('')
+
+/**
+ * Which load is current.
+ *
+ * Filters can be changed faster than the server answers, and the earlier
+ * request is not guaranteed to finish first. Without this, a slow response for
+ * a filter somebody has already moved on from lands last and replaces the
+ * table — leaving the controls saying one thing and the rows showing another,
+ * on a screen read as evidence.
+ */
+let generation = 0
 
 const action = ref('')
 const from = ref('')
@@ -51,30 +61,46 @@ const hasFilters = computed(
 const more = computed(() => rows.value.length < total.value)
 
 async function load(append = false): Promise<void> {
+    const mine = ++generation
+
     loading.value = true
     error.value = ''
 
     try {
-        const body = await listAudit({ ...filters.value, page: page.value })
+        const body = await listAudit({
+            ...filters.value,
+            // The oldest row already shown, so the server walks back from it.
+            ...(append && rows.value.length > 0
+                ? { before_id: rows.value[rows.value.length - 1]!.id }
+                : {}),
+        })
+
+        if (mine !== generation) {
+            return
+        }
 
         rows.value = append ? [...rows.value, ...body.rows] : body.rows
         total.value = body.total
         actions.value = body.actions
     } catch (caught) {
+        if (mine !== generation) {
+            return
+        }
+
         error.value = caught instanceof Error ? caught.message : t('admin.loadFailed')
     } finally {
-        loading.value = false
+        if (mine === generation) {
+            loading.value = false
+        }
     }
 }
 
 async function showMore(): Promise<void> {
-    page.value += 1
     await load(true)
 }
 
-/** Any filter change starts the list again from the top. */
+/** Any filter change starts the list again from the newest row. */
 watch(filters, () => {
-    page.value = 1
     void load()
 })
 

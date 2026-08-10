@@ -38,8 +38,11 @@ final class AuditAction
                 'from'         => $query['from'] ?? null,
                 'to'           => $query['to'] ?? null,
                 'session_hash' => $query['session_hash'] ?? null,
+                // The id the client already has the far side of. Extending the
+                // list walks back from a row rather than forwards from an
+                // offset, so a new event arriving mid-read cannot shift a page.
+                'before_id'    => $query['before_id'] ?? null,
             ],
-            (int) ($query['page'] ?? 1),
             (int) ($query['per_page'] ?? 50),
         );
 

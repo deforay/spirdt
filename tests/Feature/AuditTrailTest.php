@@ -271,6 +271,104 @@ final class AuditTrailTest extends TestCase
         self::assertSame(AuditAction::USER_CREATED, $body['rows'][0]['action']);
     }
 
+    /**
+     * A day filter means that day where the organisation is, not in UTC.
+     *
+     * created_at is stored in UTC. Pinning a local date to "00:00:00" and
+     * comparing directly asks for the wrong instant everywhere but UTC: in
+     * UTC+02 a filter from the 10th misses everything in the first two hours of
+     * the 10th, which is precisely the window somebody looking at a night shift
+     * cares about.
+     */
+    public function testADayFilterUsesTheOrganisationsOwnDay(): void
+    {
+        Capsule::table('organizations')
+            ->where('id', $this->orgId)
+            ->update(['timezone' => 'Africa/Lusaka']);
+
+        // 00:30 on the 10th in UTC+02 is 22:30 on the 9th in UTC.
+        Capsule::table('audit_log')->insert([
+            'organization_id' => $this->orgId,
+            'actor_type'      => 'user',
+            'actor_id'        => $this->boss,
+            'action'          => AuditAction::SIGNED_IN,
+            'created_at'      => '2026-08-09 22:30:00',
+        ]);
+
+        $token = $this->signIn('boss@example.org');
+
+        $body = $this->body($this->request(
+            'GET',
+            '/api/admin/audit?action=' . AuditAction::SIGNED_IN . '&from=2026-08-10&to=2026-08-10',
+            [],
+            $token,
+        ));
+
+        $stamps = array_column($body['rows'], 'created_at');
+
+        self::assertContains('2026-08-09 22:30:00', $stamps, 'that is 00:30 on the 10th locally');
+    }
+
+    /**
+     * Extending the list cannot skip a row because a new one arrived.
+     *
+     * The table is append-only and read newest first, so an offset shifts under
+     * a reader: page two repeats page one's last row and drops one older row
+     * entirely. Walking back from the oldest row already shown is stable
+     * whatever arrives while somebody reads.
+     */
+    public function testExtendingTheListIsNotShiftedByANewEvent(): void
+    {
+        $token = $this->signIn('boss@example.org');
+
+        for ($i = 0; $i < 6; ++$i) {
+            Capsule::table('audit_log')->insert([
+                'organization_id' => $this->orgId,
+                'actor_type'      => 'user',
+                'actor_id'        => $this->boss,
+                'action'          => AuditAction::USER_UPDATED,
+                'metadata'        => (string) json_encode(['n' => $i]),
+            ]);
+        }
+
+        $first = $this->body($this->request(
+            'GET',
+            '/api/admin/audit?action=' . AuditAction::USER_UPDATED . '&per_page=3',
+            [],
+            $token,
+        ));
+
+        self::assertCount(3, $first['rows']);
+
+        // Something happens while the reader is looking at page one.
+        Capsule::table('audit_log')->insert([
+            'organization_id' => $this->orgId,
+            'actor_type'      => 'user',
+            'actor_id'        => $this->boss,
+            'action'          => AuditAction::USER_UPDATED,
+            'metadata'        => (string) json_encode(['n' => 'late']),
+        ]);
+
+        $oldest = (int) $first['rows'][2]['id'];
+
+        $next = $this->body($this->request(
+            'GET',
+            '/api/admin/audit?action=' . AuditAction::USER_UPDATED . '&per_page=3&before_id=' . $oldest,
+            [],
+            $token,
+        ));
+
+        $firstIds = array_column($first['rows'], 'id');
+        $nextIds = array_column($next['rows'], 'id');
+
+        self::assertSame([], array_intersect($firstIds, $nextIds), 'no row appears on both pages');
+        self::assertCount(3, $nextIds);
+
+        foreach ($nextIds as $id) {
+            self::assertLessThan($oldest, $id);
+        }
+    }
+
     // ─── the trade-off, tested ───
 
     /**

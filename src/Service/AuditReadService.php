@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Audit\AuditAction;
+use App\Models\Organization;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
+use DateTimeImmutable;
+use DateTimeZone;
+use Exception;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Query\JoinClause;
 
 /**
  * Reading the trail back.
@@ -36,12 +41,11 @@ final class AuditReadService
 
     /**
      * @param  array<string,mixed> $filters
-     * @return array{rows: list<array<string,mixed>>, total: int, page: int, per_page: int, actions: list<string>}
+     * @return array{rows: list<array<string,mixed>>, total: int, per_page: int, actions: list<string>}
      */
-    public function list(array $filters = [], int $page = 1, int $perPage = self::PAGE_SIZE): array
+    public function list(array $filters = [], int $perPage = self::PAGE_SIZE): array
     {
         $perPage = max(1, min($perPage, 200));
-        $page = max(1, $page);
 
         $query = Capsule::table('audit_log')
             ->where('audit_log.organization_id', TenantContext::requireOrganizationId());
@@ -60,15 +64,22 @@ final class AuditReadService
 
         // Whole days, in the organisation's own reading of them. A trail
         // filtered by an instant is a trail nobody can ask a question of.
+        //
+        // CONVERTED, not concatenated. created_at is UTC and an organisation
+        // has its own timezone, so pinning a local date to "00:00:00" asks for
+        // the wrong instant everywhere but UTC: in UTC+02 a filter from the
+        // 10th would have missed everything that happened in the first two
+        // hours of the 10th, which is exactly the window somebody
+        // investigating a night shift is looking at.
         $from = trim((string) ($filters['from'] ?? ''));
         $to = trim((string) ($filters['to'] ?? ''));
 
         if ($from !== '') {
-            $query->where('audit_log.created_at', '>=', $from . ' 00:00:00');
+            $query->where('audit_log.created_at', '>=', $this->startOfDay($from));
         }
 
         if ($to !== '') {
-            $query->where('audit_log.created_at', '<=', $to . ' 23:59:59');
+            $query->where('audit_log.created_at', '<=', $this->endOfDay($to));
         }
 
         $session = trim((string) ($filters['session_hash'] ?? ''));
@@ -79,10 +90,31 @@ final class AuditReadService
 
         $total = (clone $query)->count();
 
+        // Extending the list walks BACKWARDS FROM A ROW, not forwards from an
+        // offset. This table is append-only and ordered newest first, so a
+        // single event arriving between two page requests shifts every later
+        // page by one: page two repeats page one's last row, and one older row
+        // is skipped entirely — on the screen whose whole purpose is that
+        // nothing goes unrecorded.
+        $before = $filters['before_id'] ?? null;
+
+        if (is_numeric($before)) {
+            $query->where('audit_log.id', '<', (int) $before);
+        }
+
         $records = $query
-            ->leftJoin('users', 'users.id', '=', 'audit_log.actor_id')
+            // Joined on the organisation as well as the id. Every row this
+            // application writes takes both from one verified context, so they
+            // already agree — but tenant isolation should not rest on ids
+            // never being mismatched, and a row imported or repaired by hand
+            // would otherwise show another organisation's name and address to
+            // whoever is reading this trail.
+            ->leftJoin('users', function (JoinClause $join): void {
+                $join->on('users.id', '=', 'audit_log.actor_id')
+                    ->on('users.organization_id', '=', 'audit_log.organization_id');
+            })
             ->orderByDesc('audit_log.id')
-            ->forPage($page, $perPage)
+            ->limit($perPage)
             ->get([
                 'audit_log.id',
                 'audit_log.actor_type',
@@ -130,7 +162,6 @@ final class AuditReadService
         return [
             'rows'     => $rows,
             'total'    => $total,
-            'page'     => $page,
             'per_page' => $perPage,
             // Every action this version can write, so the filter offers the
             // whole vocabulary rather than only what has happened so far. A
@@ -138,6 +169,45 @@ final class AuditReadService
             // is checking has never occurred.
             'actions'  => $this->catalogue(),
         ];
+    }
+
+    /**
+     * The first instant of a local day, in UTC.
+     *
+     * The organisation's timezone, falling back to UTC — which is also what the
+     * column stores, so a missing or unrecognised zone changes nothing rather
+     * than shifting the window silently.
+     */
+    private function startOfDay(string $date): string
+    {
+        return $this->instant($date . ' 00:00:00');
+    }
+
+    private function endOfDay(string $date): string
+    {
+        return $this->instant($date . ' 23:59:59');
+    }
+
+    private function instant(string $local): string
+    {
+        try {
+            $zone = new DateTimeZone($this->timezone());
+
+            return (new DateTimeImmutable($local, $zone))
+                ->setTimezone(new DateTimeZone('UTC'))
+                ->format('Y-m-d H:i:s');
+        } catch (Exception) {
+            return $local;
+        }
+    }
+
+    private function timezone(): string
+    {
+        $zone = Organization::query()
+            ->where('id', TenantContext::requireOrganizationId())
+            ->value('timezone');
+
+        return is_string($zone) && $zone !== '' ? $zone : 'UTC';
     }
 
     /**

@@ -114,7 +114,21 @@ final class SyncService
     ): Assessment {
         $context = is_array($payload['context'] ?? null) ? $payload['context'] : [];
 
-        $assessment = Assessment::findByUuid($assessmentId);
+        // Locked, not merely read. Two retries of the same visit can arrive at
+        // once — a device with a flaky uplink resends before the first reply
+        // lands — and both transactions would otherwise read submitted_at as
+        // null, both stamp it, and the later one win. That is a wrong
+        // submission time on the visit and a second row in the audit trail
+        // saying it was submitted twice.
+        //
+        // Applied to the underlying query: lockForUpdate reaches Eloquent
+        // through __call and degrades the builder's type. Executed through
+        // Eloquent, so the tenant scope still applies and an id belonging to
+        // another organisation still resolves to null.
+        $locking = Assessment::query()->where('assessments.id', BinaryUuid::toBytes($assessmentId));
+        $locking->getQuery()->lockForUpdate();
+
+        $assessment = $locking->first();
         $status = $this->status($payload, $assessment);
 
         $attributes = [

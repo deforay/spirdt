@@ -118,7 +118,6 @@ export interface AuditRow {
 export interface AuditPage {
     rows: AuditRow[]
     total: number
-    page: number
     per_page: number
     /** Every action this server can write, so the filter is not built from history. */
     actions: string[]
@@ -129,7 +128,8 @@ export interface AuditFilters {
     from?: string
     to?: string
     session_hash?: string
-    page?: number
+    /** Walk back from this row. Omit for the newest page. */
+    before_id?: number
 }
 
 export async function listAudit(filters: AuditFilters = {}): Promise<AuditPage> {
