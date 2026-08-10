@@ -276,7 +276,7 @@ try {
 }
 
 con_print('success', 'Provisioned ' . $name . ' (' . $code . ')');
-con_print('info', 'Roles: ' . implode(', ', array_keys(SYSTEM_ROLES)));
+con_print('info', 'Roles: ' . implode(', ', array_keys(\App\Auth\Roles::SYSTEM)));
 con_print('info', 'Dates display as ' . $dateFormat . ' in ' . $timezone);
 
 // An organisation with no published instrument cannot receive a single
