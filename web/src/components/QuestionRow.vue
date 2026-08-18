@@ -100,7 +100,7 @@ const guidanceText = computed(() => localised(props.question.guidance ?? {}))
 </script>
 
 <template>
-    <div class="flex flex-col gap-3.5 px-4 py-4 md:px-5 md:py-5 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:gap-7 xl:px-6">
+    <div class="flex flex-col gap-3 px-3.5 py-3.5 md:gap-3.5 md:px-5 md:py-5 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:gap-7 xl:px-6">
         <div class="flex flex-col gap-2.5">
             <div class="flex items-start gap-2.5">
                 <span
@@ -124,7 +124,15 @@ const guidanceText = computed(() => localised(props.question.guidance ?? {}))
                 <span aria-hidden="true">{{ open ? '‹' : '›' }}</span>
             </button>
 
-            <div class="ml-[46px]">
+            <!--
+                Full width on a phone, aligned under the question at a desk.
+                The 46px of indent that keeps the controls under the first word
+                of the question is a tenth of a phone screen, and it was being
+                spent to line up a switch with a sentence — while the switch
+                itself, four options wide when a question allows Not
+                applicable, was the tightest thing on the card.
+            -->
+            <div class="md:ml-[46px]">
                 <SegmentedControl
                     v-model="response"
                     :na-allowed="question.na_allowed"
@@ -132,11 +140,11 @@ const guidanceText = computed(() => localised(props.question.guidance ?? {}))
                 />
             </div>
 
-            <div class="ml-[46px]">
+            <div class="md:ml-[46px]">
                 <button
                     v-if="!showNote"
                     type="button"
-                    class="flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-label-3 transition-colors hover:text-accent"
+                    class="flex min-h-9 items-center gap-1.5 text-[13.5px] font-medium text-label-3 transition-colors hover:text-accent md:min-h-11 md:text-[14px]"
                     @click="openNote"
                 >
                     <PhPlus :size="14" weight="bold" aria-hidden="true" />
@@ -184,7 +192,7 @@ const guidanceText = computed(() => localised(props.question.guidance ?? {}))
         <aside
             v-if="hasGuidance"
             :class="[
-                'ml-[46px] rounded-card border-l-2 border-brass-fill/70 bg-surface-2 px-3 py-2.5 xl:ml-0 xl:block',
+                'rounded-card border-l-2 border-brass-fill/70 bg-surface-2 px-3 py-2.5 md:ml-[46px] xl:ml-0 xl:block',
                 open ? 'block' : 'hidden',
             ]"
         >

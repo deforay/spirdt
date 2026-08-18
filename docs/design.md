@@ -220,10 +220,13 @@ prose, and unfindable at a glance on a list of six.
 The screen that carries the product, and the one place where the phone and the
 desktop are designed separately rather than one being a narrowing of the other.
 
-**On a phone** the cards run edge to edge, the response buttons are 56px tall,
+**On a phone** the cards run edge to edge, the response control is 56px tall,
 and a bar pinned to the bottom — clear of the home indicator — carries progress
 and the way out. That is the screen worked standing up, one-handed, sometimes
-gloved.
+gloved. The controls run the full width of the card: the 46px that lines them
+up under the first word of the question is a tenth of a phone screen, and the
+switch is what wants it. Only the guidance link keeps the indent, because it
+belongs to the sentence above it.
 
 **On a desktop** there are three panes: a rail with per-section progress and
 the visit's score at its foot, the questions, and "What to look for" standing
@@ -236,11 +239,29 @@ behind a button that emitted an event nobody handled — the assessor tapped it
 and nothing happened at all. The judgement it supports is the one the whole
 record rests on: whether what is in front of you is a Yes or a Partial.
 
-The response control is three separate buttons with air between them, tinted
-and outlined in the response colour when chosen. Tint alone is invisible on a
-bench in daylight; the outline survives that, a projector and a photocopy.
-Solid fill was tried and was too loud at 59 rows — a finished section became a
-wall of colour with the questions lost inside it.
+The response control is the one component drawn twice, because a phone and a
+desk are not the same instrument.
+
+**At a desk** it is three separate buttons with air between them, tinted and
+outlined in the response colour when chosen. **On a phone** it is a switch: one
+track, and the answer is a chip raised out of it, ringed in the response
+colour. The choice is a thumb travelling in a groove — the shape a phone has
+used for a set of exclusive options for a decade — and the lifted chip says
+which one is true from further away than a tint does. A row of grey tracks is
+furniture on a desk screen showing a dozen questions at once, which is why the
+desk does not get it.
+
+Both carry the colour in the same three places: the outline, the mark and the
+word. Tint alone is invisible on a bench in daylight; the outline survives
+that, a projector and a photocopy. Solid fill was tried and was too loud at 59
+rows — a finished section became a wall of colour with the questions lost
+inside it.
+
+The section jumper is a row of numbers on a phone, each under a fill bar. A
+number alone says which section this is, which the title above it already says;
+the bar says which sections are still owed, which is what somebody scanning
+that row is asking. Moving on in order is not its job — that is a full-width
+button at the end of the section, where the assessor finishes.
 
 The note field appears when there is something in it, when the response obliges
 one, or when the assessor asks for it. An empty text box under all 59 questions

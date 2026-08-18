@@ -114,8 +114,23 @@ const inputClass = 'field tnum'
 </script>
 
 <template>
-    <div class="flex flex-col gap-5">
-        <div v-for="field in fields" :key="field.code" class="flex flex-col gap-1.5">
+    <!--
+        One column on a phone, two once the setup screen has the width for
+        them. Part A is twenty short fields — a date, a number, a name — and
+        run down a single column on a desk they become twenty stretched boxes
+        with a screen's worth of scrolling between the first and the last. The
+        two that are not short keep the full width: a repeating group is a
+        table of rows, and a paragraph box needs the line length.
+    -->
+    <div class="flex flex-col gap-5 xl:grid xl:grid-cols-2 xl:items-start xl:gap-x-6">
+        <div
+            v-for="field in fields"
+            :key="field.code"
+            :class="[
+                'flex flex-col gap-1.5',
+                field.type === 'repeat' || field.type === 'textarea' ? 'xl:col-span-2' : '',
+            ]"
+        >
             <div class="flex items-baseline justify-between gap-3 px-1">
                 <label :for="field.code" class="text-[16px] font-medium">
                     {{ text(field.label) }}

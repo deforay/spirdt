@@ -707,7 +707,7 @@ async function onSubmit() {
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
         v-else-if="stage === 'setup'"
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1280px] md:px-6"
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6"
     >
 
         <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
@@ -832,9 +832,9 @@ async function onSubmit() {
         same list; only one is in the accessibility tree at a time, because two
         copies of the same navigation is two things to tab through.
     -->
-    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1536px] md:px-6">
+    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6">
 
-        <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3 md:px-0 md:pt-6">
+        <header class="flex flex-col gap-0.5 px-4 pb-2 pt-1.5 md:px-0 md:pt-6">
             <div class="flex items-center justify-between gap-2">
                 <!--
                     Out of the visit, without ending it. Everything is already
@@ -860,16 +860,32 @@ async function onSubmit() {
                  room, because it is a fact about the section rather than a
                  line of its own. -->
             <div class="flex items-end justify-between gap-4">
-                <div class="flex min-w-0 flex-col gap-0.5">
-                    <span class="eyebrow text-brass">
-                        {{
-                            t('checklist.sectionOf', {
-                                number: sectionNumber,
-                                total: visibleSections.length,
-                            })
-                        }}
-                    </span>
-                    <h1 class="rule-brass self-start pb-1.5 text-[32px] font-extrabold">
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-none">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <span class="eyebrow text-brass">
+                            {{
+                                t('checklist.sectionOf', {
+                                    number: sectionNumber,
+                                    total: visibleSections.length,
+                                })
+                            }}
+                        </span>
+
+                        <!-- On a phone the count rides the eyebrow rather than
+                             taking a line of its own under the title. It is
+                             four words about the section; a row to itself cost
+                             more of the screen than the fact is worth. At a
+                             desk it is the chip on the right instead. -->
+                        <span class="tnum shrink-0 text-[13px] text-label-2 md:hidden">
+                            {{
+                                t('checklist.answered', {
+                                    answered: answeredHere,
+                                    total: section.questions.length,
+                                })
+                            }}
+                        </span>
+                    </div>
+                    <h1 class="rule-brass self-start pb-1 text-[25px] font-extrabold leading-tight md:pb-1.5 md:text-[32px]">
                         {{ text(section.title) }}
                     </h1>
                 </div>
@@ -897,34 +913,48 @@ async function onSubmit() {
                 </div>
             </div>
 
-            <span class="tnum pt-1 text-[14px] text-label-2 md:hidden">
-                {{
-                    t('checklist.answered', {
-                        answered: answeredHere,
-                        total: section.questions.length,
-                    })
-                }}
-            </span>
             <p v-if="instrumentUntranslated" class="text-[13px] leading-snug text-label-2">
                 {{ t('locale.instrumentNote') }}
             </p>
         </header>
 
-        <!-- Numbers only, because a phone has room for numbers only. -->
+        <!--
+            The jumper, for going out of order. Moving on in order is a
+            full-width button at the end of the section, where the assessor
+            finishes; this row is for the other case — the section that was
+            skipped because the store room was locked, being come back to.
+
+            Numbers only, because a phone has room for numbers only. But a
+            number on its own answers "which section is this" and not "which
+            ones are still owed", which is the question somebody scanning this
+            row is actually asking. Each carries the fill bar the desk rail
+            draws under its title, so a full bar means a finished section and
+            the row says where the work is left at a glance.
+
+            The sections share the width rather than sitting in a huddle of
+            small squares with a third of the row empty beside them. Five
+            sections of an even width read as the whole of the checklist —
+            which is what they are — and the width goes into the bars, which is
+            the part worth reading. They stop shrinking at 44px and the row
+            scrolls instead, for an instrument with more sections than this
+            one.
+        -->
         <nav
-            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2 md:hidden"
+            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2.5 md:hidden"
             :aria-label="t('checklist.sections')"
         >
             <!-- Part A sits before Section 1 in the visit, so it sits before
                  Section 1 here. An icon rather than a word: this row has room
-                 for numbers only, which is why the numbers are alone. -->
+                 for numbers only, which is why the numbers are alone. It has
+                 no bar because it is not a section — it is answered before the
+                 checklist starts or the checklist does not start. -->
             <button
                 type="button"
-                class="flex shrink-0 items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[14px] font-medium text-label-2 transition-colors hover:text-label"
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface text-label-2 transition-colors hover:text-label"
                 :aria-label="t('checklist.editSetup')"
                 @click="editSetup"
             >
-                <PhBuildings :size="15" aria-hidden="true" />
+                <PhBuildings :size="16" aria-hidden="true" />
             </button>
 
             <button
@@ -932,15 +962,35 @@ async function onSubmit() {
                 :key="item.code"
                 type="button"
                 :aria-current="item.code === activeSection ? 'true' : undefined"
+                :aria-label="`${text(item.title)} — ${sectionFilled(item.code)}`"
                 :class="[
-                    'shrink-0 rounded-full px-3 py-1.5 text-[14px] font-medium transition-colors',
+                    'flex h-11 min-w-11 flex-1 basis-0 flex-col items-center justify-center gap-1.5 rounded-[10px] px-2',
+                    'text-[14px] font-semibold transition-colors',
                     item.code === activeSection
                         ? 'bg-accent text-accent-ink'
                         : 'bg-surface text-label-2 hover:text-label',
                 ]"
                 @click="activeSection = item.code"
             >
-                {{ item.number }}
+                <span class="tnum leading-none">{{ item.number }}</span>
+
+                <!-- Hidden from assistive technology: how far through the
+                     section is, is already in the button's own label. -->
+                <span
+                    aria-hidden="true"
+                    :class="[
+                        'block h-1 w-full overflow-hidden rounded-full',
+                        item.code === activeSection ? 'bg-accent-ink/30' : 'bg-track',
+                    ]"
+                >
+                    <span
+                        :class="[
+                            'block h-full rounded-full transition-[width] duration-200',
+                            item.code === activeSection ? 'bg-accent-ink' : 'bg-accent',
+                        ]"
+                        :style="{ width: sectionFilled(item.code) }"
+                    ></span>
+                </span>
             </button>
         </nav>
 
@@ -1126,7 +1176,7 @@ async function onSubmit() {
                         question the object on screen rather than a line in a
                         ledger.
                     -->
-                    <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-3 md:gap-4">
                         <div
                             v-for="question in section.questions"
                             :key="question.code"
