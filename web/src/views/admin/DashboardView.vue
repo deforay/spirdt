@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+    PhBuildings,
+    PhClipboardText,
+    PhPencilSimpleLine,
+    PhTestTube,
+} from '@phosphor-icons/vue'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -178,21 +184,58 @@ function readPalette(): void {
         no: style.getPropertyValue('--color-no').trim() || '#B3261E',
         partial: style.getPropertyValue('--color-partial').trim() || '#9A5B00',
         yes: style.getPropertyValue('--color-yes').trim() || '#1E7B34',
-        accent: style.getPropertyValue('--color-accent').trim() || '#0A6ECB',
+        accent: style.getPropertyValue('--color-accent').trim() || '#3641F5',
+        level0: style.getPropertyValue('--color-level-0').trim() || '#E7EAEF',
+        level1: style.getPropertyValue('--color-level-1').trim() || '#CFD9E6',
+        level2: style.getPropertyValue('--color-level-2').trim() || '#A6BAD1',
+        level3: style.getPropertyValue('--color-level-3').trim() || '#4A6C94',
+        level4: style.getPropertyValue('--color-level-4').trim() || '#1B3A63',
         label3: style.getPropertyValue('--color-label-3').trim() || '#6E6E76',
         hairline: style.getPropertyValue('--color-hairline').trim() || 'rgba(60,60,67,0.2)',
     }
 }
 
+/**
+ * The bands, on the sequential ramp the badges use.
+ *
+ * They were painted red, red-faded, amber, green-faded, green — which is the
+ * response palette, on a chart about levels. A donut in those colours reads as
+ * "how many sites answered No", and it is one click from screens where those
+ * exact colours mean exactly that. The ramp deepens instead, and every slice
+ * keeps its label.
+ */
 const TONE = computed<Record<number, { fill: string; alpha: number }>>(() => ({
-    0: { fill: palette.value.no ?? '#B3261E', alpha: 1 },
-    1: { fill: palette.value.no ?? '#B3261E', alpha: 0.5 },
-    2: { fill: palette.value.partial ?? '#9A5B00', alpha: 1 },
-    3: { fill: palette.value.yes ?? '#1E7B34', alpha: 0.5 },
-    4: { fill: palette.value.yes ?? '#1E7B34', alpha: 1 },
+    0: { fill: palette.value.level0 ?? '#E7EAEF', alpha: 1 },
+    1: { fill: palette.value.level1 ?? '#CFD9E6', alpha: 1 },
+    2: { fill: palette.value.level2 ?? '#A6BAD1', alpha: 1 },
+    3: { fill: palette.value.level3 ?? '#4A6C94', alpha: 1 },
+    4: { fill: palette.value.level4 ?? '#1B3A63', alpha: 1 },
 }))
 
 const totals = computed(() => summary.value?.totals ?? null)
+
+/**
+ * The question the dashboard exists to answer, as one number.
+ *
+ * A programme office does not open this screen to learn how many assessments
+ * were filed; it opens it to learn how many sites are at or above the level
+ * the country is working toward. That number was on the screen, spread across
+ * five rows of a donut legend and needing arithmetic to reach.
+ *
+ * Level 3 is the threshold because it is where the instrument's own wording
+ * turns from partially eligible to eligible for certification.
+ */
+const CERTIFIABLE_FROM = 3
+
+const certifiable = computed(() =>
+    (summary.value?.levels ?? [])
+        .filter((band) => band.level >= CERTIFIABLE_FROM)
+        .reduce((sum, band) => sum + band.count, 0),
+)
+
+const certifiableShare = computed(() =>
+    scored.value === 0 ? null : Math.round((certifiable.value / scored.value) * 100),
+)
 
 const scored = computed(() =>
     (summary.value?.levels ?? []).reduce((sum, band) => sum + band.count, 0),
@@ -449,12 +492,17 @@ function percent(count: number, total: number): string {
 }
 
 /** Weakest first, so the bar is a ranking rather than a rainbow. */
+/**
+ * A section's mean, on the level ramp rather than a traffic light.
+ *
+ * The bands are the same thresholds the certification levels use, so a weak
+ * section is drawn in the colour of the level it would earn — and never in the
+ * red that means somebody answered No.
+ */
 function sectionTone(mean: number): string {
-    if (mean < 60) {
-        return 'var(--color-no)'
-    }
+    if (mean < 60) return 'var(--color-level-1)'
 
-    return mean < 80 ? 'var(--color-partial)' : 'var(--color-yes)'
+    return mean < 80 ? 'var(--color-level-2)' : 'var(--color-level-4)'
 }
 
 let scheme: MediaQueryList | null = null
@@ -502,7 +550,7 @@ watch(locale, () => load())
                         v-for="entry in RANGES"
                         :key="entry.key"
                         type="button"
-                        class="rounded-full px-3 py-1.5 text-[13px] font-medium"
+                        class="rounded-full px-3 py-1.5 text-[14px] font-medium"
                         :class="
                             range === entry.key
                                 ? 'bg-accent-soft text-accent'
@@ -520,7 +568,7 @@ watch(locale, () => load())
                 <input
                     v-model="from"
                     type="date"
-                    class="rounded-card border border-hairline bg-surface px-3 py-2 text-[14px] outline-none"
+                    class="rounded-card border border-hairline bg-surface px-3 py-2 text-[15px] outline-none"
                     @change="range = 'dash.rangeCustom'"
                 />
             </label>
@@ -530,7 +578,7 @@ watch(locale, () => load())
                 <input
                     v-model="to"
                     type="date"
-                    class="rounded-card border border-hairline bg-surface px-3 py-2 text-[14px] outline-none"
+                    class="rounded-card border border-hairline bg-surface px-3 py-2 text-[15px] outline-none"
                     @change="range = 'dash.rangeCustom'"
                 />
             </label>
@@ -543,48 +591,144 @@ watch(locale, () => load())
             <button
                 v-if="filtered"
                 type="button"
-                class="rounded-full px-3 py-2 text-[13px] font-medium text-accent"
+                class="rounded-full px-3 py-2 text-[14px] font-medium text-accent"
                 @click="clearFilters"
             >
                 {{ t('dash.clear') }}
             </button>
         </div>
 
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
-        <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
+        <p v-if="loading" class="text-[16px] text-label-2">{{ t('admin.loading') }}</p>
 
         <template v-else-if="summary !== null && totals !== null">
-            <!-- Headline counts -->
-            <div class="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <div class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <p class="eyebrow text-label-3">{{ t('dash.assessments') }}</p>
-                    <p class="tnum mt-2 text-[34px] font-semibold leading-none tracking-[-0.02em]">
-                        {{ totals.assessments }}
+            <!--
+                The counts, as tiles rather than as four identical boxes. Each
+                carries its mark in a tinted square, which is what lets somebody
+                find the one they came for without reading all four labels.
+
+                The tints are the accent and the level ramp. Green and amber
+                would be the conventional choice for a tile of this shape and
+                they are not available here: they mean Yes and Partial on a
+                question, and a dashboard that spends them teaches a reader the
+                wrong thing about the screens underneath it.
+            -->
+            <div class="mb-5 grid grid-cols-2 gap-5 lg:grid-cols-4">
+                <!--
+                    The headline, sized like one. A grid of four equal boxes
+                    says every number on it matters equally, which is never
+                    true; this is the one a programme office came for, so it is
+                    the one that is large.
+                -->
+                <div
+                    class="col-span-2 row-span-2 flex flex-col rounded-surface border border-hairline bg-surface p-6 shadow-surface"
+                >
+                    <p class="text-[15px] font-semibold">{{ t('dash.certifiable') }}</p>
+                    <p class="mt-1 text-[13.5px] text-label-3">
+                        {{ t('dash.certifiableHelp', { level: CERTIFIABLE_FROM }) }}
                     </p>
+
+                    <div class="mt-6 flex items-baseline gap-3">
+                        <span class="tnum text-[52px] font-bold leading-none tracking-[-0.03em]">
+                            {{ certifiableShare === null ? '—' : `${certifiableShare}%` }}
+                        </span>
+                        <span class="tnum text-[14px] text-label-2">
+                            {{ t('dash.ofScored', { count: certifiable, total: scored }) }}
+                        </span>
+                    </div>
+
+                    <!--
+                        The distribution underneath, as one bar rather than a
+                        second chart. Each band keeps its place on the ramp, so
+                        the shape of the bar is the shape of the programme.
+                    -->
+                    <div class="mt-6 flex h-3 overflow-hidden rounded-full bg-track">
+                        <span
+                            v-for="band in summary.levels"
+                            :key="band.level"
+                            class="block h-full"
+                            :style="{
+                                width: scored === 0 ? '0%' : `${(band.count / scored) * 100}%`,
+                                background: TONE[band.level]!.fill,
+                            }"
+                            :title="`${bandLabel(band.level)}: ${band.count}`"
+                        ></span>
+                    </div>
+
+                    <ul class="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                        <li
+                            v-for="band in summary.levels"
+                            :key="band.level"
+                            class="flex items-center gap-2 text-[13px]"
+                            :class="band.count === 0 ? 'text-label-3' : 'text-label-2'"
+                        >
+                            <span
+                                class="size-2.5 shrink-0 rounded-full"
+                                :style="{
+                                    background: TONE[band.level]!.fill,
+                                    opacity: band.count === 0 ? 0.35 : 1,
+                                }"
+                            ></span>
+                            {{ bandLabel(band.level) }}
+                            <span class="tnum font-semibold text-label">{{ band.count }}</span>
+                        </li>
+                    </ul>
                 </div>
 
-                <div class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <p class="eyebrow text-label-3">{{ t('dash.sites') }}</p>
-                    <p class="tnum mt-2 text-[34px] font-semibold leading-none tracking-[-0.02em]">
-                        {{ totals.sites }}
-                    </p>
-                    <p class="mt-2 text-[13px] text-label-3">
-                        {{ t('dash.ofRegistry', { total: totals.known_sites }) }}
-                    </p>
-                </div>
+                <div
+                    v-for="tile in [
+                        {
+                            key: 'assessments',
+                            label: t('dash.assessments'),
+                            value: totals.assessments,
+                            note: '',
+                            icon: PhClipboardText,
+                            tint: 'bg-accent-soft text-accent',
+                        },
+                        {
+                            key: 'sites',
+                            label: t('dash.sites'),
+                            value: totals.sites,
+                            note: t('dash.ofRegistry', { total: totals.known_sites }),
+                            icon: PhTestTube,
+                            tint: 'bg-level-1 text-level-1-ink',
+                        },
+                        {
+                            key: 'facilities',
+                            label: t('dash.facilities'),
+                            value: totals.facilities,
+                            note: '',
+                            icon: PhBuildings,
+                            tint: 'bg-level-2 text-level-2-ink',
+                        },
+                        {
+                            key: 'drafts',
+                            label: t('dash.drafts'),
+                            value: totals.drafts,
+                            note: '',
+                            icon: PhPencilSimpleLine,
+                            tint: 'bg-brass-soft text-brass',
+                        },
+                    ]"
+                    :key="tile.key"
+                    class="rounded-surface border border-hairline bg-surface p-5 shadow-surface"
+                >
+                    <span
+                        :class="[
+                            'flex size-11 items-center justify-center rounded-card',
+                            tile.tint,
+                        ]"
+                    >
+                        <component :is="tile.icon" :size="21" aria-hidden="true" />
+                    </span>
 
-                <div class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <p class="eyebrow text-label-3">{{ t('dash.facilities') }}</p>
-                    <p class="tnum mt-2 text-[34px] font-semibold leading-none tracking-[-0.02em]">
-                        {{ totals.facilities }}
+                    <p class="mt-4 text-[14px] font-medium text-label-2">{{ tile.label }}</p>
+                    <p class="tnum mt-1 text-[30px] font-bold leading-none tracking-[-0.02em]">
+                        {{ tile.value }}
                     </p>
-                </div>
-
-                <div class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <p class="eyebrow text-label-3">{{ t('dash.drafts') }}</p>
-                    <p class="tnum mt-2 text-[34px] font-semibold leading-none tracking-[-0.02em]">
-                        {{ totals.drafts }}
+                    <p v-if="tile.note !== ''" class="mt-2 text-[13px] text-label-3">
+                        {{ tile.note }}
                     </p>
                 </div>
             </div>
@@ -601,10 +745,10 @@ watch(locale, () => load())
                     class="flex flex-col rounded-surface border border-hairline bg-surface px-5 py-5"
                 >
                     <div class="flex items-baseline justify-between gap-3">
-                        <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ horizon.label }}</h2>
+                        <h2 class="text-[16px] font-semibold tracking-[-0.01em]">{{ horizon.label }}</h2>
                         <button
                             type="button"
-                            class="text-[13px] font-medium text-accent disabled:text-label-3"
+                            class="text-[14px] font-medium text-accent disabled:text-label-3"
                             :disabled="horizon.total === 0"
                             @click="showAll(horizon.days)"
                         >
@@ -623,7 +767,7 @@ watch(locale, () => load())
                         <li
                             v-for="band in horizon.rows"
                             :key="band.level"
-                            class="flex items-center gap-2 py-[3px] text-[12.5px]"
+                            class="flex items-center gap-2 py-[3px] text-[13.5px]"
                             :class="band.count === 0 ? 'text-label-3' : ''"
                         >
                             <span
@@ -651,7 +795,7 @@ watch(locale, () => load())
                     <!-- What this panel is actually showing. A percentage with
                          no denominator and no period gets quoted in a meeting. -->
                     <div
-                        class="mt-4 grid grid-cols-3 gap-2 border-t border-hairline pt-3 text-[11px] text-label-3"
+                        class="mt-4 grid grid-cols-3 gap-2 border-t border-hairline pt-3 text-[12px] text-label-3"
                     >
                         <div>
                             <p class="eyebrow">{{ t('dash.fromDate') }}</p>
@@ -672,10 +816,10 @@ watch(locale, () => load())
             <div class="mb-4 grid gap-4 lg:grid-cols-2">
                 <!-- Section profile -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ t('dash.radar') }}</h2>
-                    <p class="mt-1 text-[13px] text-label-3">{{ t('dash.radarHelp') }}</p>
+                    <h2 class="text-[16px] font-semibold tracking-[-0.01em]">{{ t('dash.radar') }}</h2>
+                    <p class="mt-1 text-[14px] text-label-3">{{ t('dash.radarHelp') }}</p>
 
-                    <p v-if="summary.sections.length < 3" class="mt-3 text-[14px] text-label-2">
+                    <p v-if="summary.sections.length < 3" class="mt-3 text-[15px] text-label-2">
                         {{
                             summary.sections.length === 0
                                 ? t('dash.noSections')
@@ -694,18 +838,18 @@ watch(locale, () => load())
 
                 <!-- Weakest sections -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
-                    <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
+                    <h2 class="text-[16px] font-semibold tracking-[-0.01em]">
                         {{ t('dash.sections') }}
                     </h2>
-                    <p class="mt-1 text-[13px] text-label-3">{{ t('dash.sectionsHelp') }}</p>
+                    <p class="mt-1 text-[14px] text-label-3">{{ t('dash.sectionsHelp') }}</p>
 
-                    <p v-if="summary.sections.length === 0" class="mt-3 text-[14px] text-label-2">
+                    <p v-if="summary.sections.length === 0" class="mt-3 text-[15px] text-label-2">
                         {{ t('dash.noSections') }}
                     </p>
 
                     <ul v-else class="mt-4 flex flex-col gap-3.5">
                         <li v-for="section in summary.sections" :key="section.code">
-                            <div class="mb-1.5 flex items-baseline gap-3 text-[14px]">
+                            <div class="mb-1.5 flex items-baseline gap-3 text-[15px]">
                                 <span class="min-w-0 flex-1 truncate">{{ section.name }}</span>
                                 <span class="tnum font-semibold">{{ section.mean }}%</span>
                             </div>
@@ -725,7 +869,7 @@ watch(locale, () => load())
 
             <!-- Assessments by month -->
             <section class="mb-4 rounded-surface border border-hairline bg-surface px-5 py-5">
-                <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
+                <h2 class="text-[16px] font-semibold tracking-[-0.01em]">
                     {{ t('dash.overTime') }}
                 </h2>
 
@@ -745,7 +889,7 @@ watch(locale, () => load())
                     >
                         <span
                             v-if="month.count > 0"
-                            class="tnum mb-1.5 text-center text-[12px] font-medium text-label-2"
+                            class="tnum mb-1.5 text-center text-[13px] font-medium text-label-2"
                         >
                             {{ month.count }}
                         </span>
@@ -763,7 +907,7 @@ watch(locale, () => load())
                     <span
                         v-for="month in months"
                         :key="month.month"
-                        class="flex-1 text-center text-[11px] text-label-3"
+                        class="flex-1 text-center text-[12px] text-label-3"
                     >
                         {{ monthLabel(month.month) }}
                     </span>
@@ -772,16 +916,16 @@ watch(locale, () => load())
 
             <!-- Where the visits happened -->
             <section class="mb-4 rounded-surface border border-hairline bg-surface px-5 py-5">
-                <h2 class="text-[15px] font-semibold tracking-[-0.01em]">{{ t('dash.map') }}</h2>
+                <h2 class="text-[16px] font-semibold tracking-[-0.01em]">{{ t('dash.map') }}</h2>
 
-                <p v-if="summary.map.length === 0" class="mt-3 text-[14px] text-label-2">
+                <p v-if="summary.map.length === 0" class="mt-3 text-[15px] text-label-2">
                     {{ t('dash.mapEmpty') }}
                 </p>
 
                 <template v-else>
                     <AuditMap class="mt-4" :points="summary.map" @pick="showAssessment" />
 
-                    <div class="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-label-3">
+                    <div class="mt-3 flex flex-wrap items-center gap-4 text-[13px] text-label-3">
                         <span class="inline-flex items-center gap-1.5">
                             <span class="size-2.5 rounded-full bg-label-3"></span>
                             {{ t('map.device') }}
@@ -803,18 +947,18 @@ watch(locale, () => load())
                 <!-- Latest -->
                 <section class="rounded-surface border border-hairline bg-surface px-5 py-5">
                     <div class="flex items-baseline justify-between gap-3">
-                        <h2 class="text-[15px] font-semibold tracking-[-0.01em]">
+                        <h2 class="text-[16px] font-semibold tracking-[-0.01em]">
                             {{ t('dash.latest') }}
                         </h2>
                         <RouterLink
                             :to="{ name: 'admin-reports' }"
-                            class="text-[13px] font-medium text-accent"
+                            class="text-[14px] font-medium text-accent"
                         >
                             {{ t('dash.viewAll') }}
                         </RouterLink>
                     </div>
 
-                    <p v-if="summary.latest.length === 0" class="mt-3 text-[14px] text-label-2">
+                    <p v-if="summary.latest.length === 0" class="mt-3 text-[15px] text-label-2">
                         {{ t('dash.nothing') }}
                     </p>
 
@@ -829,16 +973,16 @@ watch(locale, () => load())
                                 class="-mx-2 flex items-center gap-3 rounded-card px-2 py-2.5 hover:bg-accent-soft"
                             >
                                 <span class="min-w-0 flex-1">
-                                    <span class="block truncate text-[14px]">
+                                    <span class="block truncate text-[15px]">
                                         {{ row.site ?? row.facility }}
                                     </span>
-                                    <span class="block text-[12px] text-label-3">
+                                    <span class="block text-[13px] text-label-3">
                                         {{ assessedOn(row.assessed_on) }}
                                     </span>
                                 </span>
                                 <span
                                     v-if="row.percentage !== null"
-                                    class="tnum text-[14px] font-semibold"
+                                    class="tnum text-[15px] font-semibold"
                                 >
                                     {{ row.percentage }}%
                                 </span>

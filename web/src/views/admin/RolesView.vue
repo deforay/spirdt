@@ -180,25 +180,25 @@ onMounted(load)
 
 <template>
     <AdminShell :title="t('roles.title')" :subtitle="t('roles.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
-        <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
+        <p v-if="loading" class="text-[16px] text-label-2">{{ t('admin.loading') }}</p>
 
         <template v-else>
-            <div class="overflow-x-auto rounded-card bg-surface">
-                <table class="w-full min-w-[720px] text-left">
+            <div class="data-card data-scroll">
+                <table class="data-table min-w-[720px]">
                     <thead>
-                        <tr class="border-b border-hairline text-[12px] uppercase tracking-wide text-label-2">
-                            <th class="px-4 py-2.5 font-semibold">{{ t('admin.role') }}</th>
+                        <tr>
+                            <th>{{ t('admin.role') }}</th>
                             <th
                                 v-for="role in roles"
                                 :key="role.id"
-                                class="px-4 py-2.5 text-center font-semibold"
+                                class="text-center font-semibold"
                             >
-                                <span class="block normal-case text-[14px] text-label">
+                                <span class="block normal-case text-[15px] text-label">
                                     {{ role.name }}
                                 </span>
-                                <span class="block text-[11px] font-normal normal-case text-label-3">
+                                <span class="block text-[12px] font-normal normal-case text-label-3">
                                     {{
                                         role.user_count === 0
                                             ? t('roles.nobody')
@@ -212,13 +212,12 @@ onMounted(load)
                         <tr
                             v-for="permission in catalogue"
                             :key="permission"
-                            class="border-b border-hairline last:border-0"
                         >
-                            <td class="px-4 py-3 text-[15px]">{{ label(permission) }}</td>
+                            <td class="text-[16px]">{{ label(permission) }}</td>
                             <td
                                 v-for="role in roles"
                                 :key="role.id"
-                                class="px-4 py-3 text-center"
+                                class="text-center"
                             >
                                 <input
                                     type="checkbox"
@@ -236,14 +235,14 @@ onMounted(load)
             </div>
 
             <div class="mt-4 flex items-center justify-end gap-3">
-                <span v-if="saved" class="text-[14px] text-label-2">{{ t('roles.saved') }}</span>
-                <span v-else-if="changed.length === 0" class="text-[14px] text-label-3">
+                <span v-if="saved" class="text-[15px] text-label-2">{{ t('roles.saved') }}</span>
+                <span v-else-if="changed.length === 0" class="text-[15px] text-label-3">
                     {{ t('roles.noChanges') }}
                 </span>
 
                 <button
                     type="button"
-                    class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-40"
+                    class="rounded-full bg-accent px-4 py-2 text-[15px] font-semibold text-accent-ink disabled:opacity-40"
                     :disabled="changed.length === 0 || saving"
                     @click="save"
                 >

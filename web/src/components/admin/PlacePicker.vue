@@ -72,13 +72,13 @@ function choose(id: number | null): void {
     <div class="relative">
         <div
             v-if="chosen !== null && !open"
-            class="flex items-center gap-2 rounded-lg bg-surface px-3 py-2"
+            class="field flex items-center gap-2"
         >
-            <span class="flex-1 truncate text-[15px]">{{ chosen }}</span>
-            <button type="button" class="text-[13px] text-accent" @click="open = true">
+            <span class="flex-1 truncate text-[16px]">{{ chosen }}</span>
+            <button type="button" class="text-[14px] text-accent" @click="open = true">
                 {{ t('registry.change') }}
             </button>
-            <button type="button" class="text-[13px] text-label-2" @click="choose(null)">
+            <button type="button" class="text-[14px] text-label-2" @click="choose(null)">
                 {{ t('registry.clear') }}
             </button>
         </div>
@@ -90,7 +90,7 @@ function choose(id: number | null): void {
             autocapitalize="off"
             spellcheck="false"
             :placeholder="placeholder ?? t('registry.searchPlaces')"
-            class="w-full rounded-lg bg-surface px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+            class="field"
             @focus="open = true"
         />
 
@@ -100,7 +100,7 @@ function choose(id: number | null): void {
             v-if="open"
             class="absolute z-20 mt-1 max-h-[280px] w-full overflow-y-auto rounded-card border border-hairline bg-surface shadow-lg"
         >
-            <p v-if="matches.length === 0" class="px-3.5 py-2.5 text-[14px] text-label-2">
+            <p v-if="matches.length === 0" class="px-3.5 py-2.5 text-[15px] text-label-2">
                 {{ t('registry.noPlacesFound') }}
             </p>
             <button
@@ -110,15 +110,15 @@ function choose(id: number | null): void {
                 class="flex w-full flex-col items-start px-3.5 py-2 text-left hover:bg-ground"
                 @click="choose(unit.id)"
             >
-                <span class="text-[15px]">{{ unit.name }}</span>
-                <span class="text-[12px] text-label-2">
+                <span class="text-[16px]">{{ unit.name }}</span>
+                <span class="text-[13px] text-label-2">
                     {{ tree.paths[unit.id] }} · {{ unit.level }}
                 </span>
             </button>
 
             <button
                 type="button"
-                class="w-full border-t border-hairline px-3.5 py-2 text-left text-[13px] text-label-2 hover:bg-ground"
+                class="w-full border-t border-hairline px-3.5 py-2 text-left text-[14px] text-label-2 hover:bg-ground"
                 @click="open = false"
             >
                 {{ t('action.cancel') }}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PhPencilSimple } from '@phosphor-icons/vue'
 import { onMounted, ref } from 'vue'
 
 import { type AdminUser, listUsers } from '@/api/admin'
@@ -41,66 +42,84 @@ onMounted(load)
 
 <template>
     <AdminShell :title="t('admin.users')" :subtitle="t('admin.usersSubtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex justify-end">
             <RouterLink
                 :to="{ name: 'admin-user-new' }"
-                class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
+                class="rounded-full bg-accent px-4 py-2 text-[15px] font-semibold text-accent-ink"
             >
                 {{ t('admin.addUser') }}
             </RouterLink>
         </div>
 
-        <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
+        <p v-if="loading" class="text-[16px] text-label-2">{{ t('admin.loading') }}</p>
 
-        <div v-else class="overflow-x-auto rounded-card bg-surface">
-            <table class="w-full min-w-[720px] text-left">
+        <div v-else class="data-card data-scroll">
+            <table class="data-table min-w-[720px]">
                 <thead>
-                    <tr class="border-b border-hairline text-[12px] uppercase tracking-wide text-label-2">
-                        <th class="px-4 py-2.5 font-semibold">{{ t('admin.person') }}</th>
-                        <th class="px-4 py-2.5 font-semibold">{{ t('admin.role') }}</th>
-                        <th class="px-4 py-2.5 font-semibold">{{ t('admin.lastSignIn') }}</th>
-                        <th class="px-4 py-2.5 text-right font-semibold">{{ t('admin.actions') }}</th>
+                    <tr>
+                        <th>{{ t('admin.person') }}</th>
+                        <th>{{ t('admin.role') }}</th>
+                        <th>{{ t('admin.lastSignIn') }}</th>
+                        <th>{{ t('admin.status') }}</th>
+                        <th class="text-right">{{ t('admin.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr
                         v-for="user in users"
                         :key="user.id"
-                        class="border-b border-hairline last:border-0"
-                        :class="user.is_active ? '' : 'opacity-50'"
                     >
-                        <td class="px-4 py-3">
+                        <td>
                             <RouterLink :to="{ name: 'admin-user', params: { id: user.id } }">
-                                <span class="block text-[15px] hover:text-accent">
+                                <span class="block text-[16px] hover:text-accent">
                                     {{ user.full_name }}
                                 </span>
-                                <span class="block text-[13px] text-label-2">{{ user.email }}</span>
+                                <span class="block text-[14px] text-label-2">{{ user.email }}</span>
+                                <!-- Brass, not amber. Amber is Partial on a
+                                     question and means nothing else anywhere
+                                     in this application. -->
                                 <span
                                     v-if="user.must_change_password"
-                                    class="mt-0.5 inline-block text-[12px] text-partial"
+                                    class="chip mt-1.5 bg-brass-soft text-brass"
                                 >
                                     {{ t('admin.mustChangePassword') }}
                                 </span>
                             </RouterLink>
                         </td>
-                        <td class="px-4 py-3 text-[14px] text-label-2">
+                        <td class="text-[15px] text-label-2">
                             {{ t(`role.${user.role}` as 'role.admin') }}
                         </td>
-                        <td class="tnum px-4 py-3 text-[13px] text-label-2">
+                        <td class="tnum text-[14px] text-label-2">
                             {{
                                 user.last_login_at === null
                                     ? t('admin.never')
                                     : new Date(user.last_login_at).toLocaleDateString()
                             }}
                         </td>
-                        <td class="px-4 py-3 text-right">
+                        <td>
+                            <span
+                                :class="[
+                                    'chip',
+                                    user.is_active
+                                        ? 'bg-accent-soft text-accent'
+                                        : 'bg-track text-label-2',
+                                ]"
+                            >
+                                {{ user.is_active ? t('admin.active') : t('admin.disabled') }}
+                            </span>
+                        </td>
+                        <td class="text-right">
+                            <!-- The row is already a link to the record; this
+                                 is the same trip for somebody who reads across
+                                 to the last column looking for the verb. -->
                             <RouterLink
                                 :to="{ name: 'admin-user', params: { id: user.id } }"
-                                class="text-[14px] text-accent"
+                                class="inline-flex size-10 items-center justify-center rounded-card text-label-2 transition-colors hover:bg-accent-soft hover:text-accent"
+                                :aria-label="t('form.edit')"
                             >
-                                {{ t('form.edit') }}
+                                <PhPencilSimple :size="17" aria-hidden="true" />
                             </RouterLink>
                         </td>
                     </tr>

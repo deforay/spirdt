@@ -171,14 +171,14 @@ onMounted(() => load())
 
 <template>
     <AdminShell :title="t('audit.title')" :subtitle="t('audit.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex flex-wrap items-end gap-3">
             <label class="flex flex-col gap-1">
-                <span class="text-[12px] uppercase tracking-wide text-label-2">{{ t('audit.what') }}</span>
+                <span class="text-[13px] uppercase tracking-wide text-label-2">{{ t('audit.what') }}</span>
                 <select
                     v-model="action"
-                    class="min-w-[220px] rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
+                    class="field min-w-[220px] w-auto"
                 >
                     <option value="">{{ t('audit.allActions') }}</option>
                     <option v-for="value in actions" :key="value" :value="value">
@@ -188,78 +188,78 @@ onMounted(() => load())
             </label>
 
             <label class="flex flex-col gap-1">
-                <span class="text-[12px] uppercase tracking-wide text-label-2">{{ t('audit.from') }}</span>
+                <span class="text-[13px] uppercase tracking-wide text-label-2">{{ t('audit.from') }}</span>
                 <input
                     v-model="from"
                     type="date"
-                    class="rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
+                    class="field w-auto"
                 />
             </label>
 
             <label class="flex flex-col gap-1">
-                <span class="text-[12px] uppercase tracking-wide text-label-2">{{ t('audit.to') }}</span>
+                <span class="text-[13px] uppercase tracking-wide text-label-2">{{ t('audit.to') }}</span>
                 <input
                     v-model="to"
                     type="date"
-                    class="rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
+                    class="field w-auto"
                 />
             </label>
 
             <button
                 v-if="hasFilters"
                 type="button"
-                class="rounded-full px-3 py-2 text-[14px] text-accent"
+                class="rounded-full px-3 py-2 text-[15px] text-accent"
                 @click="clear"
             >
                 {{ t('audit.clear') }}
             </button>
         </div>
 
-        <p v-if="loading && rows.length === 0" class="text-[15px] text-label-2">
+        <p v-if="loading && rows.length === 0" class="text-[16px] text-label-2">
             {{ t('admin.loading') }}
         </p>
 
-        <p v-else-if="rows.length === 0" class="rounded-card bg-surface px-4 py-3 text-[15px] text-label-2">
+        <p v-else-if="rows.length === 0" class="rounded-surface border border-hairline bg-surface px-5 py-4 text-[16px] text-label-2">
             {{ t('audit.none') }}
         </p>
 
         <template v-else>
-            <div class="overflow-x-auto rounded-card bg-surface">
-                <table class="w-full min-w-[860px] text-left">
+            <div class="data-card data-scroll">
+                <table class="data-table min-w-[860px]">
                     <thead>
-                        <tr class="border-b border-hairline text-[12px] uppercase tracking-wide text-label-2">
-                            <th class="px-4 py-2.5 font-semibold">{{ t('audit.when') }}</th>
-                            <th class="px-4 py-2.5 font-semibold">{{ t('audit.who') }}</th>
-                            <th class="px-4 py-2.5 font-semibold">{{ t('audit.what') }}</th>
-                            <th class="px-4 py-2.5 font-semibold">{{ t('audit.details') }}</th>
-                            <th class="px-4 py-2.5 font-semibold">{{ t('audit.session') }}</th>
+                        <tr>
+                            <th>{{ t('audit.when') }}</th>
+                            <th>{{ t('audit.who') }}</th>
+                            <th>{{ t('audit.what') }}</th>
+                            <th>{{ t('audit.details') }}</th>
+                            <th>{{ t('audit.session') }}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in rows" :key="row.id" class="border-b border-hairline last:border-0">
-                            <td class="tnum whitespace-nowrap px-4 py-3 text-[13px] text-label-2">
+                        <tr v-for="row in rows" :key="row.id" >
+                            <td class="tnum whitespace-nowrap px-5 py-4 text-[14px] text-label-2">
                                 {{ when(row.created_at) }}
                             </td>
-                            <td class="px-4 py-3">
-                                <span class="block text-[15px]">{{ actor(row) }}</span>
-                                <span v-if="row.actor_email" class="block text-[12px] text-label-3">
+                            <td>
+                                <span class="block text-[16px]">{{ actor(row) }}</span>
+                                <span v-if="row.actor_email" class="block text-[13px] text-label-3">
                                     {{ row.actor_email }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3 text-[14px]">{{ label(row.action) }}</td>
-                            <td class="px-4 py-3 text-[13px] text-label-2">
+                            <td class="text-[15px]">{{ label(row.action) }}</td>
+                            <td class="text-[14px] text-label-2">
                                 <span class="block">{{ detail(row) }}</span>
-                                <span v-if="row.ip_address" class="block text-[12px] text-label-3">
+                                <span v-if="row.ip_address" class="block text-[13px] text-label-3">
                                     {{ row.ip_address
                                     }}<template v-if="row.browser"> · {{ row.browser }}</template
                                     ><template v-if="row.platform"> · {{ row.platform }}</template>
                                 </span>
                             </td>
-                            <td class="px-4 py-3">
+                            <td>
                                 <button
                                     v-if="row.session"
                                     type="button"
-                                    class="tnum font-mono text-[12px] text-accent"
+                                    class="tnum font-mono text-[13px] text-accent"
                                     @click="focusSession(row)"
                                 >
                                     {{ row.session }}
@@ -271,14 +271,14 @@ onMounted(() => load())
             </div>
 
             <div class="mt-4 flex items-center justify-between gap-3">
-                <span class="text-[13px] text-label-3">
+                <span class="text-[14px] text-label-3">
                     {{ t('audit.showing', { shown: rows.length, total }) }}
                 </span>
 
                 <button
                     v-if="more"
                     type="button"
-                    class="rounded-full bg-surface px-4 py-2 text-[14px] font-medium disabled:opacity-40"
+                    class="rounded-full bg-surface px-4 py-2 text-[15px] font-medium disabled:opacity-40"
                     :disabled="loading"
                     @click="showMore"
                 >

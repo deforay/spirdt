@@ -89,14 +89,14 @@ onMounted(async () => {
 
 <template>
     <AdminShell :title="t('sitesAdmin.title')" :subtitle="t('sitesAdmin.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex flex-wrap items-start gap-3">
             <input
                 v-model="search"
                 type="search"
                 :placeholder="t('sitesAdmin.search')"
-                class="min-w-[240px] flex-1 rounded-lg bg-surface px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                class="field min-w-[260px] flex-1"
             />
             <div class="min-w-[260px]">
                 <PlacePicker
@@ -108,32 +108,53 @@ onMounted(async () => {
             <RouterLink
                 v-if="canWrite"
                 :to="{ name: 'admin-site-new' }"
-                class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
+                class="flex min-h-11 shrink-0 items-center rounded-card bg-accent px-5 text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
             >
                 {{ t('sitesAdmin.add') }}
             </RouterLink>
         </div>
 
-        <div class="overflow-hidden rounded-card bg-surface">
-            <p v-if="!loading && sites.length === 0" class="px-4 py-3 text-[14px] text-label-2">
-                {{ t('registry.nothingFound') }}
-            </p>
-            <div
-                v-for="(site, index) in sites"
-                :key="site.id"
-                class="flex items-center justify-between gap-3 px-4 py-2.5"
-                :class="[index > 0 ? 'border-t border-hairline' : '', site.is_active ? '' : 'opacity-50']"
-            >
-                <RouterLink
-                    :to="{ name: 'admin-site', params: { id: site.id } }"
-                    class="min-w-0 flex-1"
-                >
-                    <span class="block truncate text-[15px] hover:text-accent">{{ site.name }}</span>
-                    <span class="block truncate text-[12px] text-label-2">
-                        {{ site.facility_name }}<template v-if="site.place"> · {{ site.place }}</template>
-                    </span>
-                </RouterLink>
-            </div>
+        <div class="data-card data-scroll">
+            <table class="data-table min-w-[720px]">
+                <thead>
+                    <tr>
+                        <th>{{ t('registry.siteName') }}</th>
+                        <th>{{ t('registry.facilityName') }}</th>
+                        <th>{{ t('registry.place') }}</th>
+                        <th>{{ t('admin.status') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="!loading && sites.length === 0">
+                        <td colspan="4" class="text-label-2">{{ t('registry.nothingFound') }}</td>
+                    </tr>
+
+                    <tr v-for="site in sites" :key="site.id">
+                        <td>
+                            <RouterLink
+                                :to="{ name: 'admin-site', params: { id: site.id } }"
+                                class="font-medium hover:text-accent"
+                            >
+                                {{ site.name }}
+                            </RouterLink>
+                        </td>
+                        <td class="text-label-2">{{ site.facility_name }}</td>
+                        <td class="text-label-2">{{ site.place ?? '—' }}</td>
+                        <td>
+                            <span
+                                :class="[
+                                    'chip',
+                                    site.is_active
+                                        ? 'bg-accent-soft text-accent'
+                                        : 'bg-track text-label-2',
+                                ]"
+                            >
+                                {{ site.is_active ? t('admin.active') : t('admin.disabled') }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <PagedList

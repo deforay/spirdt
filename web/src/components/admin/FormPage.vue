@@ -30,13 +30,13 @@ const emit = defineEmits<{ save: [] }>()
 
 <template>
     <AdminShell :title="title" :subtitle="subtitle">
-        <RouterLink :to="backTo" class="mb-4 inline-block text-[14px] text-accent">
+        <RouterLink :to="backTo" class="mb-4 inline-block text-[15px] text-accent">
             &lsaquo; {{ t('form.back') }}
         </RouterLink>
 
-        <p v-if="error" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
-        <form class="rounded-card bg-surface p-5" @submit.prevent="emit('save')">
+        <form class="rounded-surface border border-hairline bg-surface p-6" @submit.prevent="emit('save')">
             <div class="grid gap-5 sm:grid-cols-2">
                 <slot />
             </div>
@@ -44,12 +44,12 @@ const emit = defineEmits<{ save: [] }>()
             <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-4">
                 <button
                     type="submit"
-                    class="rounded-lg bg-accent px-5 py-2 text-[15px] font-semibold text-white disabled:opacity-40"
+                    class="min-h-11 rounded-card bg-accent px-5 text-[16px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40"
                     :disabled="saving"
                 >
                     {{ saving ? t('form.saving') : t('form.save') }}
                 </button>
-                <RouterLink :to="backTo" class="text-[14px] text-label-2">
+                <RouterLink :to="backTo" class="text-[15px] text-label-2">
                     {{ t('action.cancel') }}
                 </RouterLink>
 

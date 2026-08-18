@@ -202,26 +202,26 @@ onMounted(load)
 
 <template>
     <AdminShell :title="t('assignments.title')" :subtitle="t('assignments.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
-        <div class="mb-5 flex flex-wrap items-end justify-between gap-4 rounded-card bg-surface p-4">
+        <div class="mb-5 flex flex-wrap items-end justify-between gap-4 rounded-surface border border-hairline bg-surface p-5">
             <input
                 v-model="search"
                 type="search"
                 :placeholder="t('sitesAdmin.search')"
-                class="min-w-[220px] flex-1 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                class="min-w-[220px] flex-1 rounded-lg bg-ground px-3 py-2 text-[16px] outline-none placeholder:text-label-3"
             />
             <div class="min-w-[240px]">
                 <PlacePicker v-model="geoUnitId" :tree="tree" :placeholder="t('facilities.anywhere')" />
             </div>
 
             <label class="flex flex-col gap-1">
-                <span class="text-[12px] uppercase tracking-wide text-label-2">
+                <span class="text-[13px] uppercase tracking-wide text-label-2">
                     {{ t('assignments.assignTo') }}
                 </span>
                 <select
                     v-model="assignTo"
-                    class="min-w-[190px] rounded-lg bg-ground px-3 py-2 text-[15px] outline-none"
+                    class="min-w-[190px] rounded-lg bg-ground px-3 py-2 text-[16px] outline-none"
                 >
                     <option value="">{{ t('assignments.wholeOrganisation') }}</option>
                     <option v-for="user in assessors" :key="user.id" :value="String(user.id)">
@@ -233,25 +233,25 @@ onMounted(load)
 
         <div
             v-if="selected.size > 0"
-            class="mb-3 flex items-center justify-between gap-3 rounded-card bg-accent-soft px-4 py-2.5"
+            class="mb-3 flex items-center justify-between gap-3 rounded-card bg-accent-soft px-5 py-3.5"
         >
-            <span class="text-[14px] font-medium text-accent">
+            <span class="text-[15px] font-medium text-accent">
                 {{ t('assignments.selected', { count: selected.size }) }}
             </span>
             <button
                 type="button"
-                class="rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-white"
+                class="rounded-full bg-accent px-4 py-1.5 text-[14px] font-semibold text-accent-ink"
                 @click="onAssignSelected"
             >
                 {{ t('assignments.assignSelected') }}
             </button>
         </div>
 
-        <div class="overflow-x-auto rounded-card bg-surface">
-            <table class="w-full min-w-[640px] text-left">
+        <div class="data-card data-scroll">
+            <table class="data-table min-w-[640px]">
                 <thead>
-                    <tr class="border-b border-hairline text-[12px] uppercase tracking-wide text-label-2">
-                        <th class="px-4 py-2.5 font-semibold">
+                    <tr>
+                        <th>
                             <input
                                 type="checkbox"
                                 class="mr-2 align-middle"
@@ -261,22 +261,21 @@ onMounted(load)
                             />
                             {{ t('registry.testingSites') }}
                         </th>
-                        <th class="px-4 py-2.5 font-semibold">{{ t('assignments.coveredBy') }}</th>
-                        <th class="px-4 py-2.5 text-right font-semibold">{{ t('admin.actions') }}</th>
+                        <th>{{ t('assignments.coveredBy') }}</th>
+                        <th class="text-right">{{ t('admin.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="sites.length === 0">
-                        <td colspan="3" class="px-4 py-3 text-[14px] text-label-2">
+                        <td colspan="3" class="text-[15px] text-label-2">
                             {{ t('assignments.noSites') }}
                         </td>
                     </tr>
                     <tr
                         v-for="site in sites"
                         :key="site.id"
-                        class="border-b border-hairline last:border-0"
                     >
-                        <td class="px-4 py-3">
+                        <td>
                             <label class="flex items-start gap-2">
                                 <input
                                     type="checkbox"
@@ -285,25 +284,25 @@ onMounted(load)
                                     @change="toggleSelected(site.id)"
                                 />
                                 <span class="min-w-0">
-                                    <span class="block truncate text-[15px]">{{ site.name }}</span>
-                                    <span class="block truncate text-[13px] text-label-2">
+                                    <span class="block truncate text-[16px]">{{ site.name }}</span>
+                                    <span class="block truncate text-[14px] text-label-2">
                                         {{ site.facility_name
                                         }}<template v-if="site.place"> · {{ site.place }}</template>
                                     </span>
                                 </span>
                             </label>
                         </td>
-                        <td class="px-4 py-3">
+                        <td>
                             <span
                                 v-if="(bySite.get(site.id) ?? []).length === 0"
-                                class="text-[14px] text-label-3"
+                                class="text-[15px] text-label-3"
                             >
                                 {{ t('sites.unassigned') }}
                             </span>
                             <span
                                 v-for="assignment in bySite.get(site.id) ?? []"
                                 :key="assignment.id"
-                                class="mr-2 inline-flex items-center gap-2 rounded-full bg-accent-soft px-2.5 py-1 text-[13px] text-accent"
+                                class="mr-2 inline-flex items-center gap-2 rounded-full bg-accent-soft px-2.5 py-1 text-[14px] text-accent"
                             >
                                 {{ describe(assignment) }}
                                 <button
@@ -316,10 +315,10 @@ onMounted(load)
                                 </button>
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-right">
+                        <td class="text-right">
                             <button
                                 type="button"
-                                class="text-[14px] text-accent"
+                                class="text-[15px] text-accent"
                                 @click="onAssign(site)"
                             >
                                 {{ t('assignments.assign') }}

@@ -34,6 +34,13 @@ const routes: RouteRecordRaw[] = [
         redirect: () => ({ name: landing() }),
     },
     {
+        // No permission: everybody who can sign in has an account, and the
+        // password on it is the one thing they can always change.
+        path: '/account',
+        name: 'account',
+        component: () => import('@/views/AccountView.vue'),
+    },
+    {
         path: '/assess',
         name: 'assess',
         component: () => import('@/views/AssessView.vue'),
@@ -117,6 +124,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/OrganizationsView.vue'),
         // Superadmin only, and the API enforces it again.
         meta: { permission: PERMISSION.organizationsManage },
+    },
+    {
+        path: '/admin/settings',
+        name: 'admin-settings',
+        component: () => import('@/views/admin/SettingsView.vue'),
+        meta: { permission: PERMISSION.settingsManage },
     },
     {
         path: '/admin/assignments',

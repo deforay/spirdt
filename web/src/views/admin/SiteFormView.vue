@@ -107,8 +107,7 @@ onMounted(async () => {
     }
 })
 
-const inputClass =
-    'w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3'
+const inputClass = 'field'
 </script>
 
 <template>
@@ -140,7 +139,7 @@ const inputClass =
             <button
                 v-if="!isNew"
                 type="button"
-                class="text-[14px]"
+                class="text-[15px]"
                 :class="isActive ? 'text-no' : 'text-yes'"
                 @click="onToggleActive"
             >

@@ -10,8 +10,8 @@ defineProps<{ label: string; hint?: string; wide?: boolean }>()
 
 <template>
     <label class="flex flex-col gap-1.5" :class="wide ? 'sm:col-span-2' : ''">
-        <span class="text-[13px] font-medium text-label-2">{{ label }}</span>
+        <span class="text-[14px] font-medium text-label-2">{{ label }}</span>
         <slot />
-        <span v-if="hint" class="text-[12px] text-label-3">{{ hint }}</span>
+        <span v-if="hint" class="text-[13px] text-label-3">{{ hint }}</span>
     </label>
 </template>

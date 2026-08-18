@@ -91,14 +91,14 @@ onMounted(async () => {
 
 <template>
     <AdminShell :title="t('facilities.title')" :subtitle="t('facilities.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex flex-wrap items-start gap-3">
             <input
                 v-model="search"
                 type="search"
                 :placeholder="t('facilities.search')"
-                class="min-w-[240px] flex-1 rounded-lg bg-surface px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                class="field min-w-[260px] flex-1"
             />
             <div class="min-w-[260px]">
                 <PlacePicker
@@ -110,44 +110,68 @@ onMounted(async () => {
             <RouterLink
                 v-if="canWrite"
                 :to="{ name: 'admin-facility-new' }"
-                class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
+                class="flex min-h-11 shrink-0 items-center rounded-card bg-accent px-5 text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
             >
                 {{ t('facilities.add') }}
             </RouterLink>
         </div>
 
-        <div class="overflow-hidden rounded-card bg-surface">
-            <p v-if="!loading && facilities.length === 0" class="px-4 py-3 text-[14px] text-label-2">
-                {{ t('registry.nothingFound') }}
-            </p>
-            <div
-                v-for="(facility, index) in facilities"
-                :key="facility.id"
-                class="flex items-center justify-between gap-3 px-4 py-2.5"
-                :class="[
-                    index > 0 ? 'border-t border-hairline' : '',
-                    facility.is_active ? '' : 'opacity-50',
-                ]"
-            >
-                <RouterLink
-                    :to="{ name: 'admin-facility', params: { id: facility.id } }"
-                    class="min-w-0 flex-1"
-                >
-                    <span class="block truncate text-[15px] hover:text-accent">
-                        {{ facility.name }}
-                        <span v-if="facility.code" class="text-[12px] text-label-3">
-                            {{ facility.code }}
-                        </span>
-                        <span v-if="facility.source === 'field'" class="text-[12px] text-partial">
-                            {{ t('registry.fromTheField') }}
-                        </span>
-                    </span>
-                    <span class="block truncate text-[12px] text-label-2">
-                        {{ facility.place ?? t('facilities.noPlace') }}
-                        <template v-if="facility.contact_phone"> · {{ facility.contact_phone }}</template>
-                    </span>
-                </RouterLink>
-            </div>
+        <div class="data-card data-scroll">
+            <table class="data-table min-w-[760px]">
+                <thead>
+                    <tr>
+                        <th>{{ t('registry.facilityName') }}</th>
+                        <th>{{ t('report.facilityCode') }}</th>
+                        <th>{{ t('registry.place') }}</th>
+                        <th>{{ t('admin.status') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="!loading && facilities.length === 0">
+                        <td colspan="4" class="text-label-2">{{ t('registry.nothingFound') }}</td>
+                    </tr>
+
+                    <tr v-for="facility in facilities" :key="facility.id">
+                        <td>
+                            <RouterLink
+                                :to="{ name: 'admin-facility', params: { id: facility.id } }"
+                                class="font-medium hover:text-accent"
+                            >
+                                {{ facility.name }}
+                            </RouterLink>
+                            <!-- Brass rather than amber: a facility added by an
+                                 assessor in the field is a provenance note, not
+                                 a Partial. -->
+                            <span
+                                v-if="facility.source === 'field'"
+                                class="chip ml-2 bg-brass-soft text-brass"
+                            >
+                                {{ t('registry.fromTheField') }}
+                            </span>
+                            <span
+                                v-if="facility.contact_phone"
+                                class="tnum mt-1 block text-[13px] text-label-3"
+                            >
+                                {{ facility.contact_phone }}
+                            </span>
+                        </td>
+                        <td class="tnum text-label-2">{{ facility.code ?? '—' }}</td>
+                        <td class="text-label-2">{{ facility.place ?? t('facilities.noPlace') }}</td>
+                        <td>
+                            <span
+                                :class="[
+                                    'chip',
+                                    facility.is_active
+                                        ? 'bg-accent-soft text-accent'
+                                        : 'bg-track text-label-2',
+                                ]"
+                            >
+                                {{ facility.is_active ? t('admin.active') : t('admin.disabled') }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <PagedList

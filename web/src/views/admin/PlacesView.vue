@@ -65,55 +65,80 @@ onMounted(load)
 
 <template>
     <AdminShell :title="t('places.title')" :subtitle="t('places.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
-        <div class="mb-4 flex flex-wrap items-center gap-3">
+        <!-- Search and the way to add sit on one line. They were stacked, so
+             a screen whose whole content is a list spent two rows saying how to
+             filter it. -->
+        <div class="mb-5 flex flex-wrap items-center gap-3">
             <input
                 v-model="search"
                 type="search"
                 :placeholder="t('places.search')"
-                class="min-w-[240px] flex-1 rounded-lg bg-surface px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                class="field min-w-[260px] flex-1"
             />
-        </div>
 
-        <div v-if="canWrite" class="mb-4 flex justify-end">
             <RouterLink
+                v-if="canWrite"
                 :to="{ name: 'admin-place-new' }"
-                class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
+                class="flex min-h-11 shrink-0 items-center rounded-card bg-accent px-5 text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
             >
                 {{ t('placeForm.addTitle') }}
             </RouterLink>
         </div>
 
-        <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
+        <p v-if="loading" class="text-[16px] text-label-2">{{ t('admin.loading') }}</p>
 
-        <div v-else class="overflow-hidden rounded-card bg-surface">
-            <p v-if="matches.length === 0" class="px-4 py-3 text-[14px] text-label-2">
-                {{ t('registry.nothingFound') }}
-            </p>
-            <div
-                v-for="(unit, index) in matches"
-                :key="unit.id"
-                class="flex items-center justify-between gap-3 px-4 py-2.5"
-                :class="[index > 0 ? 'border-t border-hairline' : '', unit.is_active ? '' : 'opacity-50']"
-            >
-                <RouterLink
-                    :to="{ name: 'admin-place', params: { id: unit.id } }"
-                    class="min-w-0 flex-1"
-                >
-                    <span class="block truncate text-[15px] hover:text-accent">
-                        {{ tree.paths[unit.id] }}
-                    </span>
-                    <span class="text-[12px] text-label-2">{{ unit.level }}</span>
-                </RouterLink>
-                <RouterLink
-                    v-if="canWrite"
-                    :to="{ name: 'admin-place-new', query: { parent: unit.id } }"
-                    class="shrink-0 text-[13px] text-accent"
-                >
-                    {{ t('places.addUnder') }}
-                </RouterLink>
-            </div>
+        <div v-else class="data-card data-scroll">
+            <table class="data-table min-w-[640px]">
+                <thead>
+                    <tr>
+                        <th>{{ t('registry.placeName') }}</th>
+                        <th>{{ t('registry.levelName') }}</th>
+                        <th>{{ t('admin.status') }}</th>
+                        <th class="text-right">{{ t('admin.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="matches.length === 0">
+                        <td colspan="4" class="text-label-2">{{ t('registry.nothingFound') }}</td>
+                    </tr>
+
+                    <tr v-for="unit in matches" :key="unit.id">
+                        <td>
+                            <RouterLink
+                                :to="{ name: 'admin-place', params: { id: unit.id } }"
+                                class="font-medium hover:text-accent"
+                            >
+                                {{ tree.paths[unit.id] }}
+                            </RouterLink>
+                        </td>
+                        <td class="text-label-2">{{ unit.level }}</td>
+                        <td>
+                            <span
+                                :class="[
+                                    'chip',
+                                    unit.is_active
+                                        ? 'bg-accent-soft text-accent'
+                                        : 'bg-track text-label-2',
+                                ]"
+                            >
+                                {{ unit.is_active ? t('admin.active') : t('admin.disabled') }}
+                            </span>
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            <RouterLink
+                                v-if="canWrite"
+                                :to="{ name: 'admin-place-new', query: { parent: unit.id } }"
+                                class="text-[14px] font-medium text-accent hover:text-accent-hover"
+                            >
+                                {{ t('places.addUnder') }}
+                            </RouterLink>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+
     </AdminShell>
 </template>

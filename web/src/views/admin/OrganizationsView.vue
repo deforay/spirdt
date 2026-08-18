@@ -65,60 +65,59 @@ onMounted(load)
 
 <template>
     <AdminShell :title="t('organizations.title')" :subtitle="t('organizations.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex justify-end">
             <RouterLink
                 :to="{ name: 'admin-organization-new' }"
-                class="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-white"
+                class="rounded-full bg-accent px-4 py-2 text-[15px] font-semibold text-accent-ink"
             >
                 {{ t('organizations.add') }}
             </RouterLink>
         </div>
 
-        <p v-if="loading" class="text-[15px] text-label-2">{{ t('admin.loading') }}</p>
+        <p v-if="loading" class="text-[16px] text-label-2">{{ t('admin.loading') }}</p>
 
-        <div v-else class="overflow-x-auto rounded-card bg-surface">
-            <table class="w-full min-w-[720px] text-left">
+        <div v-else class="data-card data-scroll">
+            <table class="data-table min-w-[720px]">
                 <thead>
-                    <tr class="border-b border-hairline text-[12px] uppercase tracking-wide text-label-2">
-                        <th class="px-4 py-2.5 font-semibold">{{ t('organizations.organisation') }}</th>
-                        <th class="px-4 py-2.5 font-semibold">{{ t('admin.users') }}</th>
-                        <th class="px-4 py-2.5 font-semibold">{{ t('organizations.assessments') }}</th>
-                        <th class="px-4 py-2.5 text-right font-semibold">{{ t('admin.actions') }}</th>
+                    <tr>
+                        <th>{{ t('organizations.organisation') }}</th>
+                        <th>{{ t('admin.users') }}</th>
+                        <th>{{ t('organizations.assessments') }}</th>
+                        <th class="text-right">{{ t('admin.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr
                         v-for="organization in organizations"
                         :key="organization.id"
-                        class="border-b border-hairline last:border-0"
                         :class="organization.is_active ? '' : 'opacity-50'"
                     >
-                        <td class="px-4 py-3">
+                        <td>
                             <RouterLink :to="{ name: 'admin-organization', params: { id: organization.id } }">
-                                <span class="block text-[15px] hover:text-accent">
+                                <span class="block text-[16px] hover:text-accent">
                                     {{ organization.name }}
                                 </span>
-                                <span class="tnum block text-[13px] text-label-2">
+                                <span class="tnum block text-[14px] text-label-2">
                                     {{ organization.code }}
                                 </span>
                             </RouterLink>
                         </td>
-                        <td class="tnum px-4 py-3 text-[14px]">
+                        <td class="tnum text-[15px]">
                             {{ organization.user_count }}
                             <!-- Nobody able to administer it is the state
                                  bin/recover-access exists to dig out of, so it
                                  is worth seeing before somebody reports it. -->
-                            <span v-if="organization.active_admins === 0" class="block text-[12px] text-no">
+                            <span v-if="organization.active_admins === 0" class="block text-[13px] text-no">
                                 {{ t('organizations.noAdmin') }}
                             </span>
                         </td>
-                        <td class="tnum px-4 py-3 text-[14px]">{{ organization.assessments }}</td>
-                        <td class="px-4 py-3 text-right">
+                        <td class="tnum text-[15px]">{{ organization.assessments }}</td>
+                        <td class="text-right">
                             <RouterLink
                                 :to="{ name: 'admin-organization', params: { id: organization.id } }"
-                                class="text-[14px] text-accent"
+                                class="text-[15px] text-accent"
                             >
                                 {{ t('form.edit') }}
                             </RouterLink>

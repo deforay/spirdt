@@ -136,14 +136,14 @@ onMounted(async () => {
 
 <template>
     <AdminShell :title="t('reports.title')" :subtitle="t('reports.subtitle')">
-        <p v-if="error !== ''" class="mb-4 text-[14px] font-medium text-no">{{ error }}</p>
+        <p v-if="error !== ''" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
         <div class="mb-4 flex flex-wrap items-start gap-3">
             <input
                 v-model="search"
                 type="search"
                 :placeholder="t('reports.search')"
-                class="min-w-[220px] flex-1 rounded-lg bg-surface px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                class="field min-w-[260px] flex-1"
             />
             <div class="min-w-[240px]">
                 <PlacePicker
@@ -152,81 +152,133 @@ onMounted(async () => {
                     :placeholder="t('facilities.anywhere')"
                 />
             </div>
-            <select
-                v-model="status"
-                class="rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
-            >
-                <option value="">{{ t('reports.anyStatus') }}</option>
-                <option value="draft">{{ t('reports.statusDraft') }}</option>
-                <option value="submitted">{{ t('reports.statusSubmitted') }}</option>
-                <option value="reviewed">{{ t('reports.statusReviewed') }}</option>
-                <option value="finalised">{{ t('reports.statusFinalised') }}</option>
-            </select>
+
             <select
                 v-model="level"
-                class="rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
+                class="field w-auto"
             >
                 <option value="">{{ t('reports.anyLevel') }}</option>
                 <option v-for="n in [0, 1, 2, 3, 4]" :key="n" :value="String(n)">
                     {{ t('score.level', { level: n }) }}
                 </option>
             </select>
-            <label class="flex items-center gap-2 text-[13px] text-label-2">
+            <label class="flex items-center gap-2 text-[14px] text-label-2">
                 {{ t('reports.from') }}
                 <input
                     v-model="from"
                     type="date"
-                    class="rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
+                    class="field w-auto"
                 />
             </label>
-            <label class="flex items-center gap-2 text-[13px] text-label-2">
+            <label class="flex items-center gap-2 text-[14px] text-label-2">
                 {{ t('reports.to') }}
                 <input
                     v-model="to"
                     type="date"
-                    class="rounded-lg bg-surface px-3 py-2 text-[15px] outline-none"
+                    class="field w-auto"
                 />
             </label>
         </div>
 
-        <div class="overflow-hidden rounded-card bg-surface">
-            <p v-if="!loading && rows.length === 0" class="px-4 py-3 text-[14px] text-label-2">
-                {{ t('reports.nothingYet') }}
-            </p>
-            <RouterLink
-                v-for="(row, index) in rows"
-                :key="row.id"
-                :to="{ name: 'admin-report', params: { id: row.id } }"
-                class="flex items-center justify-between gap-3 px-4 py-2.5"
-                :class="index > 0 ? 'border-t border-hairline' : ''"
+        <div
+            class="mb-4 flex flex-wrap gap-1 rounded-card border border-hairline bg-surface p-1"
+            role="tablist"
+        >
+            <button
+                v-for="tab in [
+                    { key: '', label: t('reports.anyStatus') },
+                    { key: 'draft', label: t('reports.statusDraft') },
+                    { key: 'submitted', label: t('reports.statusSubmitted') },
+                    { key: 'reviewed', label: t('reports.statusReviewed') },
+                    { key: 'finalised', label: t('reports.statusFinalised') },
+                ]"
+                :key="tab.key"
+                type="button"
+                role="tab"
+                :aria-selected="status === tab.key"
+                :class="[
+                    'flex min-h-11 items-center gap-2 rounded-card px-4 text-[14.5px] font-medium transition-colors',
+                    status === tab.key
+                        ? 'bg-accent-soft text-accent'
+                        : 'text-label-2 hover:bg-surface-2 hover:text-label',
+                ]"
+                @click="status = tab.key"
             >
-                <span class="min-w-0 flex-1">
-                    <span class="block truncate text-[15px] hover:text-accent">
-                        {{ row.site ?? t('reports.siteGone') }}
-                    </span>
-                    <span class="block truncate text-[12px] text-label-2">
-                        {{ row.facility }}
-                        <template v-if="row.place"> · {{ row.place }}</template>
-                    </span>
+                {{ tab.label }}
+                <!-- The count belongs to the filter that is running, so it is
+                     shown on the tab that produced it and nowhere else. A
+                     number under every tab would mean five queries per page
+                     load to fill them. -->
+                <span
+                    v-if="status === tab.key && !loading"
+                    class="tnum rounded-full bg-accent px-2 py-0.5 text-[12px] font-semibold text-accent-ink"
+                >
+                    {{ total }}
                 </span>
+            </button>
+        </div>
 
-                <span class="shrink-0 text-right">
-                    <span class="tnum block text-[13px] text-label-2">{{ row.assessed_on }}</span>
-                    <span class="block text-[12px] text-label-3">
-                        <template v-if="row.status !== 'submitted'">{{ row.status }}</template>
-                    </span>
-                </span>
+        <div class="data-card data-scroll">
+            <table class="data-table min-w-[840px]">
+                <thead>
+                    <tr>
+                        <th>{{ t('registry.siteName') }}</th>
+                        <th>{{ t('registry.facilityName') }}</th>
+                        <th>{{ t('report.assessedOn') }}</th>
+                        <th>{{ t('admin.status') }}</th>
+                        <th class="text-right">{{ t('report.overall') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="!loading && rows.length === 0">
+                        <td colspan="5" class="text-label-2">{{ t('reports.nothingYet') }}</td>
+                    </tr>
 
-                <span class="w-[112px] shrink-0 text-right">
-                    <template v-if="row.percentage !== null">
-                        <span class="tnum block text-[15px] font-semibold">
-                            {{ formatPercent(row.percentage, 2) }}
-                        </span>
-                        <ScoreBadge :level="row.level" />
-                    </template>
-                    <span v-else class="text-[12px] text-label-3">{{ t('reports.notScoredYet') }}</span>
-                </span>
-            </RouterLink>
+                    <tr v-for="row in rows" :key="row.id">
+                        <td>
+                            <RouterLink
+                                :to="{ name: 'admin-report', params: { id: row.id } }"
+                                class="font-medium hover:text-accent"
+                            >
+                                {{ row.site ?? t('reports.siteGone') }}
+                            </RouterLink>
+                        </td>
+                        <td class="text-label-2">
+                            {{ row.facility }}
+                            <span v-if="row.place" class="block text-[13px] text-label-3">
+                                {{ row.place }}
+                            </span>
+                        </td>
+                        <td class="tnum text-label-2">{{ row.assessed_on }}</td>
+                        <td>
+                            <!-- A draft is a state of the document, so it is
+                                 stated. Everything else is the ordinary case
+                                 and does not need a badge to say so. -->
+                            <span
+                                :class="[
+                                    'chip',
+                                    row.status === 'draft'
+                                        ? 'bg-brass-soft text-brass'
+                                        : 'bg-accent-soft text-accent',
+                                ]"
+                            >
+                                {{ row.status }}
+                            </span>
+                        </td>
+                        <td class="text-right">
+                            <template v-if="row.percentage !== null">
+                                <span class="tnum block text-[16px] font-semibold">
+                                    {{ formatPercent(row.percentage, 2) }}
+                                </span>
+                                <ScoreBadge :level="row.level" />
+                            </template>
+                            <span v-else class="text-[13px] text-label-3">
+                                {{ t('reports.notScoredYet') }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <PagedList

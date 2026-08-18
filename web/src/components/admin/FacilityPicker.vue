@@ -83,10 +83,10 @@ function choose(facility: Facility): void {
     <div class="relative">
         <div
             v-if="modelValue !== '' && !open"
-            class="flex items-center gap-2 rounded-lg bg-ground px-3 py-2"
+            class="field flex items-center gap-2"
         >
-            <span class="flex-1 truncate text-[15px]">{{ label ?? modelValue }}</span>
-            <button type="button" class="text-[13px] text-accent" @click="open = true">
+            <span class="flex-1 truncate text-[16px]">{{ label ?? modelValue }}</span>
+            <button type="button" class="text-[14px] text-accent" @click="open = true">
                 {{ t('registry.change') }}
             </button>
         </div>
@@ -96,7 +96,7 @@ function choose(facility: Facility): void {
             v-model="term"
             type="search"
             :placeholder="t('sitesAdmin.findFacility')"
-            class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+            class="field"
         />
 
         <!--
@@ -107,14 +107,14 @@ function choose(facility: Facility): void {
         <RouterLink
             v-if="anyExist === false"
             :to="{ name: 'admin-facilities' }"
-            class="mt-1 block text-[13px] text-accent"
+            class="mt-1 block text-[14px] text-accent"
         >
             {{ t('sitesAdmin.noFacilitiesYet') }}
         </RouterLink>
 
         <p
             v-else-if="searched && matches.length === 0"
-            class="mt-1 text-[13px] text-label-2"
+            class="mt-1 text-[14px] text-label-2"
         >
             {{ t('sitesAdmin.noFacilityMatch') }}
         </p>
@@ -130,8 +130,8 @@ function choose(facility: Facility): void {
                 class="flex w-full flex-col items-start px-3.5 py-2 text-left hover:bg-ground"
                 @click="choose(facility)"
             >
-                <span class="text-[15px]">{{ facility.name }}</span>
-                <span class="text-[12px] text-label-2">{{ facility.place }}</span>
+                <span class="text-[16px]">{{ facility.name }}</span>
+                <span class="text-[13px] text-label-2">{{ facility.place }}</span>
             </button>
         </div>
     </div>

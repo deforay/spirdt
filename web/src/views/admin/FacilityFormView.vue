@@ -171,8 +171,7 @@ onMounted(async () => {
     }
 })
 
-const inputClass =
-    'w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3'
+const inputClass = 'field'
 </script>
 
 <template>
@@ -275,7 +274,7 @@ const inputClass =
             <template v-if="!isNew">
                 <button
                     type="button"
-                    class="text-[14px]"
+                    class="text-[15px]"
                     :class="isActive ? 'text-no' : 'text-yes'"
                     @click="onToggleActive"
                 >
@@ -283,7 +282,7 @@ const inputClass =
                 </button>
                 <button
                     type="button"
-                    class="text-[14px] text-label-2"
+                    class="text-[15px] text-label-2"
                     @click="merging = !merging"
                 >
                     {{ t('facilityForm.merge') }}
@@ -301,7 +300,7 @@ const inputClass =
     >
         <div class="mt-[10vh] w-full max-w-[520px] rounded-card bg-surface p-5 shadow-lg">
             <h2 class="text-[18px] font-bold">{{ t('facilityForm.mergeTitle') }}</h2>
-            <p class="mt-1 text-[14px] text-label-2">{{ t('facilityForm.mergeExplain') }}</p>
+            <p class="mt-1 text-[15px] text-label-2">{{ t('facilityForm.mergeExplain') }}</p>
 
             <input
                 v-model="mergeSearch"
@@ -319,14 +318,14 @@ const inputClass =
                     class="flex w-full flex-col items-start rounded-lg px-3 py-2 text-left hover:bg-ground"
                     @click="onMerge(candidate)"
                 >
-                    <span class="text-[15px]">{{ candidate.name }}</span>
-                    <span class="text-[12px] text-label-2">{{ candidate.place }}</span>
+                    <span class="text-[16px]">{{ candidate.name }}</span>
+                    <span class="text-[13px] text-label-2">{{ candidate.place }}</span>
                 </button>
             </div>
 
             <button
                 type="button"
-                class="mt-3 text-[14px] text-label-2"
+                class="mt-3 text-[15px] text-label-2"
                 @click="merging = false"
             >
                 {{ t('action.cancel') }}

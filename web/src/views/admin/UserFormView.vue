@@ -143,8 +143,7 @@ onMounted(async () => {
     }
 })
 
-const inputClass =
-    'w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3'
+const inputClass = 'field'
 </script>
 
 <template>
@@ -156,10 +155,10 @@ const inputClass =
         :error="error"
         @save="onSave"
     >
-        <div v-if="issued" class="rounded-card border border-accent bg-accent-soft px-4 py-3 sm:col-span-2">
-            <p class="text-[14px] font-semibold text-accent">{{ t('userForm.passwordIs') }}</p>
+        <div v-if="issued" class="rounded-card border border-accent bg-accent-soft px-5 py-4 sm:col-span-2">
+            <p class="text-[15px] font-semibold text-accent">{{ t('userForm.passwordIs') }}</p>
             <p class="tnum mt-1 select-all font-mono text-[18px]">{{ issued }}</p>
-            <p class="mt-1 text-[13px] text-label-2">{{ t('admin.passwordOnce') }}</p>
+            <p class="mt-1 text-[14px] text-label-2">{{ t('admin.passwordOnce') }}</p>
         </div>
 
         <FormField :label="t('admin.fullName')">
@@ -195,13 +194,13 @@ const inputClass =
 
         <template #actions>
             <template v-if="!isNew">
-                <button type="button" class="text-[14px] text-accent" @click="onResetPassword">
+                <button type="button" class="text-[15px] text-accent" @click="onResetPassword">
                     {{ t('admin.resetPassword') }}
                 </button>
                 <button
                     v-if="!isSelf"
                     type="button"
-                    class="text-[14px]"
+                    class="text-[15px]"
                     :class="isActive ? 'text-no' : 'text-yes'"
                     @click="onToggleActive"
                 >

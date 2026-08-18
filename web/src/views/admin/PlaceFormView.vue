@@ -120,8 +120,7 @@ onMounted(async () => {
     }
 })
 
-const inputClass =
-    'w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3'
+const inputClass = 'field'
 </script>
 
 <template>
@@ -157,7 +156,7 @@ const inputClass =
                 :placeholder="t('placeForm.topLevel')"
                 @update:model-value="parentId = $event"
             />
-            <span v-else class="text-[15px] text-label-2">
+            <span v-else class="text-[16px] text-label-2">
                 {{ parentId === null ? t('placeForm.topLevel') : tree.paths[parentId] }}
             </span>
         </FormField>
@@ -166,7 +165,7 @@ const inputClass =
             <button
                 v-if="!isNew"
                 type="button"
-                class="text-[14px]"
+                class="text-[15px]"
                 :class="isActive ? 'text-no' : 'text-yes'"
                 @click="onToggleActive"
             >
