@@ -75,17 +75,26 @@ final class GrantsMatchTheMigrationTest extends TestCase
     }
 
     /**
-     * And an administrator holds everything except the one that reaches across
-     * tenants. That exception is the distinction between the two roles, so it
-     * is written down here rather than left to whoever adds the next
+     * And an administrator holds everything except what reaches past their own
+     * organisation. That exception is the distinction between the two roles, so
+     * it is written down here rather than left to whoever adds the next
      * permission.
+     *
+     * There are two now. `organizations.manage` writes other tenants' rows;
+     * `settings.manage` writes `system_config`, which is shared rather than
+     * tenant-scoped, so one organisation's administrator would be setting every
+     * organisation's outgoing mail. A third belongs on this list only if the
+     * same sentence is true of it.
      */
-    public function testAnAdministratorHoldsEverythingExceptTheCrossTenantOne(): void
+    public function testAnAdministratorHoldsEverythingExceptWhatReachesAcrossTenants(): void
     {
         $held = Roles::grantsFor('admin');
         sort($held);
 
-        $expected = array_values(array_diff(Permission::all(), [Permission::ORGANIZATIONS_MANAGE]));
+        $expected = array_values(array_diff(Permission::all(), [
+            Permission::ORGANIZATIONS_MANAGE,
+            Permission::SETTINGS_MANAGE,
+        ]));
         sort($expected);
 
         self::assertSame($expected, $held);

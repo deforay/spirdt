@@ -413,6 +413,19 @@ final class AuthService
             'access_token'  => $accessToken,
             'expires_in'    => $this->tokens->ttlSeconds(),
             'refresh_token' => $refreshToken,
+            // How this installation names itself, and who to ask about it.
+            // None of it is secret and all of it is needed before the app can
+            // call anything: the frame shows the name, and the no-access screen
+            // — reached by an account that may call no admin route at all —
+            // needs the contact most of anybody.
+            //
+            // The language is the organisation's, used only when the device has
+            // no choice of its own. A device that has been switched keeps its
+            // switch; this decides what a new one starts in.
+            'instance'      => [
+                ...SettingsService::publicInstance(),
+                'locale' => $organization === null ? '' : (string) $organization->default_locale,
+            ],
             'user'          => [
                 'id'                   => (int) $user->id,
                 'email'                => (string) $user->email,

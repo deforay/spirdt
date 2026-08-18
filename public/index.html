@@ -3,11 +3,27 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#F1EFE9" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#10141B" media="(prefers-color-scheme: dark)" />
         <title>SPI-RDT</title>
-      <script type="module" crossorigin src="/assets/index-BSFOvgrz.js"></script>
-      <link rel="stylesheet" crossorigin href="/assets/index-BuRERo8l.css">
+        <!--
+            Stamps the stored theme before anything paints. Inline and first
+            because a deferred module runs after the first frame, and the flash
+            of the wrong palette is exactly what somebody who chose dark did not
+            ask for. The key is shared with composables/useTheme.ts.
+        -->
+        <script>
+            try {
+                var choice = localStorage.getItem('spirdt.theme')
+                if (choice === 'light' || choice === 'dark') {
+                    document.documentElement.dataset.theme = choice
+                }
+            } catch (error) {
+                /* Private browsing throws on access. The media query still applies. */
+            }
+        </script>
+      <script type="module" crossorigin src="/assets/index-BUNxC8vF.js"></script>
+      <link rel="stylesheet" crossorigin href="/assets/index-DaQb_RGE.css">
     </head>
     <body>
         <div id="app"></div>

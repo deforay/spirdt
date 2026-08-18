@@ -1,0 +1,31 @@
+-- ─────────────────────────────────────────────
+-- INSTANCE SETTINGS
+-- ─────────────────────────────────────────────
+--
+-- No new table. `system_config` has existed since 0.1.0 as a key/value store
+-- and has held exactly one row that whole time — app_version, stamped by
+-- bin/migrate. It is the right shape for this: a settings page adds keys, and a
+-- column per setting would mean a migration every time somebody wants one more.
+--
+-- WHAT GOES IN IT IS INSTANCE-WIDE AND SHARED. system_config is deliberately
+-- not tenant-scoped (see the baseline's tenancy note), so a row written here is
+-- read by every organisation on the installation. That is correct for the
+-- things it holds — the name of the installation, who to contact about it, and
+-- where its mail goes out — and it is exactly why the permission below is
+-- seeded to superadmin alone.
+--
+-- The timezone, language and country on the same screen are NOT in here. Those
+-- are columns on `organizations` and have been since 0.1.0, because the User's
+-- Guide makes them a per-organisation customisation point and because the audit
+-- trail already reads the timezone to work out where a day begins. Duplicating
+-- them instance-wide would create two answers to one question, and the screen
+-- would be the thing that made them disagree.
+--
+-- SETTINGS.MANAGE IS SUPERADMIN ONLY, matching organizations.manage, which is
+-- the existing precedent for "this reaches past your own tenant". An
+-- administrator who should have it can be granted it on the roles screen, which
+-- is what that screen is for. Seeding it to `admin` would hand every
+-- organisation's administrator the installation's outgoing mail settings.
+
+INSERT IGNORE INTO role_permissions (role_id, permission_key)
+    SELECT id, 'settings.manage' FROM roles WHERE `key` = 'superadmin';

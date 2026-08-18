@@ -6,6 +6,12 @@ interface TokenPair {
     access_token: string
     refresh_token: string
     expires_in: number
+    instance?: {
+        name: string
+        contact_name: string
+        contact_email: string
+        locale: string
+    }
     user: {
         id: number
         email: string
@@ -31,6 +37,12 @@ function toSession(body: TokenPair): Session {
         accessToken: body.access_token,
         refreshToken: body.refresh_token,
         expiresAt: Date.now() + body.expires_in * 1000,
+        instance: {
+            name: body.instance?.name ?? '',
+            contactName: body.instance?.contact_name ?? '',
+            contactEmail: body.instance?.contact_email ?? '',
+            locale: body.instance?.locale ?? '',
+        },
         user: {
             id: body.user.id,
             email: body.user.email,

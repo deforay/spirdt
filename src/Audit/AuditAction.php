@@ -56,6 +56,15 @@ final class AuditAction
     public const ORGANIZATION_CREATED = 'organization.created';
     public const ORGANIZATION_UPDATED = 'organization.updated';
 
+    /**
+     * The installation's own configuration changed.
+     *
+     * Names the keys that changed and never their values. One of them is an
+     * SMTP password, and an audit trail that records the secret alongside who
+     * set it is a second copy of the secret in a table that is never pruned.
+     */
+    public const SETTINGS_UPDATED = 'settings.updated';
+
     // ─── the instrument ───
 
     /** An assessment arrived as submitted rather than as a draft. */

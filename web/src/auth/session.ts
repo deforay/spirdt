@@ -40,12 +40,33 @@ export interface SessionUser {
     mustChangePassword: boolean
 }
 
+/**
+ * How the installation names itself, as the server had it at sign-in.
+ *
+ * Beside the user rather than inside it, because it describes the deployment
+ * and not the account — every session on this server carries the same values.
+ *
+ * Optional throughout: a session saved before this existed has none of it, and
+ * an older server returns none of it. Every reader falls back to what it showed
+ * before, so an absent block costs a name and a contact line, not a screen.
+ */
+export interface SessionInstance {
+    /** Shown in place of "SPI-RDT" in the frame. Empty means keep the default. */
+    name?: string
+    contactName?: string
+    /** Who an account with no access is told to ask. */
+    contactEmail?: string
+    /** The organisation's language, used only on a device that has never chosen one. */
+    locale?: string
+}
+
 export interface Session {
     accessToken: string
     refreshToken: string
     /** Epoch milliseconds. Local clock — treated as a hint, never as proof. */
     expiresAt: number
     user: SessionUser
+    instance?: SessionInstance
 }
 
 export const session = ref<Session | null>(read())

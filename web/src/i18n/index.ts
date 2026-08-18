@@ -118,6 +118,31 @@ export function setLocale(code: string): void {
     }
 }
 
+/**
+ * The organisation's language, for a device that has never chosen one.
+ *
+ * ONLY WHEN NOTHING IS STORED. A tablet that has been switched to French keeps
+ * French — the person who switched it is the one holding it, and an
+ * organisation default that reasserted itself at every sign-in would undo that
+ * choice every morning. This decides what a device out of the box starts in,
+ * which until now was whatever the browser happened to be set to.
+ *
+ * Called after sign-in and on a restored session, so it lands after this
+ * module's own initial guess and can correct it.
+ */
+export function applyDefaultLocale(code: string | undefined): void {
+    if (code === undefined || code === '' || stored() !== null) {
+        return
+    }
+
+    if (!(code in CATALOGUES)) {
+        return
+    }
+
+    locale.value = code
+    applyToDocument(code)
+}
+
 applyToDocument(locale.value)
 
 export type Params = Record<string, string | number>

@@ -29,6 +29,7 @@ export const PERMISSION = {
     rolesManage: 'roles.manage',
     auditRead: 'audit.read',
     organizationsManage: 'organizations.manage',
+    settingsManage: 'settings.manage',
 } as const
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION]
@@ -84,6 +85,7 @@ export function canManage(): boolean {
         PERMISSION.rolesManage,
         PERMISSION.auditRead,
         PERMISSION.organizationsManage,
+        PERMISSION.settingsManage,
     )
 }
 
@@ -124,6 +126,10 @@ export function landing(): string {
 
     if (can(PERMISSION.organizationsManage)) {
         return 'admin-organizations'
+    }
+
+    if (can(PERMISSION.settingsManage)) {
+        return 'admin-settings'
     }
 
     if (can(PERMISSION.assessmentsSubmit)) {

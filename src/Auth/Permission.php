@@ -67,6 +67,16 @@ final class Permission
     public const ORGANIZATIONS_MANAGE = 'organizations.manage';
 
     /**
+     * Change how the installation itself is configured.
+     *
+     * Its name, who to contact about it, and where its mail goes out. Those
+     * live in `system_config`, which is shared rather than tenant-scoped, so
+     * this is the second permission after `organizations.manage` whose effect
+     * is felt by organisations other than the holder's own.
+     */
+    public const SETTINGS_MANAGE = 'settings.manage';
+
+    /**
      * The whole catalogue, for validating what an administrator asks for.
      *
      * A permission key that is not in here is a typo or a leftover from a
@@ -87,6 +97,7 @@ final class Permission
             self::ROLES_MANAGE,
             self::AUDIT_READ,
             self::ORGANIZATIONS_MANAGE,
+            self::SETTINGS_MANAGE,
         ];
     }
 

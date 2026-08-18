@@ -9,6 +9,7 @@ use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\ReportsAction;
 use App\Http\Action\Admin\RolesAction;
+use App\Http\Action\Admin\SettingsAction;
 use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\ChangePasswordAction;
@@ -112,6 +113,17 @@ return static function (App $app): void {
         $group->patch('/roles/{id}/permissions', [RolesAction::class, 'updatePermissions']);
     })
         ->add(new RequirePermissionMiddleware(Permission::ROLES_MANAGE))
+        ->add(new AuthMiddleware());
+
+    // The installation itself: its name, who to contact about it, where its
+    // mail goes out, and the localisation of the caller's own organisation.
+    // Instance settings are shared rather than tenant-scoped, which is why this
+    // has its own permission and why that permission is seeded to superadmin.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->get('/settings', [SettingsAction::class, 'index']);
+        $group->patch('/settings', [SettingsAction::class, 'update']);
+    })
+        ->add(new RequirePermissionMiddleware(Permission::SETTINGS_MANAGE))
         ->add(new AuthMiddleware());
 
     // The registry: places, facilities, the benches inside them.

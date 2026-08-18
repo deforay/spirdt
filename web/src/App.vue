@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import { refresh } from '@/api/client'
 import { permissionsUnknown } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import ChangePassword from '@/components/ChangePassword.vue'
 import SignIn from '@/components/SignIn.vue'
+import { applyDefaultLocale } from '@/i18n'
 import { router } from '@/router'
 
 /**
@@ -50,6 +51,21 @@ if (permissionsUnknown()) {
         }
     })
 }
+
+/**
+ * Start in the organisation's language on a device that has never been
+ * switched.
+ *
+ * Watched rather than read once, because the session arrives after this
+ * component does — at sign-in, and again at every refresh. applyDefaultLocale
+ * ignores it whenever the device has a choice of its own, so a tablet somebody
+ * switched to French stays French.
+ */
+watch(
+    () => session.value?.instance?.locale,
+    (code) => applyDefaultLocale(code),
+    { immediate: true },
+)
 
 /**
  * Signed in, but the server will refuse everything except changing the
