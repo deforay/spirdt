@@ -72,29 +72,25 @@ const ICONS: Record<ResponseCode, Component> = {
 }
 
 /**
- * The selected state, and why it is this loud.
+ * Two controls, one component, because a phone and a desk are not the same
+ * instrument.
  *
- * It used to be a soft tint and a hairline shadow, which meant the control
- * with an answer in it and the two next to it without one looked like the same
- * object at slightly different brightnesses. On a bench, in daylight, through
- * a screen protector, that difference is not there at all — and this is the
- * one control whose state the whole record depends on.
+ * ON A PHONE it is a switch: one track, and the answer is a raised chip that
+ * moves along it. The choice is a thumb travelling in a groove — the shape a
+ * phone has used for a set of exclusive options for a decade — and it beats
+ * three outlined boxes on the two things that matter here. It says at a glance
+ * that exactly one of these can be true, which three identical boxes do not;
+ * and the chosen chip is lifted off the track rather than merely tinted, so
+ * the answer survives daylight on a bench, a screen protector, and a thumb
+ * hovering over it.
  *
- * Three separate buttons with air between them, not three slots cut into one
- * grey well. The well was the single largest object on the screen and the
- * least designed, and it is most of why the application read as an unstyled
- * form.
+ * AT A DESK it stays three separate buttons with air between them. The pointer
+ * has no trouble with a small target and the desk screen shows a dozen rows at
+ * once, where a row of grey wells reads as furniture and the answers get lost
+ * in it.
  *
- * A chosen option is tinted in its own colour and outlined in it, at a weight
- * heavier than the resting border. Tint alone is invisible on a bench in
- * daylight; the outline is what survives that, a projector, and a photocopy.
- * Solid fill was the other candidate and it was too loud at fifty-nine rows —
- * a finished section became a wall of colour with the questions lost inside
- * it.
- *
- * Unselected options carry the response colour in the mark alone. The word
- * stays in the label colour so the row reads as a question with three answers
- * rather than as three coloured things.
+ * Both carry the colour in the same three places, so the two screens are the
+ * same control in different clothes: the outline, the mark, and the word.
  *
  * Fourteen millimetres of target on a phone, twelve at a desk. The phone is
  * the one being tapped standing up, sometimes through a glove, and it is the
@@ -105,18 +101,24 @@ const ICONS: Record<ResponseCode, Component> = {
  * Two strengths of each colour, and which one goes where is a contrast rule
  * rather than a preference.
  *
- * The word has to clear 4.5:1 on the tint behind it, and at that ratio a green
- * is already halfway to bottle green — there is no vivid green that passes as
- * text on white. The border and the mark carry no text, answer to 3:1, and can
- * therefore be the actual red, yellow and green somebody expects to see. So
- * the outline and the tick are vivid, the label is the darker tone, and the
- * option still reads as green from across a bench.
+ * The word has to clear 4.5:1 on whatever is behind it, and at that ratio a
+ * green is already halfway to bottle green — there is no vivid green that
+ * passes as text on white. The border and the mark carry no text, answer to
+ * 3:1, and can therefore be the actual red, yellow and green somebody expects
+ * to see. So the outline and the tick are vivid, the label is the darker tone,
+ * and the option still reads as green from across a bench.
+ *
+ * The chosen chip is white on the phone and tinted at the desk. On the phone
+ * it has a grey track behind it doing the work of separating it from its
+ * neighbours, and white is what makes it look lifted; at the desk there is no
+ * track, so the tint is the only thing distinguishing a chosen box from an
+ * empty one.
  */
 const TONES: Record<ResponseCode, string> = {
-    Y: 'data-[state=checked]:border-yes-vivid data-[state=checked]:bg-yes-soft data-[state=checked]:text-yes',
-    P: 'data-[state=checked]:border-partial-vivid data-[state=checked]:bg-partial-soft data-[state=checked]:text-partial',
-    N: 'data-[state=checked]:border-no-vivid data-[state=checked]:bg-no-soft data-[state=checked]:text-no',
-    NA: 'data-[state=checked]:border-na data-[state=checked]:bg-na-soft data-[state=checked]:text-na',
+    Y: 'data-[state=checked]:border-yes-vivid data-[state=checked]:text-yes md:data-[state=checked]:bg-yes-soft',
+    P: 'data-[state=checked]:border-partial-vivid data-[state=checked]:text-partial md:data-[state=checked]:bg-partial-soft',
+    N: 'data-[state=checked]:border-no-vivid data-[state=checked]:text-no md:data-[state=checked]:bg-no-soft',
+    NA: 'data-[state=checked]:border-na data-[state=checked]:text-na md:data-[state=checked]:bg-na-soft',
 }
 
 /** The mark keeps its response colour whether or not the option is chosen. */
@@ -140,17 +142,19 @@ function choose(value: ResponseCode): void {
         :aria-label="label"
         :disabled="disabled"
         orientation="horizontal"
-        class="grid auto-cols-fr grid-flow-col gap-2 md:gap-2.5"
+        class="grid auto-cols-fr grid-flow-col gap-1 rounded-[12px] bg-track p-1 md:gap-2.5 md:rounded-none md:bg-transparent md:p-0"
     >
         <RadioGroupItem
             v-for="value in options()"
             :key="value"
             :value="value"
             :class="[
-                'flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-card md:min-h-12',
-                'border-2 border-hairline px-2 text-[16px] font-semibold text-label-2 md:text-[15px]',
-                'transition-[background-color,color,border-color] duration-150',
-                'hover:border-label-3/40 hover:text-label',
+                'flex min-h-12 cursor-pointer items-center justify-center gap-1.5 px-1',
+                'rounded-[8px] border-2 border-transparent text-[15px] font-semibold text-label-2',
+                'max-md:data-[state=checked]:bg-surface max-md:data-[state=checked]:shadow-pick',
+                'md:min-h-12 md:gap-2 md:rounded-card md:border-hairline md:px-2',
+                'transition-[background-color,color,border-color,box-shadow] duration-150',
+                'hover:text-label md:hover:border-label-3/40',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 TONES[value],
             ]"

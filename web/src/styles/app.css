@@ -442,12 +442,6 @@
             0 1px 2px 0 rgb(16 24 40 / 0.06);
     }
 
-    /* The lift under a selected response, and nothing else. Small enough to
-       read as the option rising rather than as a card. */
-    .shadow-pick {
-        box-shadow: 0 1px 2px 0 rgb(16 24 40 / 0.05);
-    }
-
     /* The caption above a heading — "SECTION 3" over "Safety and waste". Wide
        tracking is what stops it reading as a heading in its own right, which
        matters because it is never the thing being named. */
@@ -471,6 +465,17 @@
     .scroll-thin::-webkit-scrollbar { width: 7px; height: 7px; }
     .scroll-thin::-webkit-scrollbar-track { background: transparent; }
     .scroll-thin::-webkit-scrollbar-thumb { background: var(--c-scrollbar); border-radius: 100px; }
+}
+
+/* The lift under a selected response, and nothing else. Small enough to read
+   as the option rising rather than as a card.
+
+   Declared as a utility rather than a plain class in the layer above, because
+   the phone's response switch needs it under a breakpoint — a raised chip on a
+   grey track below 768px, a tinted box with no shadow at a desk — and a class
+   written into @layer utilities cannot be reached by a variant. */
+@utility shadow-pick {
+    box-shadow: 0 1px 3px 0 rgb(16 24 40 / 0.12);
 }
 
 @media (prefers-reduced-motion: reduce) {
