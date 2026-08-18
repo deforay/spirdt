@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* The two faces the app uses, shipped with the bundle rather than fetched.
+ *
+ * The rule this replaces said "no downloaded typeface", and the reason behind
+ * it still stands: nothing may block first paint on a bench connection. Self
+ * hosting keeps that. These are variable fonts served from our own origin and
+ * cached with the rest of the build, so an assessor who has opened the app once
+ * has them forever and offline. What the old rule actually bought was the
+ * absence of a third-party request, and there is still no third-party request.
+ *
+ * The system stack lost us the thing the client could not sell: every screen
+ * looked like an unstyled form, because SF and Segoe are what unstyled forms
+ * look like. */
+@import "@fontsource-variable/outfit/index.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
+
 /* ─── Tokens ───
  *
  * The palette from docs/design.md. Every value clears WCAG AA on both the
@@ -10,102 +25,237 @@
  * component, or inside a media query, is how the two themes drift apart — and
  * when they do, dark-on-boot stops matching dark-on-toggle, which is the kind
  * of bug nobody reports because it only shows up on someone else's machine.
+ *
+ * Three families live here and they never trade places:
+ *
+ *   response — green, amber, red. Yes, Partial, No. Reserved. Nothing else in
+ *   the app may spend them, which is the whole reason the accent is navy.
+ *
+ *   level — the sequential navy ramp for certification levels 0 to 4. A level
+ *   is a position on a scale, so it is drawn as one: the same hue, deepening.
+ *   It used to run red to green, which spent the response palette on a badge
+ *   and left a Level 0 site looking like it had answered No to something.
+ *
+ *   accent, chrome and brass — a cobalt blue for anything interactive, the
+ *   deep navy behind it for the app bar and the sign-in panel, and brass for
+ *   the marks of record: the rule under a report title, a seal, a
+ *   certification stamp. None of the three can be mistaken for a response.
+ *
+ * The accent used to be the same deep navy as the chrome, and at the size an
+ * accent is actually used — a 13px link, a 1px bar, an icon — a navy that dark
+ * is indistinguishable from black text. The screen read as grey on beige with
+ * no colour in it at all. Chrome is where a navy that heavy belongs: behind
+ * white text, at the size of a bar.
  */
 
 :root {
-    --c-ground:       #F2F2F7;
+    --c-ground:       #F9FAFB;
     --c-surface:      #FFFFFF;
-    --c-hairline:     rgba(60, 60, 67, 0.20);
-    --c-label:        #111114;
-    --c-label-2:      #55555D;
-    --c-label-3:      #6E6E76;
-    --c-accent:       #0A6ECB;
-    --c-accent-soft:  rgba(10, 110, 203, 0.10);
-    --c-yes:          #1E7B34;
-    --c-partial:      #9A5B00;
-    --c-no:           #B3261E;
+    --c-surface-2:    #F9FAFB;
+    --c-hairline:     #E4E7EC;
+    --c-rule:         #D0D5DD;
+    --c-label:        #1D2939;
+    --c-label-2:      #667085;
+    --c-label-3:      #98A2B3;
+    --c-accent:       #3641F5;
+    --c-accent-hover: #2A31D8;
+    --c-accent-ink:   #FFFFFF;
+    --c-chrome:       #101828;
+    --c-chrome-ink:   #F9FAFB;
+    --c-on-response:  #FFFFFF;
+    --c-accent-soft:  #ECF3FF;
+    --c-brass:        #966B1E;
+    --c-brass-fill:   #C08A28;
+    --c-brass-soft:   rgba(192, 138, 40, 0.14);
+    --c-on-brass:    #101828;
+    --c-yes:          #15803D;
+    --c-partial:      #B45309;
+    --c-no:           #C81E1E;
     --c-na:           #6B6B73;
-    --c-yes-soft:     rgba(30, 123, 52, 0.12);
-    --c-partial-soft: rgba(154, 91, 0, 0.12);
-    --c-no-soft:      rgba(179, 38, 30, 0.12);
+    --c-yes-vivid:    #16A34A;
+    --c-partial-vivid:#F59E0B;
+    --c-no-vivid:     #E02424;
+    --c-yes-soft:     rgba(22, 163, 74, 0.14);
+    --c-partial-soft: rgba(245, 158, 11, 0.18);
+    --c-no-soft:      rgba(224, 36, 36, 0.13);
     --c-na-soft:      rgba(124, 124, 132, 0.14);
-    --c-track:        rgba(118, 118, 128, 0.12);
-    --c-scrollbar:    rgba(122, 122, 130, 0.5);
+    --c-track:        #F2F4F7;
+    --c-scrollbar:    rgba(152, 162, 179, 0.7);
+
+    --c-level-0:      #E7EAEF;
+    --c-level-0-ink:  #46536A;
+    --c-level-1:      #CFD9E6;
+    --c-level-1-ink:  #32445E;
+    --c-level-2:      #A6BAD1;
+    --c-level-2-ink:  #1E3452;
+    --c-level-3:      #4A6C94;
+    --c-level-3-ink:  #FFFFFF;
+    --c-level-4:      #1B3A63;
+    --c-level-4-ink:  #FFFFFF;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --c-ground:       #000000;
-        --c-surface:      #1C1C1E;
-        --c-hairline:     rgba(84, 84, 88, 0.55);
-        --c-label:        #F5F5F7;
-        --c-label-2:      #9A9AA0;
-        --c-label-3:      #86868E;
-        --c-accent:       #4C9DF5;
-        --c-accent-soft:  rgba(76, 157, 245, 0.16);
-        --c-yes:          #4FD16B;
-        --c-partial:      #E0A030;
-        --c-no:           #FF6B60;
+        --c-ground:       #101828;
+        --c-surface:      #1D2939;
+        --c-surface-2:    #182130;
+        --c-hairline:     #344054;
+        --c-rule:         #475467;
+        --c-label:        #F2F4F7;
+        --c-label-2:      #98A2B3;
+        --c-label-3:      #7A879C;
+        --c-accent:       #7592FF;
+        --c-accent-hover: #9CB9FF;
+        --c-accent-ink:   #0C111D;
+        --c-chrome:       #0C111D;
+        --c-chrome-ink:   #F2F4F7;
+        --c-on-response:  #0B1220;
+        --c-accent-soft:  rgba(117, 146, 255, 0.16);
+        --c-brass:        #E0AC55;
+        --c-brass-fill:   #C99539;
+        --c-brass-soft:   rgba(224, 172, 85, 0.18);
+        --c-on-brass:    #101828;
+        --c-yes:          #4ADE80;
+        --c-partial:      #FBBF24;
+        --c-no:           #FF7A70;
         --c-na:           #98989F;
+        --c-yes-vivid:    #4ADE80;
+        --c-partial-vivid:#FBBF24;
+        --c-no-vivid:     #FF7A70;
         --c-yes-soft:     rgba(79, 209, 107, 0.16);
-        --c-partial-soft: rgba(224, 160, 48, 0.16);
+        --c-partial-soft: rgba(251, 191, 36, 0.20);
         --c-no-soft:      rgba(255, 107, 96, 0.16);
         --c-na-soft:      rgba(152, 152, 159, 0.18);
-        --c-track:        rgba(118, 118, 128, 0.24);
+        --c-track:        #344054;
+        --c-scrollbar:    rgba(162, 172, 188, 0.45);
+
+        --c-level-0:      #252C39;
+        --c-level-0-ink:  #A7B2C3;
+        --c-level-1:      #2E3B4D;
+        --c-level-1-ink:  #BCC8DA;
+        --c-level-2:      #3D5573;
+        --c-level-2-ink:  #D8E3F1;
+        --c-level-3:      #5C82AF;
+        --c-level-3-ink:  #0E1420;
+        --c-level-4:      #6BA5FF;
+        --c-level-4-ink:  #0E1420;
     }
 }
 
 /* The manual override must win over the media query in both directions, so
    both values are restated rather than only the dark one. */
 :root[data-theme="dark"] {
-    --c-ground:       #000000;
-    --c-surface:      #1C1C1E;
-    --c-hairline:     rgba(84, 84, 88, 0.55);
-    --c-label:        #F5F5F7;
-    --c-label-2:      #9A9AA0;
-    --c-label-3:      #86868E;
-    --c-accent:       #4C9DF5;
-    --c-accent-soft:  rgba(76, 157, 245, 0.16);
-    --c-yes:          #4FD16B;
-    --c-partial:      #E0A030;
-    --c-no:           #FF6B60;
+    --c-ground:       #101828;
+    --c-surface:      #1D2939;
+    --c-surface-2:    #182130;
+    --c-hairline:     #344054;
+    --c-rule:         #475467;
+    --c-label:        #F2F4F7;
+    --c-label-2:      #98A2B3;
+    --c-label-3:      #7A879C;
+    --c-accent:       #7592FF;
+    --c-accent-hover: #9CB9FF;
+    --c-accent-ink:   #0C111D;
+    --c-chrome:       #0C111D;
+    --c-chrome-ink:   #F2F4F7;
+    --c-on-response:  #0B1220;
+    --c-accent-soft:  rgba(117, 146, 255, 0.16);
+    --c-brass:        #E0AC55;
+    --c-brass-fill:   #C99539;
+    --c-brass-soft:   rgba(224, 172, 85, 0.18);
+    --c-on-brass:    #101828;
+    --c-yes:          #4ADE80;
+    --c-partial:      #FBBF24;
+    --c-no:           #FF7A70;
     --c-na:           #98989F;
+    --c-yes-vivid:    #4ADE80;
+    --c-partial-vivid:#FBBF24;
+    --c-no-vivid:     #FF7A70;
     --c-yes-soft:     rgba(79, 209, 107, 0.16);
-    --c-partial-soft: rgba(224, 160, 48, 0.16);
+    --c-partial-soft: rgba(251, 191, 36, 0.20);
     --c-no-soft:      rgba(255, 107, 96, 0.16);
     --c-na-soft:      rgba(152, 152, 159, 0.18);
-    --c-track:        rgba(118, 118, 128, 0.24);
+    --c-track:        #344054;
+    --c-scrollbar:    rgba(162, 172, 188, 0.45);
+
+    --c-level-0:      #252C39;
+    --c-level-0-ink:  #A7B2C3;
+    --c-level-1:      #2E3B4D;
+    --c-level-1-ink:  #BCC8DA;
+    --c-level-2:      #3D5573;
+    --c-level-2-ink:  #D8E3F1;
+    --c-level-3:      #5C82AF;
+    --c-level-3-ink:  #0E1420;
+    --c-level-4:      #6BA5FF;
+    --c-level-4-ink:  #0E1420;
 }
 
 :root[data-theme="light"] {
-    --c-ground:       #F2F2F7;
+    --c-ground:       #F9FAFB;
     --c-surface:      #FFFFFF;
-    --c-hairline:     rgba(60, 60, 67, 0.20);
-    --c-label:        #111114;
-    --c-label-2:      #55555D;
-    --c-label-3:      #6E6E76;
-    --c-accent:       #0A6ECB;
-    --c-accent-soft:  rgba(10, 110, 203, 0.10);
-    --c-yes:          #1E7B34;
-    --c-partial:      #9A5B00;
-    --c-no:           #B3261E;
+    --c-surface-2:    #F9FAFB;
+    --c-hairline:     #E4E7EC;
+    --c-rule:         #D0D5DD;
+    --c-label:        #1D2939;
+    --c-label-2:      #667085;
+    --c-label-3:      #98A2B3;
+    --c-accent:       #3641F5;
+    --c-accent-hover: #2A31D8;
+    --c-accent-ink:   #FFFFFF;
+    --c-chrome:       #101828;
+    --c-chrome-ink:   #F9FAFB;
+    --c-on-response:  #FFFFFF;
+    --c-accent-soft:  #ECF3FF;
+    --c-brass:        #966B1E;
+    --c-brass-fill:   #C08A28;
+    --c-brass-soft:   rgba(192, 138, 40, 0.14);
+    --c-on-brass:    #101828;
+    --c-yes:          #15803D;
+    --c-partial:      #B45309;
+    --c-no:           #C81E1E;
     --c-na:           #6B6B73;
-    --c-yes-soft:     rgba(30, 123, 52, 0.12);
-    --c-partial-soft: rgba(154, 91, 0, 0.12);
-    --c-no-soft:      rgba(179, 38, 30, 0.12);
+    --c-yes-vivid:    #16A34A;
+    --c-partial-vivid:#F59E0B;
+    --c-no-vivid:     #E02424;
+    --c-yes-soft:     rgba(22, 163, 74, 0.14);
+    --c-partial-soft: rgba(245, 158, 11, 0.18);
+    --c-no-soft:      rgba(224, 36, 36, 0.13);
     --c-na-soft:      rgba(124, 124, 132, 0.14);
-    --c-track:        rgba(118, 118, 128, 0.12);
+    --c-track:        #F2F4F7;
+    --c-scrollbar:    rgba(152, 162, 179, 0.7);
+
+    --c-level-0:      #E7EAEF;
+    --c-level-0-ink:  #46536A;
+    --c-level-1:      #CFD9E6;
+    --c-level-1-ink:  #32445E;
+    --c-level-2:      #A6BAD1;
+    --c-level-2-ink:  #1E3452;
+    --c-level-3:      #4A6C94;
+    --c-level-3-ink:  #FFFFFF;
+    --c-level-4:      #1B3A63;
+    --c-level-4-ink:  #FFFFFF;
 }
 
 @theme inline {
     --color-ground:       var(--c-ground);
     --color-surface:      var(--c-surface);
+    --color-surface-2:    var(--c-surface-2);
     --color-hairline:     var(--c-hairline);
+    --color-rule:         var(--c-rule);
     --color-label:        var(--c-label);
     --color-label-2:      var(--c-label-2);
     --color-label-3:      var(--c-label-3);
     --color-accent:       var(--c-accent);
+    --color-accent-hover: var(--c-accent-hover);
+    --color-accent-ink:   var(--c-accent-ink);
     --color-accent-soft:  var(--c-accent-soft);
+    --color-chrome:       var(--c-chrome);
+    --color-chrome-ink:   var(--c-chrome-ink);
+    --color-on-response:  var(--c-on-response);
+    --color-brass:        var(--c-brass);
+    --color-brass-fill:   var(--c-brass-fill);
+    --color-brass-soft:   var(--c-brass-soft);
+    --color-on-brass:     var(--c-on-brass);
     --color-yes:          var(--c-yes);
     --color-partial:      var(--c-partial);
     --color-no:           var(--c-no);
@@ -114,12 +264,34 @@
     --color-partial-soft: var(--c-partial-soft);
     --color-no-soft:      var(--c-no-soft);
     --color-na-soft:      var(--c-na-soft);
+    --color-yes-vivid:    var(--c-yes-vivid);
+    --color-partial-vivid: var(--c-partial-vivid);
+    --color-no-vivid:     var(--c-no-vivid);
     --color-track:        var(--c-track);
 
-    /* The system stack is the Apple face and downloads nothing, which is the
-       point on a bench connection. */
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --color-level-0:      var(--c-level-0);
+    --color-level-1:      var(--c-level-1);
+    --color-level-2:      var(--c-level-2);
+    --color-level-3:      var(--c-level-3);
+    --color-level-4:      var(--c-level-4);
+    --color-level-0-ink:  var(--c-level-0-ink);
+    --color-level-1-ink:  var(--c-level-1-ink);
+    --color-level-2-ink:  var(--c-level-2-ink);
+    --color-level-3-ink:  var(--c-level-3-ink);
+    --color-level-4-ink:  var(--c-level-4-ink);
+
+    /* Plus Jakarta Sans throughout, including headings.
+     *
+     * The identity study drew the institutional row with a serif, and the
+     * serif is what got cut: on a screen an assessor works through standing
+     * up, editorial type reads as a magazine rather than as a record. The
+     * authority in this palette comes from the navy, the paper and the rules
+     * under the headings, none of which are decorative.
+     *
+     * The system stack stays as the fallback, so a first paint before the
+     * font lands is still the app rather than Times. */
+    --font-sans: "Outfit Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
     /* Two radii, and the distinction is deliberate.
      *
@@ -131,8 +303,8 @@
      * rounder. A control and the panel around it sharing one radius makes the
      * control look like a slot cut into the panel rather than a thing resting
      * on it, and that reads as unfinished at any size above a phone. */
-    --radius-card: 11px;
-    --radius-surface: 20px;
+    --radius-card: 10px;
+    --radius-surface: 16px;
 }
 
 @layer base {
@@ -149,12 +321,113 @@
         scrollbar-color: var(--c-scrollbar) transparent;
     }
 
+    /* Headings are the one place the face is allowed to tighten. Jakarta at
+       its heavier weights opens up at large sizes, and a page title that
+       tracks like body copy is what made the old screens read as a form. */
+    h1, h2, h3 {
+        letter-spacing: -0.018em;
+    }
+
     /* Digits that stack must line up: scores, percentages, question codes. */
     .tnum { font-variant-numeric: tabular-nums; }
 
     :focus-visible {
         outline: 2px solid var(--c-accent);
         outline-offset: 2px;
+    }
+}
+
+/* ─── Lists ───
+ *
+ * Five screens draw a table and four more draw a list of rows, and until now
+ * each one styled its own cells. They drifted: three different row heights,
+ * two header treatments, and a search box that was round on one screen and
+ * square on the next. The registry is where an administrator spends the day,
+ * so the table is a component with a name rather than a pattern everybody
+ * retypes.
+ */
+@layer components {
+    /* The white sheet a list sits on. */
+    .data-card {
+        border-radius: var(--radius-surface);
+        border: 1px solid var(--c-hairline);
+        background: var(--c-surface);
+        overflow: hidden;
+    }
+
+    /* Its own scroller, so a wide table scrolls inside the card instead of
+       taking the page sideways with it. */
+    .data-scroll {
+        overflow-x: auto;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 14.5px;
+    }
+
+    .data-table thead th {
+        position: sticky;
+        top: 0;
+        background: var(--c-track);
+        padding: 14px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--c-label-2);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--c-hairline);
+    }
+
+    .data-table tbody td {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--c-hairline);
+        vertical-align: middle;
+    }
+
+    /* The last row's border is the card's own edge, drawn twice. */
+    .data-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .data-table tbody tr:hover td {
+        background: var(--c-surface-2);
+    }
+
+    /* A pill that states a value: a status, a role, a count. Tone comes from a
+       utility beside it — never from here, so the reserved response colours
+       cannot be reached by writing a class name. */
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* One input, wherever somebody types into a list. */
+    .field {
+        min-height: 44px;
+        width: 100%;
+        border-radius: var(--radius-card);
+        border: 1px solid var(--c-hairline);
+        background: var(--c-surface);
+        padding: 0 14px;
+        font-size: 15px;
+        color: var(--c-label);
+        outline: none;
+    }
+
+    .field::placeholder {
+        color: var(--c-label-3);
+    }
+
+    .field:focus {
+        border-color: var(--c-accent);
     }
 }
 
@@ -165,8 +438,14 @@
        what is behind it, not from a shadow nobody can see anyway. */
     .shadow-surface {
         box-shadow:
-            0 10px 28px -12px rgb(0 0 0 / 0.14),
-            0 2px 6px -3px rgb(0 0 0 / 0.08);
+            0 1px 3px 0 rgb(16 24 40 / 0.10),
+            0 1px 2px 0 rgb(16 24 40 / 0.06);
+    }
+
+    /* The lift under a selected response, and nothing else. Small enough to
+       read as the option rising rather than as a card. */
+    .shadow-pick {
+        box-shadow: 0 1px 2px 0 rgb(16 24 40 / 0.05);
     }
 
     /* The caption above a heading — "SECTION 3" over "Safety and waste". Wide
@@ -177,6 +456,15 @@
         font-weight: 600;
         letter-spacing: 0.18em;
         text-transform: uppercase;
+    }
+
+    /* The brass rule under the name of a thing of record — a report title, a
+       site, a certification statement. It is the only decorative mark in the
+       app, it is two pixels of it, and it is what carries the institution.
+       Never under a section heading or a form label: if everything has one,
+       nothing is of record. */
+    .rule-brass {
+        border-bottom: 2px solid var(--c-brass-fill);
     }
 
     .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--c-scrollbar) transparent; }
