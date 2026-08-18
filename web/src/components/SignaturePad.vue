@@ -255,6 +255,10 @@ onBeforeUnmount(() => {
              is what gets filed against somebody's name, and a signature that
              changes colour with the reader's theme is not evidence of
              anything. -->
+        <!-- White in both themes, and deliberately: this is paper. What is
+             drawn here is stored as an image and printed on a report, so a
+             signature captured on a dark background would arrive as pale ink
+             on a sheet nobody can read. -->
         <div class="overflow-hidden rounded-card bg-white sm:rounded-surface">
             <canvas
                 ref="canvas"
@@ -270,14 +274,14 @@ onBeforeUnmount(() => {
                  up inside the image that gets filed. -->
             <div class="px-4 pb-3">
                 <div class="border-t border-neutral-300"></div>
-                <p class="pt-1 text-[13px] text-neutral-600">{{ signedName }}</p>
+                <p class="pt-1 text-[14px] text-neutral-600">{{ signedName }}</p>
             </div>
         </div>
 
         <div class="flex items-center gap-2">
             <button
                 type="button"
-                class="rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-label-2 disabled:opacity-40"
+                class="rounded-full bg-surface px-3.5 py-1.5 text-[14px] font-medium text-label-2 disabled:opacity-40"
                 :disabled="isEmpty"
                 @click="undo"
             >
@@ -285,7 +289,7 @@ onBeforeUnmount(() => {
             </button>
             <button
                 type="button"
-                class="rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-label-2 disabled:opacity-40"
+                class="rounded-full bg-surface px-3.5 py-1.5 text-[14px] font-medium text-label-2 disabled:opacity-40"
                 :disabled="isEmpty"
                 @click="clear"
             >
@@ -296,14 +300,14 @@ onBeforeUnmount(() => {
 
             <button
                 type="button"
-                class="rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-label-2"
+                class="rounded-full bg-surface px-3.5 py-1.5 text-[14px] font-medium text-label-2"
                 @click="emit('cancel')"
             >
                 {{ t('action.cancel') }}
             </button>
             <button
                 type="button"
-                class="rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-white disabled:opacity-40"
+                class="rounded-full bg-accent px-3.5 py-1.5 text-[14px] font-semibold text-accent-ink disabled:opacity-40"
                 :disabled="isEmpty"
                 @click="save"
             >

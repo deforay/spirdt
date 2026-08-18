@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { PhCaretDown, PhKey, PhSignOut } from '@phosphor-icons/vue'
+import { PhCaretDown, PhChartBar, PhSignOut, PhUserCircle } from '@phosphor-icons/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { signOut } from '@/auth/login'
 import { session } from '@/auth/session'
@@ -49,20 +50,25 @@ defineProps<{
     saveError?: string
 }>()
 
-const emit = defineEmits<{ changePassword: [] }>()
-
 const open = ref(false)
 
 const user = computed(() => session.value?.user ?? null)
 
+/** Two letters off the name, for the circle beside it. */
+const initials = computed(() => {
+    const parts = (user.value?.fullName ?? '').trim().split(/\s+/).filter((part) => part !== '')
+
+    if (parts.length === 0) return '?'
+
+    const first = parts[0]![0] ?? ''
+    const last = parts.length > 1 ? (parts[parts.length - 1]![0] ?? '') : ''
+
+    return (first + last).toUpperCase()
+})
+
 async function onSignOut(): Promise<void> {
     open.value = false
     await signOut(session.value?.refreshToken ?? null)
-}
-
-function onChangePassword(): void {
-    open.value = false
-    emit('changePassword')
 }
 
 /**
@@ -85,9 +91,20 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 <template>
     <div class="flex min-h-screen flex-col bg-ground">
+        <!--
+            The same bar the management side wears: white, hairline under it,
+            the mark on the left and who you are on the right. The two halves
+            of the application are one product and an assessor moving between
+            them should not feel the join.
+        -->
         <header class="border-b border-hairline bg-surface">
-            <div class="mx-auto flex w-full max-w-[1280px] items-center gap-3 px-4 py-2 sm:px-6">
-                <span class="text-[15px] font-bold tracking-tight">SPI-RDT</span>
+            <div class="mx-auto flex h-[64px] w-full max-w-[1536px] items-center gap-3 px-4 sm:px-6">
+                <span
+                    class="flex size-8 shrink-0 items-center justify-center rounded-card bg-accent text-accent-ink"
+                >
+                    <PhChartBar :size="17" weight="bold" aria-hidden="true" />
+                </span>
+                <span class="text-[17px] font-bold tracking-[-0.02em]">SPI-RDT</span>
 
                 <span class="flex-1"></span>
 
@@ -97,11 +114,17 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                 <div ref="root" class="relative">
                     <button
                         type="button"
-                        class="flex min-h-11 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
+                        class="flex min-h-11 items-center gap-2 rounded-full py-1 pl-1 pr-2 text-[14px] font-medium text-label transition-colors hover:bg-accent-soft"
                         :aria-expanded="open"
                         aria-haspopup="menu"
                         @click="open = !open"
                     >
+                        <span
+                            class="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-[13px] font-semibold text-accent-ink"
+                            aria-hidden="true"
+                        >
+                            {{ initials }}
+                        </span>
                         <!-- The name is the point of showing anything here, so
                              it is what survives when the screen is narrow. -->
                         <span class="max-w-[9rem] truncate">{{ user?.fullName }}</span>
@@ -113,24 +136,30 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                         role="menu"
                         class="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-surface bg-surface shadow-surface"
                     >
-                        <p class="truncate px-3.5 pb-1 pt-3 text-[13px] text-label-3">
+                        <p class="truncate px-3.5 pb-1 pt-3 text-[14px] text-label-3">
                             {{ user?.email }}
                         </p>
 
-                        <button
-                            type="button"
+
+
+                        <RouterLink
+                            :to="{ name: 'account' }"
                             role="menuitem"
-                            class="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[15px]"
-                            @click="onChangePassword"
+                            class="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[16px]"
+                            @click="open = false"
                         >
-                            <PhKey :size="16" class="shrink-0 text-label-3" aria-hidden="true" />
-                            {{ t('account.changePassword') }}
-                        </button>
+                            <PhUserCircle
+                                :size="16"
+                                class="shrink-0 text-label-3"
+                                aria-hidden="true"
+                            />
+                            {{ t('account.title') }}
+                        </RouterLink>
 
                         <button
                             type="button"
                             role="menuitem"
-                            class="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left text-[15px] text-no"
+                            class="flex w-full items-center gap-2.5 border-t border-hairline px-3.5 py-3 text-left text-[16px] text-no"
                             @click="onSignOut"
                         >
                             <PhSignOut :size="16" class="shrink-0" aria-hidden="true" />
@@ -141,7 +170,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
             </div>
         </header>
 
-        <div class="mx-auto w-full max-w-[1280px] px-4 sm:px-6">
+        <div class="mx-auto w-full max-w-[1536px] px-4 sm:px-6">
             <StorageNotice
                 :storage="storage ?? null"
                 :save-state="saveState ?? 'idle'"

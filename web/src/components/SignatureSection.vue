@@ -131,11 +131,11 @@ onBeforeUnmount(() => {
 
 <template>
     <section class="mb-4">
-        <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
+        <h2 class="px-1 pb-1.5 text-[14px] font-semibold uppercase tracking-wide text-label-2">
             {{ t('signature.heading') }}
         </h2>
 
-        <div class="overflow-hidden rounded-card bg-surface">
+        <div class="overflow-hidden rounded-surface border border-hairline bg-surface">
             <div
                 v-for="(slot, index) in SLOTS"
                 :key="slot.role"
@@ -143,7 +143,7 @@ onBeforeUnmount(() => {
             >
                 <div class="flex items-center justify-between gap-3 px-3.5 py-3">
                     <div class="min-w-0 flex-1">
-                        <span class="block text-[13px] text-label-2">{{ slot.label }}</span>
+                        <span class="block text-[14px] text-label-2">{{ slot.label }}</span>
 
                         <input
                             v-if="slot.typed"
@@ -151,19 +151,19 @@ onBeforeUnmount(() => {
                             type="text"
                             :placeholder="t('signature.namePlaceholder')"
                             :aria-label="slot.label"
-                            class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
+                            class="w-full bg-transparent text-[18px] outline-none placeholder:text-label-3"
                         />
-                        <span v-else class="block truncate text-[17px]">
+                        <span v-else class="block truncate text-[18px]">
                             {{ slot.name === '' ? t('signature.noName') : slot.name }}
                         </span>
 
                         <span
                             v-if="rowFor(slot.role) === undefined"
-                            class="block text-[13px] text-label-3"
+                            class="block text-[14px] text-label-3"
                         >
                             {{ t('signature.unsigned') }}
                         </span>
-                        <span v-else class="tnum block text-[13px] text-label-2">
+                        <span v-else class="tnum block text-[14px] text-label-2">
                             {{
                                 t('signature.signedAt', {
                                     time: formatTime(new Date(rowFor(slot.role)!.capturedAt)),
@@ -176,12 +176,12 @@ onBeforeUnmount(() => {
 
                         <span
                             v-if="rowFor(slot.role)?.syncError"
-                            class="block text-[13px] font-medium text-no"
+                            class="block text-[14px] font-medium text-no"
                         >
                             {{ rowFor(slot.role)!.syncError }}
                         </span>
 
-                        <span v-if="slot.hint !== ''" class="block text-[13px] text-label-3">
+                        <span v-if="slot.hint !== ''" class="block text-[14px] text-label-3">
                             {{ slot.hint }}
                         </span>
                     </div>
@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
 
                     <button
                         type="button"
-                        class="shrink-0 text-[15px] font-medium text-accent disabled:opacity-40"
+                        class="shrink-0 text-[16px] font-medium text-accent disabled:opacity-40"
                         :disabled="slot.name === ''"
                         @click="signing = signing === slot.role ? null : slot.role"
                     >
@@ -217,6 +217,6 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <p class="px-1 pt-1.5 text-[13px] text-label-2">{{ t('signature.optional') }}</p>
+        <p class="px-1 pt-1.5 text-[14px] text-label-2">{{ t('signature.optional') }}</p>
     </section>
 </template>

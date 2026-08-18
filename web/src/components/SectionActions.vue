@@ -87,14 +87,14 @@ const described = computed(
     <!-- Nothing to do when the section has no gaps, and saying so would be a
          heading over an empty box. -->
     <section v-if="gaps.length > 0" class="mt-4">
-        <h2 class="flex items-baseline justify-between px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
+        <h2 class="flex items-baseline justify-between px-1 pb-1.5 text-[14px] font-semibold uppercase tracking-wide text-label-2">
             <span>{{ t('actions.heading') }}</span>
             <span class="tnum normal-case">
                 {{ t('review.described', { described, total: gaps.length }) }}
             </span>
         </h2>
 
-        <div class="overflow-hidden rounded-card bg-surface md:rounded-surface md:shadow-surface">
+        <div class="overflow-hidden rounded-surface border border-hairline bg-surface">
             <div
                 v-for="(gap, index) in gaps"
                 :key="gap.question.code"
@@ -102,7 +102,7 @@ const described = computed(
             >
                 <div class="flex items-start gap-2.5 px-3.5 pt-3">
                     <span
-                        class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold"
+                        class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold"
                         :class="gap.response === 'N' ? 'bg-no-soft text-no' : 'bg-partial-soft text-partial'"
                     >
                         {{ gap.response }}
@@ -110,7 +110,7 @@ const described = computed(
                     <span class="tnum shrink-0 pt-0.5 font-mono text-xs text-label-3">
                         {{ gap.question.code }}
                     </span>
-                    <span class="flex-1 text-[13px] leading-snug text-label-2">
+                    <span class="flex-1 text-[14px] leading-snug text-label-2">
                         {{ localised(gap.question.text) }}
                     </span>
                 </div>
@@ -124,7 +124,7 @@ const described = computed(
                         :value="finding.gap"
                         rows="2"
                         :placeholder="t('review.gapPlaceholder')"
-                        class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                        class="field"
                         @change="emit('update', finding.key, { gap: ($event.target as HTMLTextAreaElement).value })"
                     ></textarea>
 
@@ -132,7 +132,7 @@ const described = computed(
                         :value="finding.recommendation"
                         type="text"
                         :placeholder="t('review.recommendationPlaceholder')"
-                        class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                        class="field"
                         @change="emit('update', finding.key, { recommendation: ($event.target as HTMLInputElement).value })"
                     />
 
@@ -144,8 +144,8 @@ const described = computed(
                             v-for="option in URGENCY"
                             :key="option.key"
                             type="button"
-                            class="rounded-full px-3 py-1.5 text-[13px] font-medium"
-                            :class="finding.urgency === option.key ? 'bg-accent text-white' : 'bg-ground text-label-2'"
+                            class="rounded-full px-3 py-1.5 text-[14px] font-medium"
+                            :class="finding.urgency === option.key ? 'bg-accent text-accent-ink' : 'bg-ground text-label-2'"
                             @click="emit('update', finding.key, { urgency: finding.urgency === option.key ? null : option.key })"
                         >
                             {{ t(option.label) }}
@@ -159,7 +159,7 @@ const described = computed(
                             v-for="level in RESPONSIBILITY"
                             :key="level.key"
                             type="button"
-                            class="rounded-full px-3 py-1.5 text-[13px] font-medium"
+                            class="rounded-full px-3 py-1.5 text-[14px] font-medium"
                             :class="finding.responsibilityLevel === level.key ? 'bg-label text-ground' : 'bg-ground text-label-2'"
                             @click="emit('update', finding.key, { responsibilityLevel: level.key })"
                         >
@@ -172,20 +172,20 @@ const described = computed(
                             :value="finding.responsiblePerson"
                             type="text"
                             :placeholder="t('review.responsiblePerson')"
-                            class="w-full rounded-lg bg-ground px-3 py-2 text-[15px] outline-none placeholder:text-label-3"
+                            class="field"
                             @change="emit('update', finding.key, { responsiblePerson: ($event.target as HTMLInputElement).value })"
                         />
                         <input
                             :value="finding.dueDate ?? ''"
                             type="date"
-                            class="tnum shrink-0 rounded-lg bg-ground px-3 py-2 text-[15px] outline-none"
+                            class="field tnum w-auto shrink-0"
                             @change="emit('update', finding.key, { dueDate: ($event.target as HTMLInputElement).value || null })"
                         />
                     </div>
 
                     <button
                         type="button"
-                        class="flex items-center gap-1.5 self-start text-[13px] text-no"
+                        class="flex items-center gap-1.5 self-start text-[14px] text-no"
                         @click="emit('remove', finding.key)"
                     >
                         <PhTrash :size="14" aria-hidden="true" />
@@ -198,7 +198,7 @@ const described = computed(
                      owner and date. -->
                 <button
                     type="button"
-                    class="flex w-full items-center gap-1.5 px-3.5 pb-3 pt-1 text-left text-[13px] text-accent"
+                    class="flex w-full items-center gap-1.5 px-3.5 pb-3 pt-1 text-left text-[14px] text-accent"
                     @click="emit('add', gap.question.code, pathogen)"
                 >
                     <PhPlus :size="14" aria-hidden="true" />

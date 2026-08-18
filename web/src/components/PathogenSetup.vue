@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PhPlus, PhX } from '@phosphor-icons/vue'
 import { ref } from 'vue'
 
 import type { StoredPathogen } from '@/db/database'
@@ -63,41 +64,50 @@ function remove(key: string) {
 
 <template>
     <div class="flex flex-col gap-3">
-        <div v-if="modelValue.length > 0" class="overflow-hidden rounded-card bg-surface">
-            <div
-                v-for="(pathogen, index) in modelValue"
+        <!--
+            The tests, as chips. A stacked list with a red Remove beside every
+            line spent four rows and two red words on four facts; the chip
+            carries the name and the way to drop it in one object, and red goes
+            back to meaning No.
+        -->
+        <div v-if="modelValue.length > 0" class="flex flex-wrap gap-2">
+            <span
+                v-for="pathogen in modelValue"
                 :key="pathogen.key"
-                class="flex items-center justify-between gap-3 px-3.5 py-3"
-                :class="index > 0 ? 'border-t border-hairline' : ''"
+                class="flex min-h-11 items-center gap-2 rounded-card border border-hairline bg-surface pl-4 pr-2 text-[16px]"
             >
-                <span class="text-[17px]">{{ pathogen.name }}</span>
-                <button type="button" class="text-[15px] text-no" @click="remove(pathogen.key)">
-                    {{ t('action.remove') }}
-                </button>
-            </div>
-        </div>
-
-        <p v-else class="px-1 text-[15px] text-label-2">{{ t('pathogens.empty') }}</p>
-
-        <div class="overflow-hidden rounded-card bg-surface">
-            <form class="flex items-center gap-3 px-3.5 py-3" @submit.prevent="add(draft)">
-                <input
-                    v-model="draft"
-                    type="text"
-                    class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                    :placeholder="t('pathogens.placeholder')"
-                />
+                {{ pathogen.name }}
                 <button
-                    type="submit"
-                    class="shrink-0 text-[15px] font-semibold text-accent disabled:opacity-40"
-                    :disabled="draft.trim() === ''"
+                    type="button"
+                    class="flex size-8 items-center justify-center rounded-full text-label-3 transition-colors hover:bg-no-soft hover:text-no"
+                    :aria-label="`${t('action.remove')} ${pathogen.name}`"
+                    @click="remove(pathogen.key)"
                 >
-                    {{ t('action.add') }}
+                    <PhX :size="14" weight="bold" aria-hidden="true" />
                 </button>
-            </form>
+            </span>
         </div>
 
-        <div class="flex flex-wrap gap-1.5 px-1">
+        <p v-else class="text-[16px] text-label-2">{{ t('pathogens.empty') }}</p>
+
+        <form class="flex items-center gap-2" @submit.prevent="add(draft)">
+            <input
+                v-model="draft"
+                type="text"
+                class="field flex-1"
+                :placeholder="t('pathogens.placeholder')"
+            />
+            <button
+                type="submit"
+                class="flex min-h-11 shrink-0 items-center rounded-card bg-accent px-5 text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40"
+                :disabled="draft.trim() === ''"
+            >
+                {{ t('action.add') }}
+            </button>
+        </form>
+
+        <!-- The common four, one tap each. -->
+        <div class="flex flex-wrap gap-2">
             <button
                 v-for="name in COMMON.filter(
                     (candidate) =>
@@ -105,14 +115,15 @@ function remove(key: string) {
                 )"
                 :key="name"
                 type="button"
-                class="rounded-full bg-surface px-3 py-1.5 text-[13px] text-label-2"
+                class="flex min-h-10 items-center gap-1.5 rounded-full border border-dashed border-hairline px-3.5 text-[14px] font-medium text-label-2 transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent"
                 @click="add(name)"
             >
-                + {{ name }}
+                <PhPlus :size="12" weight="bold" aria-hidden="true" />
+                {{ name }}
             </button>
         </div>
 
-        <p class="tnum px-1 text-[13px] text-label-2">
+        <p class="tnum text-[14px] text-label-2">
             {{
                 t('pathogens.repeatNote', {
                     number: repeatingSection,

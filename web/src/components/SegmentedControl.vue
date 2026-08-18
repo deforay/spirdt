@@ -71,11 +71,60 @@ const ICONS: Record<ResponseCode, Component> = {
     NA: PhProhibit,
 }
 
+/**
+ * The selected state, and why it is this loud.
+ *
+ * It used to be a soft tint and a hairline shadow, which meant the control
+ * with an answer in it and the two next to it without one looked like the same
+ * object at slightly different brightnesses. On a bench, in daylight, through
+ * a screen protector, that difference is not there at all — and this is the
+ * one control whose state the whole record depends on.
+ *
+ * Three separate buttons with air between them, not three slots cut into one
+ * grey well. The well was the single largest object on the screen and the
+ * least designed, and it is most of why the application read as an unstyled
+ * form.
+ *
+ * A chosen option is tinted in its own colour and outlined in it, at a weight
+ * heavier than the resting border. Tint alone is invisible on a bench in
+ * daylight; the outline is what survives that, a projector, and a photocopy.
+ * Solid fill was the other candidate and it was too loud at fifty-nine rows —
+ * a finished section became a wall of colour with the questions lost inside
+ * it.
+ *
+ * Unselected options carry the response colour in the mark alone. The word
+ * stays in the label colour so the row reads as a question with three answers
+ * rather than as three coloured things.
+ *
+ * Fourteen millimetres of target on a phone, twelve at a desk. The phone is
+ * the one being tapped standing up, sometimes through a glove, and it is the
+ * only screen where the target is the whole interaction; a mouse does not need
+ * the extra height and spending it there would cost a question per screen.
+ */
+/**
+ * Two strengths of each colour, and which one goes where is a contrast rule
+ * rather than a preference.
+ *
+ * The word has to clear 4.5:1 on the tint behind it, and at that ratio a green
+ * is already halfway to bottle green — there is no vivid green that passes as
+ * text on white. The border and the mark carry no text, answer to 3:1, and can
+ * therefore be the actual red, yellow and green somebody expects to see. So
+ * the outline and the tick are vivid, the label is the darker tone, and the
+ * option still reads as green from across a bench.
+ */
 const TONES: Record<ResponseCode, string> = {
-    Y: 'data-[state=checked]:bg-yes-soft data-[state=checked]:text-yes',
-    P: 'data-[state=checked]:bg-partial-soft data-[state=checked]:text-partial',
-    N: 'data-[state=checked]:bg-no-soft data-[state=checked]:text-no',
-    NA: 'data-[state=checked]:bg-na-soft data-[state=checked]:text-na',
+    Y: 'data-[state=checked]:border-yes-vivid data-[state=checked]:bg-yes-soft data-[state=checked]:text-yes',
+    P: 'data-[state=checked]:border-partial-vivid data-[state=checked]:bg-partial-soft data-[state=checked]:text-partial',
+    N: 'data-[state=checked]:border-no-vivid data-[state=checked]:bg-no-soft data-[state=checked]:text-no',
+    NA: 'data-[state=checked]:border-na data-[state=checked]:bg-na-soft data-[state=checked]:text-na',
+}
+
+/** The mark keeps its response colour whether or not the option is chosen. */
+const MARKS: Record<ResponseCode, string> = {
+    Y: 'text-yes-vivid',
+    P: 'text-partial-vivid',
+    N: 'text-no-vivid',
+    NA: 'text-na',
 }
 
 const options = (): ResponseCode[] => (props.naAllowed ? ['Y', 'P', 'N', 'NA'] : ['Y', 'P', 'N'])
@@ -91,17 +140,17 @@ function choose(value: ResponseCode): void {
         :aria-label="label"
         :disabled="disabled"
         orientation="horizontal"
-        class="grid auto-cols-fr grid-flow-col gap-0.5 rounded-[9px] bg-track p-0.5"
+        class="grid auto-cols-fr grid-flow-col gap-2 md:gap-2.5"
     >
         <RadioGroupItem
             v-for="value in options()"
             :key="value"
             :value="value"
             :class="[
-                'flex min-h-11 cursor-pointer items-center justify-center gap-1 rounded-[7px]',
-                'px-1 text-[13px] font-medium text-label-2',
-                'transition-colors duration-150 hover:text-label',
-                'data-[state=checked]:font-semibold data-[state=checked]:shadow-sm',
+                'flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-card md:min-h-12',
+                'border-2 border-hairline px-2 text-[16px] font-semibold text-label-2 md:text-[15px]',
+                'transition-[background-color,color,border-color] duration-150',
+                'hover:border-label-3/40 hover:text-label',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 TONES[value],
             ]"
@@ -111,10 +160,10 @@ function choose(value: ResponseCode): void {
                  announced "check Yes" is worse than "Yes". -->
             <component
                 :is="ICONS[value]"
-                :size="14"
+                :size="16"
                 weight="bold"
                 aria-hidden="true"
-                class="shrink-0"
+                :class="['shrink-0', MARKS[value]]"
             />
             {{ t(LABELS[value]) }}
         </RadioGroupItem>

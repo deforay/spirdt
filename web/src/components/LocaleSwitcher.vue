@@ -15,14 +15,25 @@ import { availableLocales, locale, localeName, setLocale, t } from '@/i18n'
  * menu component we would otherwise reach for was twenty-two kilobytes
  * compressed — a fifth of the whole app, downloaded over the connection an
  * offline-first tool exists to cope with, for four options.
+ *
+ * Two grounds to sit on. It appears in the navy app bar on the working screens
+ * and on the paper ground on sign-in, and a pill drawn for one is invisible on
+ * the other.
  */
+
+withDefaults(defineProps<{ variant?: 'page' | 'chrome' }>(), { variant: 'page' })
 </script>
 
 <template>
     <div class="relative shrink-0">
         <span
             aria-hidden="true"
-            class="block rounded-full bg-surface px-2.5 py-1 text-[12px] font-semibold uppercase text-label-2"
+            :class="[
+                'block rounded-full px-2.5 py-1 text-[13px] font-semibold uppercase',
+                variant === 'chrome'
+                    ? 'bg-white/15 text-chrome-ink'
+                    : 'bg-surface text-label-2',
+            ]"
         >
             {{ locale }}
         </span>

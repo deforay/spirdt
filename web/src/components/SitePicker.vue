@@ -89,31 +89,34 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[620px] sm:px-4">
-        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 sm:px-0 sm:pt-6">
+    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[720px] sm:px-4">
+        <header class="flex items-start justify-between gap-3 px-4 pb-5 pt-5 sm:px-0 sm:pt-8">
             <div>
-                <h1 class="text-[30px] font-bold tracking-tight">{{ t('sites.title') }}</h1>
-                <p class="mt-0.5 text-[13px] text-label-2">{{ t('sites.subtitle') }}</p>
+                <h1 class="text-[30px] font-bold tracking-[-0.02em]">{{ t('sites.title') }}</h1>
+                <p class="mt-1.5 text-[15px] text-label-2">{{ t('sites.subtitle') }}</p>
             </div>
         </header>
 
         <!-- Unfinished visits, above everything. Somebody opening this app
-             usually means to finish one, not to start another. -->
-        <section v-if="drafts.length > 0" class="px-4 pb-4 sm:px-0">
-            <h2 class="eyebrow px-1 pb-1.5 text-label-2">{{ t('sites.unfinished') }}</h2>
+             usually means to finish one, not to start another. Each is its own
+             card rather than a row in a list: there are rarely more than two,
+             and the whole screen exists to make resuming one the easy move. -->
+        <section v-if="drafts.length > 0" class="px-4 pb-6 sm:px-0">
+            <h2 class="eyebrow pb-2.5 text-label-3">{{ t('sites.unfinished') }}</h2>
 
-            <div class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
+            <div class="flex flex-col gap-3">
                 <button
-                    v-for="(draft, index) in drafts"
+                    v-for="draft in drafts"
                     :key="draft.id"
                     type="button"
-                    class="flex w-full items-center gap-3 px-3.5 py-3 text-left"
-                    :class="index > 0 ? 'border-t border-hairline' : ''"
+                    class="flex w-full items-center gap-4 rounded-surface border border-hairline bg-surface p-4 text-left transition-colors hover:border-accent"
                     @click="emit('resume', draft.id)"
                 >
                     <span class="min-w-0 flex-1">
-                        <span class="block truncate text-[17px]">{{ draft.siteName }}</span>
-                        <span class="tnum block text-[13px] text-label-2">
+                        <span class="block truncate text-[17px] font-semibold">
+                            {{ draft.siteName }}
+                        </span>
+                        <span class="tnum mt-0.5 block text-[14px] text-label-2">
                             {{ formatDate(draft.assessedOn) }} ·
                             {{
                                 t('sites.draftProgress', {
@@ -122,41 +125,68 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
                                 })
                             }}
                         </span>
+
+                        <!-- How far in, drawn. A fraction says how much is
+                             done; a bar says how much is left, which is what
+                             somebody deciding whether to pick this one up
+                             again is actually asking. -->
+                        <span
+                            aria-hidden="true"
+                            class="mt-2.5 block h-1.5 w-full overflow-hidden rounded-full bg-track"
+                        >
+                            <span
+                                class="block h-full rounded-full bg-accent"
+                                :style="{
+                                    width:
+                                        draft.total === 0
+                                            ? '0%'
+                                            : `${Math.min(100, Math.round((draft.answered / draft.total) * 100))}%`,
+                                }"
+                            ></span>
+                        </span>
                     </span>
-                    <PhArrowRight :size="18" class="shrink-0 text-accent" aria-hidden="true" />
+
+                    <span
+                        class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+                    >
+                        <PhArrowRight :size="17" weight="bold" aria-hidden="true" />
+                    </span>
                 </button>
             </div>
         </section>
 
         <div class="px-4 pb-3 sm:px-0">
-            <h2 v-if="drafts.length > 0" class="eyebrow px-1 pb-1.5 text-label-2">
+            <h2 v-if="drafts.length > 0" class="eyebrow pb-2.5 text-label-3">
                 {{ t('sites.startNew') }}
             </h2>
             <input
                 v-model="filter"
                 type="search"
-                class="w-full rounded-card bg-surface px-3.5 py-2.5 text-[17px] outline-none placeholder:text-label-3"
+                class="field"
                 :placeholder="t('sites.search')"
             />
         </div>
 
         <main class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 sm:px-0">
-            <div v-if="shown.length > 0" class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
+            <div
+                v-if="shown.length > 0"
+                class="overflow-hidden rounded-surface border border-hairline bg-surface"
+            >
                 <button
                     v-for="(site, index) in shown"
                     :key="site.id"
                     type="button"
-                    class="flex w-full flex-col items-start gap-0.5 px-3.5 py-3 text-left"
+                    class="flex w-full flex-col items-start gap-0.5 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
                     :class="index > 0 ? 'border-t border-hairline' : ''"
                     @click="emit('chosen', site)"
                 >
-                    <span class="text-[17px]">{{ site.name }}</span>
-                    <span v-if="site.facility_name" class="text-[13px] text-label-2">
+                    <span class="text-[17px] font-medium">{{ site.name }}</span>
+                    <span v-if="site.facility_name" class="text-[14px] text-label-2">
                         {{ site.facility_name }}
                     </span>
                     <span
                         v-if="showAll && hasAssignments && !site.assigned_to_me"
-                        class="text-[12px] text-label-3"
+                        class="chip mt-1.5 bg-track text-label-2"
                     >
                         {{ site.assigned ? t('sites.assignedToColleague') : t('sites.unassigned') }}
                     </span>
@@ -166,17 +196,17 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
             <button
                 v-if="hasAssignments && hiddenCount > 0"
                 type="button"
-                class="mt-3 w-full py-2 text-center text-[15px] text-accent"
+                class="mt-4 min-h-11 w-full rounded-card border border-hairline text-center text-[15px] font-medium text-accent transition-colors hover:bg-accent-soft"
                 @click="showAll = !showAll"
             >
                 {{ showAll ? t('sites.showMine') : t('sites.showAll', { count: hiddenCount }) }}
             </button>
 
-            <p v-else-if="loading" class="px-1 pt-2 text-[15px] text-label-2">
+            <p v-else-if="loading" class="pt-3 text-[16px] text-label-2">
                 {{ t('sites.loading') }}
             </p>
 
-            <p v-else class="px-1 pt-2 text-[15px] text-label-2">
+            <p v-else class="pt-3 text-[16px] text-label-2">
                 {{ t('sites.empty') }}
             </p>
         </main>

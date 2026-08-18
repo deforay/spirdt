@@ -27,6 +27,15 @@ import type { ScoreResult, Template } from '@/scoring/types'
  * a site that cannot act on it never closes.
  */
 
+/** Same ramp as ScoreBadge and the checklist footer. See docs/design.md. */
+const LEVEL_TONES: Record<number, string> = {
+    0: 'bg-level-0 text-level-0-ink',
+    1: 'bg-level-1 text-level-1-ink',
+    2: 'bg-level-2 text-level-2-ink',
+    3: 'bg-level-3 text-level-3-ink',
+    4: 'bg-level-4 text-level-4-ink',
+}
+
 const props = defineProps<{
     template: Template
     result: ScoreResult
@@ -236,11 +245,11 @@ function summaryOf(gap: Gap): string {
         causing it.
     -->
     <div
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground min-[900px]:max-w-[1280px] min-[900px]:px-6"
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground min-[900px]:max-w-[1536px] min-[900px]:px-6"
     >
         <header class="px-4 pb-3 pt-4 min-[900px]:px-0 min-[900px]:pt-6">
             <div class="mb-2 flex items-center gap-3">
-                <button type="button" class="text-[15px] text-accent" @click="emit('back')">
+                <button type="button" class="text-[16px] text-accent" @click="emit('back')">
                     {{ t('review.back') }}
                 </button>
                 <!-- Part A is reachable from here as well. A wrong interviewee
@@ -248,14 +257,14 @@ function summaryOf(gap: Gap): string {
                      screen that shows the visit as a whole. -->
                 <button
                     type="button"
-                    class="text-[15px] text-accent"
+                    class="text-[16px] text-accent"
                     @click="emit('editSetup')"
                 >
                     {{ t('checklist.editSetup') }}
                 </button>
             </div>
-            <h1 class="text-[30px] font-bold tracking-tight">{{ t('review.title') }}</h1>
-            <p class="mt-0.5 text-[13px] text-label-2">{{ siteName }}</p>
+            <h1 class="text-[32px] font-bold tracking-tight">{{ t('review.title') }}</h1>
+            <p class="mt-0.5 text-[14px] text-label-2">{{ siteName }}</p>
         </header>
 
         <main
@@ -264,17 +273,17 @@ function summaryOf(gap: Gap): string {
           <div class="min-[900px]:sticky min-[900px]:top-0">
             <!-- The score, stated once and plainly. -->
             <div
-                class="mb-4 flex items-end justify-between rounded-card bg-surface px-4 py-4 min-[900px]:rounded-surface min-[900px]:shadow-surface"
+                class="mb-5 flex items-end justify-between rounded-surface border border-hairline bg-surface p-5"
             >
                 <div>
-                    <div class="tnum text-[34px] font-bold leading-none tracking-tight">
+                    <div class="tnum text-[36px] font-bold leading-none tracking-tight">
                         {{
                             result.percentage === null
                                 ? '—'
                                 : formatPercent(result.percentage, result.roundDp)
                         }}
                     </div>
-                    <div class="tnum mt-1 text-[13px] text-label-2">
+                    <div class="tnum mt-1 text-[14px] text-label-2">
                         {{
                             t('review.points', {
                                 score: result.totalScore,
@@ -283,19 +292,13 @@ function summaryOf(gap: Gap): string {
                         }}
                     </div>
                 </div>
+                <!-- The level ramp, not the response palette. Green for a
+                     Level 4 and red for a Level 0 spends the three colours
+                     that mean Yes, Partial and No on the questions this very
+                     screen is reviewing. -->
                 <span
-                    class="rounded-full px-3 py-1.5 text-[15px] font-semibold"
-                    :class="
-                        result.level === null
-                            ? 'bg-track text-label-2'
-                            : result.level >= 4
-                              ? 'bg-yes-soft text-yes'
-                              : result.level === 3
-                                ? 'bg-accent-soft text-accent'
-                                : result.level === 2
-                                  ? 'bg-partial-soft text-partial'
-                                  : 'bg-no-soft text-no'
-                    "
+                    class="tnum rounded-full px-3.5 py-1.5 text-[15px] font-semibold"
+                    :class="LEVEL_TONES[result.level ?? -1] ?? 'bg-track text-label-2'"
                 >
                     {{
                         result.level === null
@@ -309,34 +312,34 @@ function summaryOf(gap: Gap): string {
                 Every section, done or not. Tapping one goes there.
             -->
             <section class="mb-4">
-                <h2 class="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
+                <h2 class="eyebrow pb-2.5 text-label-3">
                     {{ t('review.overview') }}
                 </h2>
-                <div class="overflow-hidden rounded-card bg-surface">
+                <div class="overflow-hidden rounded-surface border border-hairline bg-surface">
                     <button
                         v-for="(row, index) in overview"
                         :key="row.code"
                         type="button"
-                        class="flex w-full items-center gap-3 px-3.5 py-3 text-left"
+                        class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
                         :class="index > 0 ? 'border-t border-hairline' : ''"
                         @click="emit('jump', row.code, null)"
                     >
-                        <span class="tnum shrink-0 text-[13px] font-semibold text-label-3">
+                        <span class="tnum shrink-0 text-[14px] font-semibold text-label-3">
                             {{ row.number }}
                         </span>
 
                         <span class="min-w-0 flex-1">
                             <span
-                                class="block truncate text-[15px]"
+                                class="block truncate text-[16px]"
                                 :class="row.applicable ? '' : 'text-label-3'"
                             >
                                 {{ row.title }}
                             </span>
 
-                            <span v-if="!row.applicable" class="block text-[13px] text-label-3">
+                            <span v-if="!row.applicable" class="block text-[14px] text-label-3">
                                 {{ t('review.notApplicable') }}
                             </span>
-                            <span v-else class="tnum block text-[13px] text-label-2">
+                            <span v-else class="tnum block text-[14px] text-label-2">
                                 {{ t('checklist.answered', { answered: row.answered, total: row.expected }) }}
                                 <template v-if="row.outstanding === 0">
                                     · {{ formatNumber(row.score) }}/{{ formatNumber(row.possible) }}
@@ -350,13 +353,13 @@ function summaryOf(gap: Gap): string {
                         <span class="flex shrink-0 flex-col items-end gap-0.5">
                             <span
                                 v-if="row.outstanding > 0"
-                                class="tnum rounded-full bg-no-soft px-2 py-0.5 text-[12px] font-semibold text-no"
+                                class="chip tnum bg-no-soft text-no"
                             >
                                 {{ t('review.outstanding', { count: row.outstanding }) }}
                             </span>
                             <span
                                 v-if="row.needsNote > 0"
-                                class="tnum rounded-full bg-partial-soft px-2 py-0.5 text-[12px] font-semibold text-partial"
+                                class="chip tnum bg-partial-soft text-partial"
                             >
                                 {{ t('review.noteCount', { count: row.needsNote }) }}
                             </span>
@@ -380,24 +383,24 @@ function summaryOf(gap: Gap): string {
                 job from writing them, and it is the one this screen has.
             -->
             <section class="mb-4">
-                <h2 class="flex items-baseline justify-between px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-label-2">
-                    <span>{{ t('review.gaps') }}</span>
-                    <span class="tnum normal-case">
+                <h2 class="flex items-baseline justify-between gap-3 pb-2.5">
+                    <span class="eyebrow text-label-3">{{ t('review.gaps') }}</span>
+                    <span class="tnum text-[13px] text-label-3">
                         {{ t('review.described', { described, total: gaps.length }) }}
                     </span>
                 </h2>
 
-                <div v-if="gaps.length > 0" class="overflow-hidden rounded-card bg-surface">
+                <div v-if="gaps.length > 0" class="overflow-hidden rounded-surface border border-hairline bg-surface">
                     <button
                         v-for="(gap, index) in gaps"
                         :key="gap.key"
                         type="button"
-                        class="flex w-full items-start gap-2.5 px-3.5 py-3 text-left"
+                        class="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
                         :class="index > 0 ? 'border-t border-hairline' : ''"
                         @click="emit('jump', sectionOf(gap.questionCode), gap.pathogen)"
                     >
                         <span
-                            class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold"
+                            class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold"
                             :class="gap.response === 'N' ? 'bg-no-soft text-no' : 'bg-partial-soft text-partial'"
                         >
                             {{ gap.response }}
@@ -407,7 +410,7 @@ function summaryOf(gap: Gap): string {
                         </span>
 
                         <span class="min-w-0 flex-1">
-                            <span class="block text-[15px] leading-snug">
+                            <span class="block text-[16px] leading-snug">
                                 {{ questionText.get(gap.questionCode) }}
                             </span>
 
@@ -415,18 +418,18 @@ function summaryOf(gap: Gap): string {
                                  undescribed gap is the thing worth showing. -->
                             <span
                                 v-if="summaryOf(gap) !== ''"
-                                class="mt-0.5 block text-[13px] text-label-2"
+                                class="mt-0.5 block text-[14px] text-label-2"
                             >
                                 {{ summaryOf(gap) }}
                             </span>
-                            <span v-else class="mt-0.5 block text-[13px] font-medium text-no">
+                            <span v-else class="mt-0.5 block text-[14px] font-medium text-no">
                                 {{ t('review.notDescribed') }}
                             </span>
                         </span>
                     </button>
                 </div>
 
-                <p v-else class="px-1 text-[15px] text-label-2">{{ t('review.noGaps') }}</p>
+                <p v-else class="px-1 text-[16px] text-label-2">{{ t('review.noGaps') }}</p>
             </section>
 
 
@@ -443,25 +446,25 @@ function summaryOf(gap: Gap): string {
         <footer
             class="border-t border-hairline bg-surface px-4 pb-4 pt-3 min-[900px]:rounded-t-surface min-[900px]:border-x min-[900px]:px-6"
         >
-            <p v-if="submitError !== ''" class="pb-2 text-[13px] font-medium text-no">
+            <p v-if="submitError !== ''" class="pb-2 text-[14px] font-medium text-no">
                 {{ submitError }}
             </p>
 
             <button
                 type="button"
-                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40 min-[900px]:mx-auto min-[900px]:block min-[900px]:w-auto min-[900px]:px-16"
+                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 min-[900px]:mx-auto min-[900px]:block min-[900px]:w-auto min-[900px]:px-12"
                 :disabled="!submittable || submitting"
                 @click="emit('submit')"
             >
                 {{ submitting ? t('review.submitting') : t('review.submit') }}
             </button>
 
-            <p v-if="!result.isComplete" class="tnum pt-2 text-center text-[13px] text-label-2">
+            <p v-if="!result.isComplete" class="tnum pt-2 text-center text-[14px] text-label-2">
                 {{ t('review.stillNeeded', { count: result.missing.length }) }}
             </p>
             <p
                 v-else-if="result.missingNotes.length > 0"
-                class="tnum pt-2 text-center text-[13px] text-label-2"
+                class="tnum pt-2 text-center text-[14px] text-label-2"
             >
                 {{ t('review.notesNeeded', { count: result.missingNotes.length }) }}
             </p>

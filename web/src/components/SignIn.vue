@@ -12,6 +12,12 @@ import { t } from '@/i18n'
  * The organisation field appears only once the server has asked for it. Most
  * installations have one organisation, and a field that is nearly always blank
  * is a field people fill in wrongly.
+ *
+ * Two layouts, one form. On a phone it is the form and nothing else, because
+ * that is the screen an assessor signs in on at the start of a visit. Past
+ * 1024px a navy panel carries the name of the programme beside it — that is
+ * the width a stakeholder sees the app at, and this is the first screen they
+ * see. The panel holds no controls, so nothing is lost when it is not there.
  */
 
 const emit = defineEmits<{ signedIn: [] }>()
@@ -56,53 +62,90 @@ async function submit() {
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center bg-ground px-5">
-        <header class="mb-7 flex items-start justify-between gap-3">
+    <div class="flex min-h-screen bg-ground lg:items-stretch">
+        <!--
+            The panel is decoration in the strict sense: nothing here can be
+            acted on, and it is hidden below 1024px rather than stacked, so a
+            phone opens straight onto the form. aria-hidden for the same
+            reason — the wordmark beside the form would otherwise be announced
+            twice.
+        -->
+        <aside
+            aria-hidden="true"
+            class="hidden w-[46%] max-w-[560px] flex-col justify-between bg-accent px-12 py-14 text-accent-ink lg:flex"
+        >
             <div>
-                <h1 class="text-[30px] font-bold tracking-tight">SPI-RDT</h1>
-                <p class="mt-1 text-[15px] text-label-2">{{ t('signIn.subtitle') }}</p>
+                <span class="eyebrow text-white/60">SPI-RDT</span>
+                <p class="rule-brass mt-6 max-w-[15ch] pb-6 text-[38px] font-extrabold leading-[1.12]">
+                    {{ t('signIn.tagline') }}
+                </p>
             </div>
-            <div class="mt-1.5"><LocaleSwitcher /></div>
-        </header>
 
-        <form class="flex flex-col gap-3" @submit.prevent="submit">
-            <div class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
-                <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[76px] shrink-0 text-[15px] text-label-2">
-                        {{ t('signIn.email') }}
-                    </span>
-                    <input
-                        v-model="email"
-                        type="email"
-                        autocomplete="username"
-                        inputmode="email"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                        placeholder="you@example.org"
-                    />
-                </label>
+            <!-- The levels, as the thing the app exists to produce. Five
+                 squares on the brass-to-navy ramp say what a stepwise
+                 assessment is faster than a sentence about it does. -->
+            <div class="flex items-center gap-2 text-[13px] text-white/70">
+                <span
+                    v-for="level in [0, 1, 2, 3, 4]"
+                    :key="level"
+                    class="tnum flex h-7 w-7 items-center justify-center rounded-[7px] font-semibold"
+                    :class="[
+                        'bg-white/10',
+                        level === 4 ? 'bg-brass-fill text-on-brass' : '',
+                    ]"
+                >
+                    {{ level }}
+                </span>
+                <span class="ml-2">{{ t('score.level', { level: 4 }) }}</span>
+            </div>
+        </aside>
 
-                <div class="ml-[100px] border-t border-hairline"></div>
+        <div class="flex min-h-screen w-full flex-col justify-center px-5 lg:px-16">
+            <div class="mx-auto w-full max-w-[430px]">
+                <header class="mb-7 flex items-start justify-between gap-3">
+                    <div>
+                        <h1 class="text-[32px] font-extrabold">SPI-RDT</h1>
+                        <p class="mt-1 text-[16px] text-label-2">{{ t('signIn.subtitle') }}</p>
+                    </div>
+                    <div class="mt-1.5"><LocaleSwitcher /></div>
+                </header>
 
-                <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[76px] shrink-0 text-[15px] text-label-2">
-                        {{ t('signIn.password') }}
-                    </span>
-                    <input
-                        v-model="password"
-                        type="password"
-                        autocomplete="current-password"
-                        class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                        placeholder="••••••••••••"
-                    />
-                </label>
+                <form class="flex flex-col gap-4" @submit.prevent="submit">
+                    <!-- Label above field, as everywhere else. The row idiom
+                         this replaces put a fixed 76px gutter before every
+                         input, which is a quarter of a phone's width spent on
+                         the word "Email". -->
+                    <label class="flex flex-col gap-1.5">
+                        <span class="text-[14px] font-medium text-label-2">
+                            {{ t('signIn.email') }}
+                        </span>
+                        <input
+                            v-model="email"
+                            type="email"
+                            autocomplete="username"
+                            inputmode="email"
+                            autocapitalize="off"
+                            spellcheck="false"
+                            class="field"
+                            placeholder="you@example.org"
+                        />
+                    </label>
 
-                <template v-if="needsOrganization">
-                    <div class="ml-[100px] border-t border-hairline"></div>
+                    <label class="flex flex-col gap-1.5">
+                        <span class="text-[14px] font-medium text-label-2">
+                            {{ t('signIn.password') }}
+                        </span>
+                        <input
+                            v-model="password"
+                            type="password"
+                            autocomplete="current-password"
+                            class="field"
+                            placeholder="••••••••••••"
+                        />
+                    </label>
 
-                    <label class="flex items-center gap-3 px-3.5 py-3">
-                        <span class="w-[76px] shrink-0 text-[15px] text-label-2">
+                    <label v-if="needsOrganization" class="flex flex-col gap-1.5">
+                        <span class="text-[14px] font-medium text-label-2">
                             {{ t('signIn.organization') }}
                         </span>
                         <input
@@ -110,22 +153,22 @@ async function submit() {
                             type="text"
                             autocapitalize="off"
                             spellcheck="false"
-                            class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
+                            class="field"
                             placeholder="demo"
                         />
                     </label>
-                </template>
+
+                    <p v-if="error !== ''" class="text-[14px] font-medium text-no">{{ error }}</p>
+
+                    <button
+                        type="submit"
+                        :disabled="!canSubmit"
+                        class="mt-1 min-h-12 rounded-card bg-accent px-5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40"
+                    >
+                        {{ busy ? t('signIn.submitting') : t('signIn.submit') }}
+                    </button>
+                </form>
             </div>
-
-            <p v-if="error !== ''" class="px-1 text-[13px] font-medium text-no">{{ error }}</p>
-
-            <button
-                type="submit"
-                :disabled="!canSubmit"
-                class="mt-1 rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40"
-            >
-                {{ busy ? t('signIn.submitting') : t('signIn.submit') }}
-            </button>
-        </form>
+        </div>
     </div>
 </template>

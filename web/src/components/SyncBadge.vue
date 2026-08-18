@@ -13,6 +13,16 @@ import { syncStatus } from '@/sync/engine'
  * answers the second.
  *
  * "Blocked" is the state worth interrupting for — it will not clear on its own.
+ *
+ * Drawn in tokens rather than in white, because the bar it sits on is white in
+ * one theme and near-black in the other, and a translucent-white pill is
+ * invisible on the first.
+ *
+ * Sync used to borrow green for synced and amber for waiting, which spent two
+ * of the three response colours on a badge that is not a response — the exact
+ * confusion the reserved palette exists to prevent, sitting a thumb's width
+ * from the control it would be confused with. Only blocked keeps a colour, and
+ * it is the one state worth interrupting for.
  */
 
 const emit = defineEmits<{ retry: [] }>()
@@ -31,7 +41,7 @@ const state = computed(() => {
     if (status.pending > 0) {
         return {
             label: t('sync.pending', { count: status.pending }),
-            tone: 'bg-partial-soft text-partial',
+            tone: 'bg-track text-label-2',
             clickable: true,
         }
     }
@@ -40,14 +50,14 @@ const state = computed(() => {
         return { label: t('sync.never'), tone: 'bg-track text-label-2', clickable: true }
     }
 
-    return { label: t('sync.synced'), tone: 'bg-yes-soft text-yes', clickable: false }
+    return { label: t('sync.synced'), tone: 'bg-track text-label-2', clickable: false }
 })
 </script>
 
 <template>
     <button
         type="button"
-        :class="['rounded-full px-2.5 py-1 text-[12px] font-semibold', state.tone]"
+        :class="['rounded-full px-2.5 py-1 text-[13px] font-semibold', state.tone]"
         :disabled="!state.clickable"
         @click="emit('retry')"
     >

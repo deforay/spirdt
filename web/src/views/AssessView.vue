@@ -7,7 +7,6 @@ import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
 import type { Site } from '@/api/sites'
 import { session } from '@/auth/session'
 import AssessorShell from '@/components/AssessorShell.vue'
-import ChangePassword from '@/components/ChangePassword.vue'
 import ContextForm from '@/components/ContextForm.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
@@ -57,7 +56,6 @@ const submitError = ref('')
  * set and there is no way past it; here it is opened from the account menu and
  * can be closed again, which is the difference between a gate and a setting.
  */
-const changingPassword = ref(false)
 
 
 /** Part A fields whose value decides whether a section applies. */
@@ -401,6 +399,33 @@ const visibleSections = computed(() =>
     }),
 )
 
+/** How far through the whole visit, for the bar on the score tile. */
+const visitFilled = computed(() =>
+    progress.value.total === 0
+        ? '0%'
+        : `${Math.min(100, Math.round((progress.value.answered / progress.value.total) * 100))}%`,
+)
+
+/** Where the section on screen sits in the visit, for the eyebrow above it. */
+const sectionNumber = computed(
+    () => visibleSections.value.findIndex((entry) => entry.code === activeSection.value) + 1,
+)
+
+/**
+ * How full a section's bar is, as a width.
+ *
+ * A section nobody has opened has an expected count of zero until the engine
+ * has seen it, and dividing by that is how a bar ends up full before a
+ * question is answered.
+ */
+function sectionFilled(code: string): string {
+    const tally = sectionProgress.value.get(code)
+
+    if (tally === undefined || tally.expected === 0) return '0%'
+
+    return `${Math.min(100, Math.round((tally.answered / tally.expected) * 100))}%`
+}
+
 /** Section 4 repeats per pathogen; every other section is answered once. */
 const instance = computed(() => (section.value.scope === 'pathogen' ? activePathogen.value : null))
 
@@ -411,10 +436,12 @@ const instance = computed(() => (section.value.scope === 'pathogen' ? activePath
  * standing. What is left is the question it gets looked at to answer, and
  * answering it there saves a trip to the review screen to find out.
  *
- * Counts rather than colour. Green, amber and red mean a response in this
- * application, and a navigation list lit up in them would be the loudest thing
- * on a screen whose actual content is the questions. The review screen carries
- * the badges; this carries the arithmetic.
+ * Counts and one navy bar, never the response colours. Green, amber and red
+ * mean a response in this application, and a navigation list lit up in them
+ * would be the loudest thing on a screen whose actual content is the
+ * questions — including for a finished section, which is why the bar stays
+ * navy when it fills rather than turning green. The review screen carries the
+ * badges; this carries the arithmetic.
  */
 const sectionProgress = computed(() => {
     const outstanding = new Map<string, number>()
@@ -551,6 +578,22 @@ const answersByKey = computed(() => {
     return map
 })
 
+/**
+ * The band, on the sequential navy ramp rather than red to green.
+ *
+ * Same ramp as ScoreBadge, and for the same reason: red, amber and green are
+ * spoken for. They mean No, Partial and Yes on a question, and a Level 1 site
+ * wearing the red of a failed answer says something the instrument does not.
+ * A level is a position on a scale, so it deepens.
+ */
+const LEVEL_TONES: Record<number, string> = {
+    0: 'bg-level-0 text-level-0-ink',
+    1: 'bg-level-1 text-level-1-ink',
+    2: 'bg-level-2 text-level-2-ink',
+    3: 'bg-level-3 text-level-3-ink',
+    4: 'bg-level-4 text-level-4-ink',
+}
+
 const levelTone = computed(() => {
     const level = assessment.result.value.level
 
@@ -560,10 +603,8 @@ const levelTone = computed(() => {
     if (!assessment.result.value.isComplete) return 'bg-track text-label-2'
 
     if (level === null) return 'bg-track text-label-2'
-    if (level >= 4) return 'bg-yes-soft text-yes'
-    if (level === 3) return 'bg-accent-soft text-accent'
-    if (level === 2) return 'bg-partial-soft text-partial'
-    return 'bg-no-soft text-no'
+
+    return LEVEL_TONES[level] ?? 'bg-track text-label-2'
 })
 
 const savedLabel = computed(() => {
@@ -659,16 +700,14 @@ async function onSubmit() {
     :storage="assessment.storage.value"
     :save-state="assessment.saveState.value"
     :save-error="assessment.saveError.value"
-    @change-password="changingPassword = true"
   >
-    <ChangePassword v-if="changingPassword" @changed="changingPassword = false" />
 
-    <SitePicker v-else-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
+    <SitePicker v-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
 
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
         v-else-if="stage === 'setup'"
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1120px] md:px-6"
+        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1280px] md:px-6"
     >
 
         <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
@@ -682,7 +721,7 @@ async function onSubmit() {
                 -->
                 <button
                     type="button"
-                    class="-ml-1 flex min-h-11 items-center gap-1 pr-1 text-left text-[13px] text-accent"
+                    class="-ml-1 flex min-h-11 items-center gap-1 pr-1 text-left text-[14px] text-accent"
                     @click="revisitingSetup ? startChecklist() : leaveVisit()"
                 >
                     <PhArrowLeft :size="14" class="shrink-0" aria-hidden="true" />
@@ -694,10 +733,10 @@ async function onSubmit() {
                         }}
                     </span>
                 </button>
-                <h1 class="text-[30px] font-bold tracking-tight">
+                <h1 class="text-[32px] font-bold tracking-tight">
                     {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
                 </h1>
-                <p v-if="instrumentUntranslated" class="mt-1 text-[12px] leading-snug text-label-2">
+                <p v-if="instrumentUntranslated" class="mt-1 text-[13px] leading-snug text-label-2">
                     {{ t('locale.instrumentNote') }}
                 </p>
             </div>
@@ -710,10 +749,17 @@ async function onSubmit() {
             being filled in, rather than a scroll away.
         -->
         <main
-            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:grid md:grid-cols-2 md:items-start md:gap-6 md:px-0"
+            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:grid md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start md:gap-7 md:px-0"
         >
-            <section>
-                <h2 class="eyebrow px-1 pb-2 text-label-2">
+            <!--
+                The tests are four chips and a box; Part A is twenty fields. An
+                even split gave the short half a column of its own and left two
+                thirds of it empty down the length of the long one, so the panel
+                is now sized to its content and sticks while the form scrolls
+                past it — it is the thing the form's last section depends on.
+            -->
+            <section class="rounded-surface border border-hairline bg-surface p-5 md:sticky md:top-4">
+                <h2 class="eyebrow pb-3 text-label-3">
                     {{ t('setup.pathogensHeading') }}
                 </h2>
                 <PathogenSetup
@@ -723,8 +769,8 @@ async function onSubmit() {
                 />
             </section>
 
-            <section>
-                <h2 class="eyebrow px-1 pb-2 pt-6 text-label-2 md:pt-0">
+            <section class="mt-5 rounded-surface border border-hairline bg-surface p-5 md:mt-0 md:p-6">
+                <h2 class="eyebrow pb-4 text-label-3">
                     {{ t('setup.contextHeading') }}
                 </h2>
                 <ContextForm
@@ -739,23 +785,23 @@ async function onSubmit() {
         <footer class="border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6">
             <button
                 type="button"
-                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40 md:mx-auto md:block md:w-auto md:px-16"
+                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 md:mx-auto md:block md:w-auto md:px-12"
                 :disabled="!setupReady"
                 @click="startChecklist"
             >
                 {{ revisitingSetup ? t('setup.backToChecklist') : t('setup.start') }}
             </button>
-            <p v-if="draftPathogens.length === 0" class="pt-2 text-center text-[13px] text-label-2">
+            <p v-if="draftPathogens.length === 0" class="pt-2 text-center text-[14px] text-label-2">
                 {{ t('setup.needPathogen') }}
             </p>
-            <p v-else-if="missingContext.length > 0" class="pt-2 text-center text-[13px] text-label-2">
+            <p v-else-if="missingContext.length > 0" class="pt-2 text-center text-[14px] text-label-2">
                 {{ t('setup.missingFields', { count: missingContext.length }) }}
             </p>
             <!-- Last, because an empty field is the commoner reason to be
                  stopped here and the assessor should be told about that first.
                  The field itself carries the detail; this only says why the
                  button will not move. -->
-            <p v-else-if="contextProblems.length > 0" class="pt-2 text-center text-[13px] font-medium text-no">
+            <p v-else-if="contextProblems.length > 0" class="pt-2 text-center text-[14px] font-medium text-no">
                 {{ t('setup.invalidFields', { count: contextProblems.length }) }}
             </p>
         </footer>
@@ -786,7 +832,7 @@ async function onSubmit() {
         same list; only one is in the accessibility tree at a time, because two
         copies of the same navigation is two things to tab through.
     -->
-    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1280px] md:px-6">
+    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground md:max-w-[1536px] md:px-6">
 
         <header class="flex flex-col gap-0.5 px-4 pb-2.5 pt-3 md:px-0 md:pt-6">
             <div class="flex items-center justify-between gap-2">
@@ -798,7 +844,7 @@ async function onSubmit() {
                 -->
                 <button
                     type="button"
-                    class="-ml-1 flex min-h-11 flex-1 items-center gap-1 truncate pr-1 text-left text-[13px] text-accent"
+                    class="-ml-1 flex min-h-11 flex-1 items-center gap-1 truncate pr-1 text-left text-[14px] text-accent"
                     @click="leaveVisit"
                 >
                     <PhArrowLeft :size="14" class="shrink-0" aria-hidden="true" />
@@ -807,8 +853,51 @@ async function onSubmit() {
                     </span>
                 </button>
             </div>
-            <h1 class="text-[30px] font-bold tracking-tight">{{ text(section.title) }}</h1>
-            <span class="tnum text-[13px] text-label-2">
+            <!-- Where you are, then what it is called. The eyebrow carries the
+                 position so the title does not have to, and the brass rule is
+                 the mark this app gives to the name of a thing of record.
+                 How much of it is answered sits beside the name once there is
+                 room, because it is a fact about the section rather than a
+                 line of its own. -->
+            <div class="flex items-end justify-between gap-4">
+                <div class="flex min-w-0 flex-col gap-0.5">
+                    <span class="eyebrow text-brass">
+                        {{
+                            t('checklist.sectionOf', {
+                                number: sectionNumber,
+                                total: visibleSections.length,
+                            })
+                        }}
+                    </span>
+                    <h1 class="rule-brass self-start pb-1.5 text-[32px] font-extrabold">
+                        {{ text(section.title) }}
+                    </h1>
+                </div>
+
+                <div
+                    class="hidden shrink-0 items-center gap-3 rounded-full bg-surface px-4 py-2.5 shadow-pick md:flex"
+                >
+                    <span class="tnum text-[14px] font-semibold">
+                        {{
+                            t('checklist.answered', {
+                                answered: answeredHere,
+                                total: section.questions.length,
+                            })
+                        }}
+                    </span>
+                    <span
+                        aria-hidden="true"
+                        class="block h-1.5 w-24 overflow-hidden rounded-full bg-track"
+                    >
+                        <span
+                            class="block h-full rounded-full bg-accent transition-[width] duration-200"
+                            :style="{ width: sectionFilled(section.code) }"
+                        ></span>
+                    </span>
+                </div>
+            </div>
+
+            <span class="tnum pt-1 text-[14px] text-label-2 md:hidden">
                 {{
                     t('checklist.answered', {
                         answered: answeredHere,
@@ -816,7 +905,7 @@ async function onSubmit() {
                     })
                 }}
             </span>
-            <p v-if="instrumentUntranslated" class="text-[12px] leading-snug text-label-2">
+            <p v-if="instrumentUntranslated" class="text-[13px] leading-snug text-label-2">
                 {{ t('locale.instrumentNote') }}
             </p>
         </header>
@@ -831,7 +920,7 @@ async function onSubmit() {
                  for numbers only, which is why the numbers are alone. -->
             <button
                 type="button"
-                class="flex shrink-0 items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-label-2 transition-colors hover:text-label"
+                class="flex shrink-0 items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[14px] font-medium text-label-2 transition-colors hover:text-label"
                 :aria-label="t('checklist.editSetup')"
                 @click="editSetup"
             >
@@ -844,9 +933,9 @@ async function onSubmit() {
                 type="button"
                 :aria-current="item.code === activeSection ? 'true' : undefined"
                 :class="[
-                    'shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors',
+                    'shrink-0 rounded-full px-3 py-1.5 text-[14px] font-medium transition-colors',
                     item.code === activeSection
-                        ? 'bg-accent text-white'
+                        ? 'bg-accent text-accent-ink'
                         : 'bg-surface text-label-2 hover:text-label',
                 ]"
                 @click="activeSection = item.code"
@@ -855,15 +944,28 @@ async function onSubmit() {
             </button>
         </nav>
 
-        <div class="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:gap-6">
+        <div class="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[17rem_minmax(0,1fr)] md:gap-7">
             <!--
-                The same navigation with the titles restored. A number alone is
-                a thing to count through; a title is a thing to choose. The
-                width exists here, so it is spent on saying what the sections
-                are.
+                The rail holds the whole visit: what is being assessed, the
+                sections of it, and where it stands. The score used to be a bar
+                across the foot of the page, which put the state of the visit
+                as far from the list of sections as the layout allowed and
+                spent a row of the working area on it.
             -->
+            <div class="hidden min-h-0 md:flex md:flex-col md:pb-6">
+                <div class="mb-3 rounded-surface bg-accent-soft px-3.5 py-3">
+                    <span class="eyebrow text-accent">{{ t('checklist.currentVisit') }}</span>
+                    <p class="mt-1 text-[15px] font-semibold leading-snug">
+                        {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
+                    </p>
+                </div>
+
+                <span class="eyebrow px-3 pb-1.5 text-label-3">
+                    {{ t('checklist.sections') }}
+                </span>
+
             <nav
-                class="scroll-thin hidden md:block md:overflow-y-auto md:pb-6"
+                class="scroll-thin min-h-0 flex-1 md:overflow-y-auto"
                 :aria-label="t('checklist.sections')"
             >
                 <!-- Before the sections, because that is where it comes in the
@@ -872,7 +974,7 @@ async function onSubmit() {
                      is where somebody looks for where a visit can be. -->
                 <button
                     type="button"
-                    class="mb-1 flex w-full items-center gap-2.5 rounded-card px-3 py-2.5 text-left text-[14px] text-label-2 transition-colors hover:bg-surface hover:text-label"
+                    class="mb-1 flex w-full items-center gap-2.5 rounded-card px-3 py-2.5 text-left text-[15px] text-label-2 transition-colors hover:bg-surface hover:text-label"
                     @click="editSetup"
                 >
                     <PhBuildings :size="16" class="shrink-0" aria-hidden="true" />
@@ -885,16 +987,37 @@ async function onSubmit() {
                     type="button"
                     :aria-current="item.code === activeSection ? 'true' : undefined"
                     :class="[
-                        'flex w-full items-baseline gap-2.5 rounded-card px-3 py-2.5 text-left',
-                        'text-[14px] transition-colors',
+                        'relative flex w-full items-baseline gap-2.5 rounded-card px-3 py-2.5 text-left',
+                        'text-[15px] transition-colors',
                         item.code === activeSection
-                            ? 'bg-accent-soft font-semibold text-accent'
-                            : 'text-label-2 hover:bg-surface hover:text-label',
+                            ? 'bg-surface font-semibold text-accent shadow-pick'
+                            : 'text-label-2 hover:bg-surface/70 hover:text-label',
                     ]"
                     @click="activeSection = item.code"
                 >
-                    <span class="tnum shrink-0 font-semibold">{{ item.number }}</span>
-                    <span class="min-w-0 flex-1">{{ text(item.title) }}</span>
+                    <span class="tnum shrink-0 font-bold">{{ item.number }}</span>
+
+                    <span class="min-w-0 flex-1">
+                        {{ text(item.title) }}
+
+                        <!--
+                            How far through this section is, drawn rather than
+                            counted. The count is still there and still exact;
+                            the bar is what makes a rail of five sections
+                            answerable at a glance, which a column of fractions
+                            never was. Hidden from assistive technology because
+                            the fraction beside it says the same thing in words.
+                        -->
+                        <span
+                            aria-hidden="true"
+                            class="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-track"
+                        >
+                            <span
+                                class="block h-full rounded-full bg-accent transition-[width] duration-200"
+                                :style="{ width: sectionFilled(item.code) }"
+                            ></span>
+                        </span>
+                    </span>
 
                     <!-- A tick when there is nothing left, the count when there
                          is. Both in the faintest label colour: this is the
@@ -903,16 +1026,70 @@ async function onSubmit() {
                     <PhCheck
                         v-if="sectionProgress.get(item.code)?.done"
                         :size="14"
-                        class="mt-0.5 shrink-0 self-start text-label-3"
+                        class="mt-0.5 shrink-0 self-start text-accent"
                         :aria-label="t('checklist.sectionDone')"
                     />
-                    <span v-else class="tnum shrink-0 self-start text-[12px] text-label-3">
+                    <span v-else class="tnum shrink-0 self-start text-[13px] text-label-3">
                         {{ sectionProgress.get(item.code)?.answered ?? 0 }}/{{
                             sectionProgress.get(item.code)?.expected ?? 0
                         }}
                     </span>
                 </button>
             </nav>
+
+                <!--
+                    Where the visit stands, at the foot of the rail. Dark on a
+                    light page because it is the one figure somebody looks up
+                    rather than reads past, and a tile that dark is found
+                    without being hunted for.
+                -->
+                <div class="mt-3 rounded-surface bg-chrome px-4 py-3.5 text-chrome-ink">
+                    <span class="eyebrow text-chrome-ink/55">
+                        {{ progress.isComplete ? t('checklist.runningScore') : t('checklist.progress2') }}
+                    </span>
+
+                    <div class="mt-1.5 flex items-baseline gap-2.5">
+                        <span class="tnum text-[30px] font-extrabold leading-none">
+                            <template v-if="progress.isComplete">
+                                {{
+                                    assessment.result.value.percentage === null
+                                        ? '—'
+                                        : formatPercent(
+                                              assessment.result.value.percentage,
+                                              assessment.result.value.roundDp,
+                                          )
+                                }}
+                            </template>
+                            <template v-else>{{ progress.answered }}/{{ progress.total }}</template>
+                        </span>
+
+                        <span
+                            v-if="progress.isComplete"
+                            :class="['tnum rounded-full px-2 py-0.5 text-[12px] font-semibold', levelTone]"
+                        >
+                            {{
+                                assessment.result.value.level === null
+                                    ? t('score.notScorable')
+                                    : t('score.level', { level: assessment.result.value.level })
+                            }}
+                        </span>
+                    </div>
+
+                    <span
+                        aria-hidden="true"
+                        class="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-white/15"
+                    >
+                        <span
+                            class="block h-full rounded-full bg-brass-fill transition-[width] duration-200"
+                            :style="{ width: visitFilled }"
+                        ></span>
+                    </span>
+
+                    <p class="tnum mt-2.5 truncate text-[12.5px] text-chrome-ink/60">
+                        {{ savedLabel }}
+                    </p>
+                </div>
+            </div>
 
             <div class="flex min-h-0 flex-1 flex-col">
                 <!-- Section 4 is answered once per pathogen, so it gets its own
@@ -929,10 +1106,10 @@ async function onSubmit() {
                         type="button"
                         :aria-current="pathogen.name === activePathogen ? 'true' : undefined"
                         :class="[
-                            'shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors',
+                            'shrink-0 rounded-full px-3 py-1.5 text-[14px] font-medium transition-colors',
                             pathogen.name === activePathogen
-                                ? 'bg-label text-ground'
-                                : 'bg-surface text-label-2',
+                                ? 'bg-accent text-accent-ink shadow-pick'
+                                : 'bg-surface text-label-2 hover:text-label',
                         ]"
                         @click="activePathogen = pathogen.name"
                     >
@@ -940,10 +1117,21 @@ async function onSubmit() {
                     </button>
                 </nav>
 
-                <main ref="questionList" class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:px-0">
-                    <div class="overflow-hidden rounded-card bg-surface md:rounded-surface md:shadow-surface">
-                        <div v-for="(question, index) in section.questions" :key="question.code">
-                            <div v-if="index > 0" class="ml-[49px] border-t border-hairline"></div>
+                <main ref="questionList" class="scroll-thin flex-1 overflow-y-auto px-3 pb-6 md:px-0">
+                    <!--
+                        A card per question rather than one grouped list.
+                        Fifty-nine rows separated by hairlines is a table, and a
+                        table is what an assessor reads down rather than works
+                        through; the gap between cards is what makes the current
+                        question the object on screen rather than a line in a
+                        ledger.
+                    -->
+                    <div class="flex flex-col gap-4">
+                        <div
+                            v-for="question in section.questions"
+                            :key="question.code"
+                            class="rounded-card border-hairline bg-surface md:rounded-surface md:border md:shadow-surface"
+                        >
                             <QuestionRow
                                 :question="question"
                                 :response="
@@ -964,7 +1152,7 @@ async function onSubmit() {
                         </div>
 
                         <div
-                            class="flex justify-between border-t border-hairline px-3.5 py-3 text-[13px] text-label-2"
+                            class="flex justify-between rounded-card border border-hairline bg-surface px-5 py-4 text-[15px] text-label-2 md:rounded-surface"
                         >
                             <span>{{ t('checklist.sectionScore') }}</span>
                             <strong class="tnum font-semibold text-label">
@@ -1000,7 +1188,7 @@ async function onSubmit() {
                         <button
                             v-if="previousSection"
                             type="button"
-                            class="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-card bg-surface px-3 py-2.5 text-[15px] font-medium text-label-2 transition-colors hover:text-label"
+                            class="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-card border border-hairline bg-surface px-3 py-2.5 text-[16px] font-medium text-label-2 transition-colors hover:bg-accent-soft hover:text-accent"
                             @click="goToSection(previousSection.code)"
                         >
                             <PhArrowLeft :size="16" aria-hidden="true" />
@@ -1010,7 +1198,7 @@ async function onSubmit() {
                         <button
                             v-if="nextPathogen"
                             type="button"
-                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-label px-3 py-2.5 text-[15px] font-semibold text-ground transition-opacity hover:opacity-90"
+                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-label px-3 py-2.5 text-[16px] font-semibold text-ground transition-opacity hover:opacity-90"
                             @click="goToPathogen(nextPathogen.name)"
                         >
                             <span class="truncate">{{ nextPathogen.name }}</span>
@@ -1020,7 +1208,7 @@ async function onSubmit() {
                         <button
                             v-else-if="nextSection"
                             type="button"
-                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-[16px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
                             @click="goToSection(nextSection.code)"
                         >
                             <span class="truncate">
@@ -1033,7 +1221,7 @@ async function onSubmit() {
                         <button
                             v-else
                             type="button"
-                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+                            class="flex min-h-11 flex-[2] items-center justify-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-[16px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
                             @click="stage = 'review'"
                         >
                             <span class="truncate">{{ t('checklist.review') }}</span>
@@ -1047,8 +1235,15 @@ async function onSubmit() {
         <!-- Full width under both columns. The running score and the level are
              about the whole visit, not the section on screen, so pinning them
              to the content column would say otherwise. -->
+        <!--
+            The phone gets a bar it can reach, not a copy of the desktop rail.
+            Pinned to the bottom because that is where a thumb is while the
+            other hand holds a specimen rack, padded past the home indicator,
+            and carrying only the two things worth a tap from anywhere in a
+            section: how far through the visit is, and the way out of it.
+        -->
         <footer
-            class="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6"
+            class="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:hidden"
         >
             <div class="min-w-0">
                 <!--
@@ -1065,7 +1260,7 @@ async function onSubmit() {
                     Progress takes its place, which is the question actually
                     being asked mid-visit — how much is left.
                 -->
-                <div class="tnum text-[22px] font-bold tracking-tight">
+                <div class="tnum text-[24px] font-bold tracking-tight">
                     <template v-if="progress.isComplete">
                         {{
                             assessment.result.value.percentage === null
@@ -1094,7 +1289,7 @@ async function onSubmit() {
                      until there is a finished assessment behind it. -->
                 <span
                     v-if="progress.isComplete"
-                    :class="['rounded-full px-3 py-1.5 text-[13px] font-semibold', levelTone]"
+                    :class="['rounded-full px-3 py-1.5 text-[14px] font-semibold', levelTone]"
                 >
                     {{
                         assessment.result.value.level === null
@@ -1104,7 +1299,7 @@ async function onSubmit() {
                 </span>
                 <button
                     type="button"
-                    class="rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-white"
+                    class="min-h-12 rounded-card bg-accent px-5 text-[15px] font-semibold text-accent-ink"
                     @click="stage = 'review'"
                 >
                     {{ t('checklist.review') }}

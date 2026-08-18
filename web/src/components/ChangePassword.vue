@@ -20,6 +20,17 @@ import { t } from '@/i18n'
 
 const emit = defineEmits<{ changed: [] }>()
 
+/**
+ * Two homes, one form.
+ *
+ * On its own it is the screen that blocks a first sign-in with a password
+ * somebody else set, so it owns the viewport and says why it is there. Inside
+ * the account page it is a panel in a card that already has a heading, and a
+ * second heading plus a language switcher would be furniture repeated a
+ * centimetre apart.
+ */
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 /** Kept in step with AuthService::MIN_PASSWORD_LENGTH. */
 const MIN_LENGTH = 12
 
@@ -62,76 +73,74 @@ async function submit() {
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center bg-ground px-5">
-        <header class="mb-7 flex items-start justify-between gap-3">
+    <div
+        :class="
+            embedded
+                ? 'w-full'
+                : 'mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center bg-ground px-5'
+        "
+    >
+        <header v-if="!embedded" class="mb-7 flex items-start justify-between gap-3">
             <div>
-                <h1 class="text-[30px] font-bold tracking-tight">{{ t('password.title') }}</h1>
-                <p class="mt-1 text-[15px] text-label-2">{{ t('password.why') }}</p>
+                <h1 class="text-[32px] font-bold tracking-tight">{{ t('password.title') }}</h1>
+                <p class="mt-1 text-[16px] text-label-2">{{ t('password.why') }}</p>
             </div>
             <div class="mt-1.5"><LocaleSwitcher /></div>
         </header>
 
-        <form class="flex flex-col gap-3" @submit.prevent="submit">
-            <div class="overflow-hidden rounded-card bg-surface sm:rounded-surface sm:shadow-surface">
-                <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[104px] shrink-0 text-[15px] text-label-2">
-                        {{ t('password.current') }}
-                    </span>
-                    <input
-                        v-model="current"
-                        type="password"
-                        autocomplete="current-password"
-                        class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                    />
-                </label>
+        <form class="flex flex-col gap-4" @submit.prevent="submit">
+            <!-- Label above the field rather than beside it. The row idiom
+                 this replaces gave every input a fixed 104px gutter, which on
+                 a phone left a password box a little over half the width of
+                 the screen — and inside the account page it disagreed with
+                 every other form in the application. -->
+            <label class="flex flex-col gap-1.5">
+                <span class="text-[14px] font-medium text-label-2">
+                    {{ t('password.current') }}
+                </span>
+                <input
+                    v-model="current"
+                    type="password"
+                    autocomplete="current-password"
+                    class="field"
+                />
+            </label>
 
-                <div class="ml-[128px] border-t border-hairline"></div>
+            <label class="flex flex-col gap-1.5">
+                <span class="text-[14px] font-medium text-label-2">{{ t('password.new') }}</span>
+                <input v-model="next" type="password" autocomplete="new-password" class="field" />
+            </label>
 
-                <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[104px] shrink-0 text-[15px] text-label-2">
-                        {{ t('password.new') }}
-                    </span>
-                    <input
-                        v-model="next"
-                        type="password"
-                        autocomplete="new-password"
-                        class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                    />
-                </label>
+            <label class="flex flex-col gap-1.5">
+                <span class="text-[14px] font-medium text-label-2">
+                    {{ t('password.confirm') }}
+                </span>
+                <input
+                    v-model="confirmation"
+                    type="password"
+                    autocomplete="new-password"
+                    class="field"
+                />
+            </label>
 
-                <div class="ml-[128px] border-t border-hairline"></div>
-
-                <label class="flex items-center gap-3 px-3.5 py-3">
-                    <span class="w-[104px] shrink-0 text-[15px] text-label-2">
-                        {{ t('password.confirm') }}
-                    </span>
-                    <input
-                        v-model="confirmation"
-                        type="password"
-                        autocomplete="new-password"
-                        class="w-full bg-transparent text-[17px] outline-none placeholder:text-label-3"
-                    />
-                </label>
-            </div>
-
-            <p v-if="tooShort" class="px-1 text-[13px] text-label-2">
+            <p v-if="tooShort" class="text-[14px] text-label-2">
                 {{ t('password.tooShort', { count: MIN_LENGTH }) }}
             </p>
-            <p v-else-if="mismatched" class="px-1 text-[13px] text-label-2">
+            <p v-else-if="mismatched" class="text-[14px] text-label-2">
                 {{ t('password.mismatch') }}
             </p>
 
-            <p v-if="error !== ''" class="px-1 text-[13px] font-medium text-no">{{ error }}</p>
+            <p v-if="error !== ''" class="text-[14px] font-medium text-no">{{ error }}</p>
 
             <button
                 type="submit"
                 :disabled="!canSubmit"
-                class="mt-1 rounded-card bg-accent py-3.5 text-[17px] font-semibold text-white transition-opacity disabled:opacity-40"
+                class="mt-1 min-h-12 rounded-card bg-accent px-5 text-[16px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40"
             >
                 {{ busy ? t('password.saving') : t('password.save') }}
             </button>
 
-            <p class="px-1 pt-1 text-center text-[13px] text-label-2">
+            <p v-if="!embedded" class="pt-1 text-center text-[14px] text-label-2">
                 {{ t('password.signsOutOthers') }}
             </p>
         </form>
