@@ -36,7 +36,7 @@
  *   It used to run red to green, which spent the response palette on a badge
  *   and left a Level 0 site looking like it had answered No to something.
  *
- *   accent, chrome and brass — a cobalt blue for anything interactive, the
+ *   accent, chrome and brass — an azure blue for anything interactive, the
  *   deep navy behind it for the app bar and the sign-in panel, and brass for
  *   the marks of record: the rule under a report title, a seal, a
  *   certification stamp. None of the three can be mistaken for a response.
@@ -46,6 +46,22 @@
  * is indistinguishable from black text. The screen read as grey on beige with
  * no colour in it at all. Chrome is where a navy that heavy belongs: behind
  * white text, at the size of a bar.
+ *
+ * An accent is for marks, not for fields. A link, an icon, a chosen chip, a
+ * button — things the eye finds. Spent across a field, the same blue stops
+ * pointing at anything and just shouts: twelve bars of it on the dashboard
+ * read as a blue panel with numbers on it rather than as a year of work. So
+ * an area of the accent hue is a token of its own, lightened until it sits
+ * under its own labels instead of competing with them. It is never text and
+ * never carries text, which is what lets it be as light as it is.
+ *
+ * The accent itself is as light as it can be. One token is both the link and
+ * the fill behind white text, so it answers to 4.5:1 twice over — from above, as text on the
+ * white card, and from below, as the ground under the white word on a button.
+ * Both bounds move the same way, and #2563EB sits at 5.2:1 against white with
+ * 4.6:1 left over for accent text on the soft tint. A blue lighter than this
+ * is a blue that stops being readable as a link; if one is ever wanted, the
+ * fills and the text have to part company and become two tokens.
  */
 
 :root {
@@ -57,13 +73,14 @@
     --c-label:        #1D2939;
     --c-label-2:      #667085;
     --c-label-3:      #98A2B3;
-    --c-accent:       #3641F5;
-    --c-accent-hover: #2A31D8;
+    --c-accent:       #2563EB;
+    --c-accent-hover: #1D4ED8;
     --c-accent-ink:   #FFFFFF;
     --c-chrome:       #101828;
     --c-chrome-ink:   #F9FAFB;
     --c-on-response:  #FFFFFF;
     --c-accent-soft:  #ECF3FF;
+    --c-accent-area:  #7BA6F2;
     --c-brass:        #966B1E;
     --c-brass-fill:   #C08A28;
     --c-brass-soft:   rgba(192, 138, 40, 0.14);
@@ -104,13 +121,14 @@
         --c-label:        #F2F4F7;
         --c-label-2:      #98A2B3;
         --c-label-3:      #7A879C;
-        --c-accent:       #7592FF;
-        --c-accent-hover: #9CB9FF;
+        --c-accent:       #7CA9FF;
+        --c-accent-hover: #A6C6FF;
         --c-accent-ink:   #0C111D;
         --c-chrome:       #0C111D;
         --c-chrome-ink:   #F2F4F7;
         --c-on-response:  #0B1220;
-        --c-accent-soft:  rgba(117, 146, 255, 0.16);
+        --c-accent-soft:  rgba(124, 169, 255, 0.16);
+        --c-accent-area:  #4C74BE;
         --c-brass:        #E0AC55;
         --c-brass-fill:   #C99539;
         --c-brass-soft:   rgba(224, 172, 85, 0.18);
@@ -153,13 +171,14 @@
     --c-label:        #F2F4F7;
     --c-label-2:      #98A2B3;
     --c-label-3:      #7A879C;
-    --c-accent:       #7592FF;
-    --c-accent-hover: #9CB9FF;
+    --c-accent:       #7CA9FF;
+    --c-accent-hover: #A6C6FF;
     --c-accent-ink:   #0C111D;
     --c-chrome:       #0C111D;
     --c-chrome-ink:   #F2F4F7;
     --c-on-response:  #0B1220;
-    --c-accent-soft:  rgba(117, 146, 255, 0.16);
+    --c-accent-soft:  rgba(124, 169, 255, 0.16);
+    --c-accent-area:  #4C74BE;
     --c-brass:        #E0AC55;
     --c-brass-fill:   #C99539;
     --c-brass-soft:   rgba(224, 172, 85, 0.18);
@@ -199,13 +218,14 @@
     --c-label:        #1D2939;
     --c-label-2:      #667085;
     --c-label-3:      #98A2B3;
-    --c-accent:       #3641F5;
-    --c-accent-hover: #2A31D8;
+    --c-accent:       #2563EB;
+    --c-accent-hover: #1D4ED8;
     --c-accent-ink:   #FFFFFF;
     --c-chrome:       #101828;
     --c-chrome-ink:   #F9FAFB;
     --c-on-response:  #FFFFFF;
     --c-accent-soft:  #ECF3FF;
+    --c-accent-area:  #7BA6F2;
     --c-brass:        #966B1E;
     --c-brass-fill:   #C08A28;
     --c-brass-soft:   rgba(192, 138, 40, 0.14);
@@ -249,6 +269,7 @@
     --color-accent-hover: var(--c-accent-hover);
     --color-accent-ink:   var(--c-accent-ink);
     --color-accent-soft:  var(--c-accent-soft);
+    --color-accent-area:  var(--c-accent-area);
     --color-chrome:       var(--c-chrome);
     --color-chrome-ink:   var(--c-chrome-ink);
     --color-on-response:  var(--c-on-response);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhCaretDown, PhChartBar, PhSignOut, PhUserCircle } from '@phosphor-icons/vue'
+import { PhArrowLeft, PhCaretDown, PhChartBar, PhSignOut, PhUserCircle } from '@phosphor-icons/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -28,8 +28,9 @@ import { syncAll } from '@/sync/engine'
  *
  * Deliberately slim. This sits above a fifty-nine question form worked
  * standing up, and every row it takes is a row of questions somebody has to
- * scroll past. Brand, sync state, language, and a menu — nothing else earns
- * the height.
+ * scroll past. Sync state, language, a menu, and either the brand or — on a
+ * phone, where a screen has somewhere to go back to — the way back. Nothing
+ * else earns the height.
  *
  * The sync badge and the language switcher moved here from the screens below.
  * They were repeated on three of them and absent from the fourth, which is
@@ -44,11 +45,26 @@ import { syncAll } from '@/sync/engine'
  * device rather than of whatever screen happens to be open, so it sits under
  * the bar, in the same column as everything else, and is written once.
  */
+/**
+ * The bar carries where you are, on a phone.
+ *
+ * A screen with somewhere to go back to used to draw its own row for it,
+ * under a bar showing a logo. That is two rows of chrome above the work, and
+ * on the checklist — where the header does not scroll away — it was two rows
+ * for the length of a fifty-nine question visit. The logo is the part nobody
+ * needs while they are working, so on a phone the way out takes its place and
+ * the screen below gets the row back. From 768px up there is room for both,
+ * and the brand comes back with the screen keeping its own way out.
+ */
 defineProps<{
     storage?: StorageReport | null
     saveState?: SaveState
     saveError?: string
+    /** What the phone bar says beside the back arrow. Absent, it shows the brand. */
+    backLabel?: string
 }>()
+
+const emit = defineEmits<{ back: [] }>()
 
 const open = ref(false)
 
@@ -99,12 +115,32 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
         -->
         <header class="border-b border-hairline bg-surface">
             <div class="mx-auto flex h-[64px] w-full max-w-[1536px] items-center gap-3 px-4 sm:px-6">
+                <!-- On a phone, where you are instead of who made the app. -->
+                <button
+                    v-if="backLabel !== undefined"
+                    type="button"
+                    class="-ml-1 flex min-h-11 min-w-0 shrink items-center gap-1.5 pr-1 text-left text-[15px] font-medium text-accent md:hidden"
+                    @click="emit('back')"
+                >
+                    <PhArrowLeft :size="15" class="shrink-0" aria-hidden="true" />
+                    <span class="truncate">{{ backLabel }}</span>
+                </button>
+
                 <span
-                    class="flex size-8 shrink-0 items-center justify-center rounded-card bg-accent text-accent-ink"
+                    :class="[
+                        'size-8 shrink-0 items-center justify-center rounded-card bg-accent text-accent-ink',
+                        backLabel === undefined ? 'flex' : 'hidden md:flex',
+                    ]"
                 >
                     <PhChartBar :size="17" weight="bold" aria-hidden="true" />
                 </span>
-                <span class="text-[17px] font-bold tracking-[-0.02em]">SPI-RDT</span>
+                <span
+                    :class="[
+                        'text-[17px] font-bold tracking-[-0.02em]',
+                        backLabel === undefined ? '' : 'hidden md:inline',
+                    ]"
+                    >SPI-RDT</span
+                >
 
                 <span class="flex-1"></span>
 
@@ -126,9 +162,22 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                             {{ initials }}
                         </span>
                         <!-- The name is the point of showing anything here, so
-                             it is what survives when the screen is narrow. -->
-                        <span class="max-w-[9rem] truncate">{{ user?.fullName }}</span>
-                        <PhCaretDown :size="13" class="shrink-0" aria-hidden="true" />
+                             it is what survives when the screen is narrow —
+                             unless the bar is already carrying where you are,
+                             in which case the circle stands for it and the
+                             menu underneath spells it out. -->
+                        <span
+                            :class="[
+                                'max-w-[9rem] truncate',
+                                backLabel === undefined ? '' : 'hidden md:inline',
+                            ]"
+                            >{{ user?.fullName }}</span
+                        >
+                        <PhCaretDown
+                            :size="13"
+                            :class="['shrink-0', backLabel === undefined ? '' : 'hidden md:block']"
+                            aria-hidden="true"
+                        />
                     </button>
 
                     <div
@@ -136,7 +185,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                         role="menu"
                         class="absolute right-0 top-full z-10 mt-1 w-56 overflow-hidden rounded-surface bg-surface shadow-surface"
                     >
-                        <p class="truncate px-3.5 pb-1 pt-3 text-[14px] text-label-3">
+                        <p class="truncate px-3.5 pt-3 text-[14px] font-semibold">
+                            {{ user?.fullName }}
+                        </p>
+                        <p class="truncate px-3.5 pb-1 text-[13px] text-label-3">
                             {{ user?.email }}
                         </p>
 

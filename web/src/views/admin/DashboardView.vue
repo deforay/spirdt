@@ -184,7 +184,7 @@ function readPalette(): void {
         no: style.getPropertyValue('--color-no').trim() || '#B3261E',
         partial: style.getPropertyValue('--color-partial').trim() || '#9A5B00',
         yes: style.getPropertyValue('--color-yes').trim() || '#1E7B34',
-        accent: style.getPropertyValue('--color-accent').trim() || '#3641F5',
+        accent: style.getPropertyValue('--color-accent').trim() || '#2563EB',
         level0: style.getPropertyValue('--color-level-0').trim() || '#E7EAEF',
         level1: style.getPropertyValue('--color-level-1').trim() || '#CFD9E6',
         level2: style.getPropertyValue('--color-level-2').trim() || '#A6BAD1',
@@ -412,7 +412,11 @@ const radar = computed(() => {
                 symbolSize: 4,
                 lineStyle: { width: 2, color: palette.value.accent },
                 itemStyle: { color: palette.value.accent },
-                areaStyle: { color: 'rgba(10,110,203,0.14)' },
+                // The accent at 12%: a wash under the outline, not a field
+                // of blue. Written out rather than taken from the token
+                // because ECharts wants a colour it can parse, and the token
+                // is opaque.
+                areaStyle: { color: 'rgba(37,99,235,0.12)' },
                 data: [
                     {
                         value: sections.map((section) => section.mean),
@@ -895,7 +899,7 @@ watch(locale, () => load())
                         </span>
                         <span
                             class="block rounded-md"
-                            :class="month.count === 0 ? 'bg-track' : 'bg-accent'"
+                            :class="month.count === 0 ? 'bg-track' : 'bg-accent-area'"
                             :style="{
                                 height: month.count === 0 ? '4px' : `${columnHeight(month.count)}%`,
                             }"

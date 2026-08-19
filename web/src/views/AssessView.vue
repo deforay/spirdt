@@ -700,6 +700,12 @@ async function onSubmit() {
     :storage="assessment.storage.value"
     :save-state="assessment.saveState.value"
     :save-error="assessment.saveError.value"
+    :back-label="
+        stage === 'checklist'
+            ? (assessment.assessment.value?.siteName ?? t('checklist.loading'))
+            : undefined
+    "
+    @back="leaveVisit"
   >
 
     <SitePicker v-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
@@ -707,7 +713,7 @@ async function onSubmit() {
     <!-- Part A and the pathogens, before a single question is answered. -->
     <div
         v-else-if="stage === 'setup'"
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6"
+        class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6"
     >
 
         <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
@@ -832,16 +838,44 @@ async function onSubmit() {
         same list; only one is in the accessibility tree at a time, because two
         copies of the same navigation is two things to tab through.
     -->
-    <div v-else class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6">
+    <!--
+        Fluid until there is a reason not to be.
 
-        <header class="flex flex-col gap-0.5 px-4 pb-2 pt-1.5 md:px-0 md:pt-6">
-            <div class="flex items-center justify-between gap-2">
-                <!--
-                    Out of the visit, without ending it. Everything is already
-                    written to the device, so leaving costs nothing and the
-                    visit is waiting under Unfinished when they come back.
-                    Without this the checklist is a room with no door.
-                -->
+        The column used to stop at 430px, which is a phone held in the hand and
+        nothing else. Anything between that and 640px — a small tablet, a phone
+        turned sideways, a browser window pulled narrow — got a 430px strip of
+        questions with an empty margin down both sides, while the bar above it
+        ran the full width. The caps that matter are the ones that keep a line
+        of text readable, and those start at 640px.
+    -->
+    <div v-else class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6">
+
+        <!--
+            On a phone this is a bar, not a run of headings.
+
+            Everything above the questions is fixed furniture — the questions
+            scroll under it — so what used to be four bands floating on the
+            grey page was four objects, each taking its own slice of a screen
+            that has none to spare, on every section, all visit. Now it is two:
+            the section, and the row for changing it. White and edged, it reads
+            as one piece of chrome the way the top bar above it does, and the
+            questions below are plainly the page.
+
+            The way out went up into that top bar, where the brand was — a
+            phone has no room for a logo above a working screen — and the
+            eyebrow saying which of five this is went with it, because the
+            numbered row below says the same thing in larger type and with the
+            other four to compare against. Two rows saved, and what is left can
+            have some air around it.
+        -->
+        <header class="flex flex-col border-b border-hairline bg-surface px-4 pb-3 pt-3 md:gap-0.5 md:border-b-0 md:bg-transparent md:px-0 md:pb-2 md:pt-6">
+            <!-- Out of the visit, without ending it. Everything is already
+                 written to the device, so leaving costs nothing and the visit
+                 is waiting under Unfinished when they come back. Without this
+                 the checklist is a room with no door. On a phone this door is
+                 in the top bar; this is the one for a desk, where the bar
+                 keeps the brand. -->
+            <div class="hidden items-center justify-between gap-3 md:flex">
                 <button
                     type="button"
                     class="-ml-1 flex min-h-11 flex-1 items-center gap-1 truncate pr-1 text-left text-[14px] text-accent"
@@ -853,39 +887,37 @@ async function onSubmit() {
                     </span>
                 </button>
             </div>
-            <!-- Where you are, then what it is called. The eyebrow carries the
-                 position so the title does not have to, and the brass rule is
-                 the mark this app gives to the name of a thing of record.
-                 How much of it is answered sits beside the name once there is
-                 room, because it is a fact about the section rather than a
-                 line of its own. -->
+
             <div class="flex items-end justify-between gap-4">
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-none">
-                    <div class="flex items-baseline justify-between gap-3">
-                        <span class="eyebrow text-brass">
-                            {{
-                                t('checklist.sectionOf', {
-                                    number: sectionNumber,
-                                    total: visibleSections.length,
-                                })
-                            }}
-                        </span>
+                    <span class="eyebrow hidden text-brass md:block">
+                        {{
+                            t('checklist.sectionOf', {
+                                number: sectionNumber,
+                                total: visibleSections.length,
+                            })
+                        }}
+                    </span>
 
-                        <!-- On a phone the count rides the eyebrow rather than
-                             taking a line of its own under the title. It is
-                             four words about the section; a row to itself cost
-                             more of the screen than the fact is worth. At a
-                             desk it is the chip on the right instead. -->
-                        <span class="tnum shrink-0 text-[13px] text-label-2 md:hidden">
-                            {{
-                                t('checklist.answered', {
-                                    answered: answeredHere,
-                                    total: section.questions.length,
-                                })
-                            }}
-                        </span>
-                    </div>
-                    <h1 class="rule-brass self-start pb-1 text-[25px] font-extrabold leading-tight md:pb-1.5 md:text-[32px]">
+                    <!--
+                        The rule runs the column on a phone rather than
+                        stopping wherever the words happen to stop. Cut to the
+                        text it looked like a mistake — worse on a title that
+                        wraps, where it measured the longer of two lines — and
+                        a mark that carries the institution cannot look
+                        accidental. At a desk the title sits beside the
+                        progress chip, so there the rule still belongs to the
+                        words.
+
+                        Nothing shares this line. "8 of 8 answered" set beside
+                        the title pushed most section names onto a second line,
+                        which is a whole line of screen spent on a fact the
+                        switcher underneath already draws: the bar under the
+                        current number is that fraction. The exact figure for
+                        the visit is in the bar across the foot of the screen,
+                        where it is the one somebody looks up.
+                    -->
+                    <h1 class="rule-brass self-stretch pb-2 text-[25px] font-extrabold leading-tight md:self-start md:pb-1.5 md:text-[32px]">
                         {{ text(section.title) }}
                     </h1>
                 </div>
@@ -916,83 +948,94 @@ async function onSubmit() {
             <p v-if="instrumentUntranslated" class="text-[13px] leading-snug text-label-2">
                 {{ t('locale.instrumentNote') }}
             </p>
-        </header>
 
-        <!--
-            The jumper, for going out of order. Moving on in order is a
-            full-width button at the end of the section, where the assessor
-            finishes; this row is for the other case — the section that was
-            skipped because the store room was locked, being come back to.
+            <!--
+                The jumper, for going out of order. Moving on in order is a
+                full-width button at the end of the section, where the assessor
+                finishes; this row is for the other case — the section that was
+                skipped because the store room was locked, being come back to.
 
-            Numbers only, because a phone has room for numbers only. But a
-            number on its own answers "which section is this" and not "which
-            ones are still owed", which is the question somebody scanning this
-            row is actually asking. Each carries the fill bar the desk rail
-            draws under its title, so a full bar means a finished section and
-            the row says where the work is left at a glance.
+                One groove with the current section filled in it, which is
+                the shape this app already uses on a phone for a set of
+                exclusive choices — it is the response switch under every
+                question, in smaller clothes. Five separate cards floating on
+                the page said five separate things; a switch says one of these,
+                and you are on it. The current one is filled rather than merely
+                lifted, because this is the row an assessor glances at from
+                arm's length on a bench, and a white chip on a pale groove is
+                not a glance's worth of difference.
 
-            The sections share the width rather than sitting in a huddle of
-            small squares with a third of the row empty beside them. Five
-            sections of an even width read as the whole of the checklist —
-            which is what they are — and the width goes into the bars, which is
-            the part worth reading. They stop shrinking at 44px and the row
-            scrolls instead, for an instrument with more sections than this
-            one.
-        -->
-        <nav
-            class="scroll-thin flex gap-1.5 overflow-x-auto px-4 pb-2.5 md:hidden"
-            :aria-label="t('checklist.sections')"
-        >
-            <!-- Part A sits before Section 1 in the visit, so it sits before
-                 Section 1 here. An icon rather than a word: this row has room
-                 for numbers only, which is why the numbers are alone. It has
-                 no bar because it is not a section — it is answered before the
-                 checklist starts or the checklist does not start. -->
-            <button
-                type="button"
-                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface text-label-2 transition-colors hover:text-label"
-                :aria-label="t('checklist.editSetup')"
-                @click="editSetup"
+                Numbers only, because a phone has room for numbers only. But a
+                number on its own answers "which section is this" and not
+                "which ones are still owed", which is the question somebody
+                scanning this row is actually asking. Each carries the fill bar
+                the desk rail draws under its title, so a full bar means a
+                finished section and the row says where the work is left at a
+                glance.
+
+                The sections share the width evenly, because five sections of
+                an even width read as the whole of the checklist — which is
+                what they are — and the width goes into the bars, which is the
+                part worth reading. They stop shrinking at 40px and the groove
+                scrolls instead, for an instrument with more sections than this
+                one.
+            -->
+            <nav
+                class="scroll-thin mt-3 flex gap-1 overflow-x-auto rounded-[12px] bg-track p-1 md:hidden"
+                :aria-label="t('checklist.sections')"
             >
-                <PhBuildings :size="16" aria-hidden="true" />
-            </button>
-
-            <button
-                v-for="item in visibleSections"
-                :key="item.code"
-                type="button"
-                :aria-current="item.code === activeSection ? 'true' : undefined"
-                :aria-label="`${text(item.title)} — ${sectionFilled(item.code)}`"
-                :class="[
-                    'flex h-11 min-w-11 flex-1 basis-0 flex-col items-center justify-center gap-1.5 rounded-[10px] px-2',
-                    'text-[14px] font-semibold transition-colors',
-                    item.code === activeSection
-                        ? 'bg-accent text-accent-ink'
-                        : 'bg-surface text-label-2 hover:text-label',
-                ]"
-                @click="activeSection = item.code"
-            >
-                <span class="tnum leading-none">{{ item.number }}</span>
-
-                <!-- Hidden from assistive technology: how far through the
-                     section is, is already in the button's own label. -->
-                <span
-                    aria-hidden="true"
-                    :class="[
-                        'block h-1 w-full overflow-hidden rounded-full',
-                        item.code === activeSection ? 'bg-accent-ink/30' : 'bg-track',
-                    ]"
+                <!-- Part A sits before Section 1 in the visit, so it sits
+                     before Section 1 here. An icon rather than a word: this
+                     row has room for numbers only, which is why the numbers
+                     are alone. It has no bar because it is not a section — it
+                     is answered before the checklist starts or the checklist
+                     does not start. -->
+                <button
+                    type="button"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] text-label-3 transition-colors hover:text-label"
+                    :aria-label="t('checklist.editSetup')"
+                    @click="editSetup"
                 >
+                    <PhBuildings :size="16" aria-hidden="true" />
+                </button>
+
+                <button
+                    v-for="item in visibleSections"
+                    :key="item.code"
+                    type="button"
+                    :aria-current="item.code === activeSection ? 'true' : undefined"
+                    :aria-label="`${text(item.title)} — ${sectionFilled(item.code)}`"
+                    :class="[
+                        'flex h-10 min-w-10 flex-1 basis-0 flex-col items-center justify-center gap-1.5 rounded-[8px] px-2',
+                        'text-[14px] font-semibold transition-[background-color,color,box-shadow] duration-150',
+                        item.code === activeSection
+                            ? 'bg-accent text-accent-ink shadow-pick'
+                            : 'text-label-2 hover:text-label',
+                    ]"
+                    @click="activeSection = item.code"
+                >
+                    <span class="tnum leading-none">{{ item.number }}</span>
+
+                    <!-- Hidden from assistive technology: how far through the
+                         section is, is already in the button's own label. -->
                     <span
+                        aria-hidden="true"
                         :class="[
-                            'block h-full rounded-full transition-[width] duration-200',
-                            item.code === activeSection ? 'bg-accent-ink' : 'bg-accent',
+                            'block h-1 w-full overflow-hidden rounded-full',
+                            item.code === activeSection ? 'bg-accent-ink/30' : 'bg-surface',
                         ]"
-                        :style="{ width: sectionFilled(item.code) }"
-                    ></span>
-                </span>
-            </button>
-        </nav>
+                    >
+                        <span
+                            :class="[
+                                'block h-full rounded-full transition-[width] duration-200',
+                                item.code === activeSection ? 'bg-accent-ink' : 'bg-accent',
+                            ]"
+                            :style="{ width: sectionFilled(item.code) }"
+                        ></span>
+                    </span>
+                </button>
+            </nav>
+        </header>
 
         <div class="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[17rem_minmax(0,1fr)] md:gap-7">
             <!--
@@ -1167,7 +1210,11 @@ async function onSubmit() {
                     </button>
                 </nav>
 
-                <main ref="questionList" class="scroll-thin flex-1 overflow-y-auto px-3 pb-6 md:px-0">
+                <!-- Same 16px gutter as the header above and the bar below.
+                     At 12px the cards sat four pixels proud of everything else
+                     on the screen, which is not a difference anybody can name
+                     and is exactly the sort nobody can stop seeing. -->
+                <main ref="questionList" class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 pt-3 md:px-0 md:pt-0">
                     <!--
                         A card per question rather than one grouped list.
                         Fifty-nine rows separated by hairlines is a table, and a

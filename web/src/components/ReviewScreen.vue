@@ -245,7 +245,7 @@ function summaryOf(gap: Gap): string {
         causing it.
     -->
     <div
-        class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[680px] min-[900px]:max-w-[1536px] min-[900px]:px-6"
+        class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[680px] min-[900px]:max-w-[1536px] min-[900px]:px-6"
     >
         <header class="px-4 pb-3 pt-4 min-[900px]:px-0 min-[900px]:pt-6">
             <div class="mb-2 flex items-center gap-3">

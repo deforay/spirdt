@@ -89,7 +89,7 @@ const hiddenCount = computed(() => sites.value.length - mine.value.length)
 </script>
 
 <template>
-    <div class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-ground sm:max-w-[720px] sm:px-4">
+    <div class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[720px] sm:px-4">
         <header class="flex items-start justify-between gap-3 px-4 pb-5 pt-5 sm:px-0 sm:pt-8">
             <div>
                 <h1 class="text-[30px] font-bold tracking-[-0.02em]">{{ t('sites.title') }}</h1>
