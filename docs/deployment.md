@@ -13,6 +13,28 @@ The split is the same whichever web server you use:
 | `/assets/*` | `public/assets` | Fingerprinted by the build, cacheable for a year |
 | everything else | `public/index.html` | Unmatched paths are routes inside the app |
 
+## One command, on a bare server
+
+Everything below is what the installer automates, and reading it is worth the
+five minutes whether or not you run the script. On an Ubuntu LTS box with
+nothing on it yet:
+
+```bash
+wget -O spirdt-setup.sh https://raw.githubusercontent.com/deforay/spirdt/main/bin/setup.sh
+sudo bash spirdt-setup.sh
+```
+
+It installs the stack, clones the repository, creates the database with a
+generated password, writes `.env`, renders the vhost from the example in
+`deploy/apache/`, obtains a certificate, sets permissions, schedules the
+nightly sweep, and offers to create the first organisation. It is idempotent:
+run it again after a failure.
+
+Afterwards, `sudo bash bin/upgrade.sh` is the upgrade path. Both are described
+in the [CLI reference](cli.md#setup-and-upgrade).
+
+The rest of this page is the manual route, and what the script is doing.
+
 ## The app arrives built
 
 `public/` is committed. A checkout is deployable as it stands: Apache or nginx,
@@ -149,3 +171,13 @@ composer preflight
 template in the database rather than the one bundled with the app, and a
 missing row is reported as a refused sync days later rather than as a
 deployment failure.
+
+Then schedule the sweep, which is the one thing a fresh installation has no
+way to ask for:
+
+```
+17 2 * * * cd /var/www/spirdt && /usr/bin/php bin/housekeeping >> /var/www/spirdt/var/log/housekeeping.log 2>&1
+```
+
+It takes the nightly backup and prunes what is safe to prune. See
+[Housekeeping](operations.md#housekeeping).

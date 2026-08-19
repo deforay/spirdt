@@ -45,6 +45,7 @@
         "app:upgrade": "php bin/upgrade",
         "refresh": "php bin/refresh",
         "preflight": "php bin/preflight",
+        "housekeeping": "php bin/housekeeping",
         "serve": "php bin/serve",
         "migrate": "php bin/migrate",
         "test": "vendor/bin/phpunit",

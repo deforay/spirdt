@@ -98,14 +98,28 @@ composer app:upgrade -- --dry-run
 
 ## Housekeeping
 
-Not yet implemented. When it lands it will follow the pattern from the other house projects: **one** idempotent `bin/housekeeping` sweep, retention policy in a single array, with `--dry-run` and `--only=<target>`.
+One sweep, one crontab line, scheduled by `bin/setup.sh` at 02:17:
+
+```bash
+composer housekeeping             # every target
+composer housekeeping -- --dry-run
+composer housekeeping -- --only=api-logs
+```
+
+Targets are `tokens`, `api-logs`, `backup`, `exports`, `cache` and `own-log`. Retention is one array at the top of `bin/housekeeping`, so the question "how long do we keep exports?" is answered by reading four lines rather than five functions.
+
+A target that fails does not stop the others — a backup that failed is not a reason to leave expired tokens in the database for another day — and the script exits non-zero if any did, so cron's mail says something went wrong.
+
+The backup target does not trust `db-tools`' exit code. It checks the archive it just wrote is bigger than a kilobyte, because a compressed dump of nothing is a few hundred bytes and exits `0` — see the note under [Backups](#backups).
 
 The rule that matters most is which tables it must never touch:
 
 !!! danger "Never pruned"
     `assessments`, `answers`, `findings`, `assessment_scores`, `submissions_raw`, `audit_log`.
 
-    These are the audit trail. Integrity comes before disk space. Only `api_logs` and the auth token tables are prune candidates.
+    These are the audit trail. Integrity comes before disk space. Only `api_logs` and the auth token tables are prune candidates, and those are the only two the sweep touches.
+
+    `api_logs` is a diagnostic and holds a copy of the request body, which on this API means assessment answers; `audit_log` is evidence. They look alike and they are not the same thing.
 
 ## Logs
 

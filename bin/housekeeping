@@ -1,0 +1,412 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * The nightly sweep — one script, one crontab line.
+ *
+ * ONE ENTRY POINT ON PURPOSE. Four scheduled jobs mean four crontab lines to
+ * keep in step with the code, and the one nobody updates is the one that keeps
+ * running against a path that moved. What runs nightly is decided here, in the
+ * repository, versioned with everything else; bin/setup.sh schedules this file
+ * and nothing else.
+ *
+ * Every target is idempotent and safe to run at any hour: they delete rows
+ * that expired and files that aged out, and doing that twice is doing it once.
+ *
+ * Retention lives in one array below. A policy spread across five functions is
+ * a policy nobody can state, and the question asked of it — "how long do we
+ * keep exports?" — should be answerable by reading four lines.
+ *
+ * Usage:
+ *   bin/housekeeping                  run every target
+ *   bin/housekeeping --dry-run        say what would go, delete nothing
+ *   bin/housekeeping --only=tokens    one target (repeatable)
+ *   bin/housekeeping --quiet          only report problems, for cron
+ *   bin/housekeeping --help
+ *
+ * Exit codes: 0 all targets succeeded, 1 one or more failed. A failed target
+ * does not stop the others — a backup that fails is not a reason to leave
+ * expired tokens in the database for another day.
+ */
+
+require __DIR__ . '/lib/help.php';
+bin_help_if_requested(__FILE__);
+require __DIR__ . '/lib/console.php';
+
+$root = dirname(__DIR__);
+chdir($root);
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    con_fail('vendor/ missing — run composer install.');
+}
+
+require $root . '/vendor/autoload.php';
+
+/**
+ * How long each thing is kept.
+ *
+ * Backups: db-tools holds its own retention (14, in db-tools.php) and prunes
+ * as it writes, so there is no number here — one policy, in the file that
+ * enforces it.
+ *
+ * Logs: the application's own handler rotates by LOG_RETENTION_DAYS and
+ * deletes what falls off the end. The only log it does not own is the one
+ * cron writes for this script, which is why housekeeping.log is truncated
+ * rather than rotated.
+ */
+const RETENTION = [
+    // Generated spreadsheets. Downloaded within minutes of being asked for,
+    // and regenerable from the data at any time.
+    'exports' => 7,
+
+    // Nothing in here is authoritative. It exists so the next request is
+    // faster, and a fortnight-old entry has stopped making anything faster.
+    'cache' => 14,
+
+    // Request records. Kept long enough to investigate a report of "it did
+    // not sync last week" and no longer: the row holds a request body, which
+    // on this API means assessment answers, and keeping a second copy of the
+    // record outside the tables that own it is a liability with no reader.
+    //
+    // The audit trail is a different thing and is NEVER pruned — see
+    // docs/operations.md. api_logs is a diagnostic; audit_log is evidence.
+    'api-logs' => 60,
+
+    // The cron log for this script. Not rotated by the application, because
+    // the application does not write it.
+    'own-log-mb' => 8,
+];
+
+$dryRun = in_array('--dry-run', $argv, true);
+$quiet  = in_array('--quiet', $argv, true);
+
+$only = [];
+foreach ($argv as $argument) {
+    if (preg_match('/^--only=([a-z-]+)$/', $argument, $matches) === 1) {
+        $only[] = $matches[1];
+    }
+}
+
+/** Say it unless asked not to. Problems are said either way. */
+function note(string $level, string $message): void
+{
+    global $quiet;
+
+    if ($quiet && in_array($level, ['success', 'info'], true)) {
+        return;
+    }
+
+    con_print($level, $message);
+}
+
+/**
+ * Delete files under a directory older than a number of days.
+ *
+ * Returns what it removed, or would have. Directories are left alone: the
+ * tree under var/ is created by the application at boot and removing a
+ * directory it expects to exist trades a stale file for a fatal error.
+ */
+function sweep_directory(string $directory, int $days, bool $dryRun): array
+{
+    if (!is_dir($directory)) {
+        return ['files' => 0, 'bytes' => 0];
+    }
+
+    $cutoff  = time() - ($days * 86400);
+    $files   = 0;
+    $bytes   = 0;
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+
+    foreach ($iterator as $file) {
+        if (!$file->isFile()) {
+            continue;
+        }
+
+        // .gitkeep is how the empty directories survive a clone. Deleting one
+        // is how the directory stops existing on the next checkout.
+        if ($file->getFilename() === '.gitkeep') {
+            continue;
+        }
+
+        if ($file->getMTime() >= $cutoff) {
+            continue;
+        }
+
+        $files++;
+        $bytes += $file->getSize();
+
+        if (!$dryRun) {
+            @unlink($file->getPathname());
+        }
+    }
+
+    return ['files' => $files, 'bytes' => $bytes];
+}
+
+function human_bytes(int $bytes): string
+{
+    if ($bytes < 1024) {
+        return $bytes . ' B';
+    }
+
+    $units = ['KB', 'MB', 'GB'];
+    $value = $bytes / 1024;
+
+    foreach ($units as $unit) {
+        if ($value < 1024 || $unit === 'GB') {
+            return sprintf('%.1f %s', $value, $unit);
+        }
+        $value /= 1024;
+    }
+
+    return $bytes . ' B';
+}
+
+$targets = [];
+
+/**
+ * Expired tokens.
+ *
+ * A refresh token is valid for thirty days and an assessor may be offline for
+ * a fortnight of it, so the table grows steadily and nothing ever removes a
+ * row: the application checks expiry on use and has no reason to delete what
+ * it will never look up again. Password reset tokens are shorter-lived and
+ * accumulate the same way.
+ *
+ * Deleted rather than kept for the record. An expired token is not evidence of
+ * anything — the audit trail records the sign-in, not the token — and a table
+ * of dead credentials is a liability that grows.
+ */
+$targets['tokens'] = static function () use ($root, $dryRun): bool {
+    $env = con_read_env(con_env_path($root));
+
+    try {
+        $pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+    } catch (PDOException $e) {
+        note('error', 'tokens: cannot reach the database: ' . $e->getMessage());
+
+        return false;
+    }
+
+    $total = 0;
+
+    foreach (['refresh_tokens', 'password_reset_tokens'] as $table) {
+        $count = (int) $pdo->query("SELECT COUNT(*) FROM `{$table}` WHERE expires_at < NOW()")->fetchColumn();
+
+        if ($count > 0 && !$dryRun) {
+            $pdo->exec("DELETE FROM `{$table}` WHERE expires_at < NOW()");
+        }
+
+        $total += $count;
+    }
+
+    note('success', sprintf(
+        'tokens: %s %d expired',
+        $dryRun ? 'would remove' : 'removed',
+        $total
+    ));
+
+    return true;
+};
+
+/**
+ * Request records past their retention.
+ *
+ * Deleted in batches. A single DELETE across a table this size holds a lock
+ * for as long as it takes and blocks the requests that are trying to write
+ * the next row into it — which turns a tidy-up into an outage at two in the
+ * morning, when nobody is watching to explain it.
+ */
+$targets['api-logs'] = static function () use ($root, $dryRun): bool {
+    $env = con_read_env(con_env_path($root));
+
+    try {
+        $pdo = con_pdo($env, $env['DB_NAME'] ?? 'spirdt');
+    } catch (PDOException $e) {
+        note('error', 'api-logs: cannot reach the database: ' . $e->getMessage());
+
+        return false;
+    }
+
+    $days  = RETENTION['api-logs'];
+    $count = (int) $pdo->query(
+        "SELECT COUNT(*) FROM `api_logs` WHERE created_at < NOW() - INTERVAL {$days} DAY"
+    )->fetchColumn();
+
+    if ($count > 0 && !$dryRun) {
+        $statement = $pdo->prepare(
+            "DELETE FROM `api_logs` WHERE created_at < NOW() - INTERVAL {$days} DAY LIMIT 5000"
+        );
+
+        do {
+            $statement->execute();
+            $removed = $statement->rowCount();
+            usleep(50_000);
+        } while ($removed === 5000);
+    }
+
+    note('success', sprintf(
+        'api-logs: %s %d row(s) older than %d days',
+        $dryRun ? 'would remove' : 'removed',
+        $count,
+        $days
+    ));
+
+    return true;
+};
+
+/**
+ * The nightly backup.
+ *
+ * --no-encrypt is deliberate and documented in docs/operations.md: supplying
+ * an encryption password currently produces no archive at all while exiting 0,
+ * and a backup step that silently writes nothing is worse than an unencrypted
+ * one. Retention is db-tools' own.
+ *
+ * The archive is checked for size afterwards rather than trusted. This has
+ * failed twice by exiting 0 having written an empty file, and an empty backup
+ * is only discovered on the day somebody needs it.
+ */
+$targets['backup'] = static function () use ($root, $dryRun): bool {
+    if ($dryRun) {
+        note('success', 'backup: would run vendor/bin/db-tools backup --no-encrypt');
+
+        return true;
+    }
+
+    [$output, $code] = con_run('php vendor/bin/db-tools backup --no-encrypt');
+
+    if ($code !== 0) {
+        note('error', 'backup: db-tools exited ' . $code);
+
+        foreach (array_slice(explode("\n", $output), -5) as $line) {
+            if (trim($line) !== '') {
+                note('error', '  ' . $line);
+            }
+        }
+
+        return false;
+    }
+
+    $archives = glob($root . '/var/backups/db/*.sql.zst') ?: [];
+
+    if ($archives === []) {
+        note('error', 'backup: db-tools reported success but wrote no archive.');
+
+        return false;
+    }
+
+    usort($archives, static fn (string $a, string $b): int => filemtime($b) <=> filemtime($a));
+    $newest = $archives[0];
+    $size   = (int) filesize($newest);
+
+    // A compressed dump of an empty stream is a few hundred bytes and zstd is
+    // perfectly happy to produce one. Anything this small is not a database.
+    if ($size < 1024) {
+        note('error', sprintf('backup: %s is %s — that is an empty dump.', basename($newest), human_bytes($size)));
+
+        return false;
+    }
+
+    note('success', sprintf('backup: %s (%s)', basename($newest), human_bytes($size)));
+
+    return true;
+};
+
+/** Generated spreadsheets, long since downloaded. */
+$targets['exports'] = static function () use ($root, $dryRun): bool {
+    $swept = sweep_directory($root . '/var/exports', RETENTION['exports'], $dryRun);
+
+    note('success', sprintf(
+        'exports: %s %d file(s), %s, older than %d days',
+        $dryRun ? 'would remove' : 'removed',
+        $swept['files'],
+        human_bytes($swept['bytes']),
+        RETENTION['exports']
+    ));
+
+    return true;
+};
+
+/** Cache entries nothing is waiting on. */
+$targets['cache'] = static function () use ($root, $dryRun): bool {
+    $swept = sweep_directory($root . '/var/cache', RETENTION['cache'], $dryRun);
+
+    note('success', sprintf(
+        'cache: %s %d file(s), %s, older than %d days',
+        $dryRun ? 'would remove' : 'removed',
+        $swept['files'],
+        human_bytes($swept['bytes']),
+        RETENTION['cache']
+    ));
+
+    return true;
+};
+
+/**
+ * This script's own cron log.
+ *
+ * Truncated to its last lines rather than deleted, so the morning after a
+ * failure there is still something to read. Nothing else rotates it: it is
+ * written by cron's redirection, not by the application's log handler.
+ */
+$targets['own-log'] = static function () use ($root, $dryRun): bool {
+    $path  = $root . '/var/log/housekeeping.log';
+    $limit = RETENTION['own-log-mb'] * 1024 * 1024;
+
+    if (!is_file($path) || filesize($path) < $limit) {
+        return true;
+    }
+
+    if ($dryRun) {
+        note('success', sprintf('own-log: would trim %s (%s)', basename($path), human_bytes((int) filesize($path))));
+
+        return true;
+    }
+
+    $keep = array_slice(file($path, FILE_IGNORE_NEW_LINES) ?: [], -2000);
+    file_put_contents($path, implode(PHP_EOL, $keep) . PHP_EOL);
+
+    note('success', 'own-log: trimmed to the last 2000 lines');
+
+    return true;
+};
+
+if ($only !== []) {
+    $unknown = array_diff($only, array_keys($targets));
+
+    if ($unknown !== []) {
+        con_fail('Unknown target(s): ' . implode(', ', $unknown) . '. Known: ' . implode(', ', array_keys($targets)));
+    }
+
+    $targets = array_intersect_key($targets, array_flip($only));
+}
+
+note('info', $dryRun ? 'Housekeeping (dry run)' : 'Housekeeping');
+
+$failed = 0;
+
+foreach ($targets as $name => $target) {
+    try {
+        if (!$target()) {
+            $failed++;
+        }
+    } catch (Throwable $e) {
+        note('error', $name . ': ' . $e->getMessage());
+        $failed++;
+    }
+}
+
+if ($failed > 0) {
+    con_print('error', sprintf('%d target(s) failed.', $failed));
+    exit(1);
+}
+
+note('success', 'Done.');
+exit(0);

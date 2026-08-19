@@ -41,7 +41,9 @@ Three supported paths, all first-class. The application reads `DB_HOST` and `DB_
 | Native, PHP's own server | Working on the code. Fastest loop, no web server to configure |
 | Apache and mod_php | You want the machine to run what a server runs |
 
-Each is written out step by step in [Installation](https://deforay.github.io/spirdt/getting-started/). Three things there are worth knowing before you start, because none of them are guessable:
+On a bare Ubuntu server there is a fourth route and it is one command — `bin/setup.sh` installs the stack, clones, creates the database, writes the vhost, gets a certificate and schedules the nightly sweep. See [Deployment](https://deforay.github.io/spirdt/deployment/).
+
+Each of the three above is written out step by step in [Installation](https://deforay.github.io/spirdt/getting-started/). Three things there are worth knowing before you start, because none of them are guessable:
 
 - The **test database is migrated separately** — `DB_NAME=spirdt_test php bin/migrate`. Nothing does it for you, and skipping it fails the integration suite on a missing column.
 - The app user needs a **global `PROCESS` grant**. Without it `mysqldump` errors and still exits `0`, so every backup is empty and reports success.
@@ -64,6 +66,7 @@ Run directly. Under Docker, prefix with `docker compose exec php`.
 | `composer phpstan` | Static analysis |
 | `composer cs:fix` | Apply style fixes |
 | `composer db:backup` | Backup via db-tools |
+| `composer housekeeping` | The nightly sweep: backup, expired tokens, old exports |
 | `composer app:upgrade` | Backup, sync code, migrate, verify. The production path |
 | `npm --prefix web test` | Device-side suite |
 | `npm --prefix web run build` | Rebuild the app into `public/` |

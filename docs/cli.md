@@ -16,6 +16,50 @@ Under Docker, prefix with `docker compose exec php`. Natively, run directly.
 
 ## Setup and upgrade
 
+There are two of each, and the split is the machine against the application.
+
+`bin/setup.sh` and `bin/upgrade.sh` are shell, run with `sudo`, and deal with the **server**: packages, Apache, MySQL, the vhost, the certificate, permissions, cron. `bin/setup` and `bin/upgrade` are PHP and deal with the **application**: `.env`, Composer, the schema, verification. The shell pair calls the PHP pair rather than repeating it, so a server and a laptop are set up by the same code from that point on.
+
+On a developer machine you want only the PHP ones.
+
+### `bin/setup.sh`
+
+Takes a bare Ubuntu LTS server to a running installation, and can be run before this repository exists on the machine:
+
+```bash
+wget -O spirdt-setup.sh https://raw.githubusercontent.com/deforay/spirdt/main/bin/setup.sh
+sudo bash spirdt-setup.sh
+```
+
+Installs PHP 8.4 with the extensions this application actually uses, Apache with `mod_php`, MySQL, and Composer; clones the repository; creates the database and an application user with a generated password; writes `.env`; renders the vhost from `deploy/apache/spirdt.conf.example`; obtains a Let's Encrypt certificate; schedules `bin/housekeeping`; and offers to create the first organisation and administrator.
+
+**Idempotent** — run it again after a failure and it resumes.
+
+No Node.js is installed. The front end is committed already built into `public/`, so a server never needs it.
+
+| Flag | Effect |
+|---|---|
+| `--path=` | Where to install. Default `/var/www/spirdt` |
+| `--host=` | The hostname the site answers to |
+| `--email=` | Address for certificate expiry notices |
+| `--branch=` | Which branch to clone. Default `main` |
+| `--skip-tls` | Leave it on port 80 |
+| `--skip-org` | Do not create an organisation or administrator |
+| `--yes` | Take every default; never prompt |
+
+### `bin/upgrade.sh`
+
+The server-side upgrade: system packages, the PHP version, then `bin/upgrade` for the application, then permissions, an Apache reload, the cron entry, and a certificate renewal check.
+
+It does not take the backup itself — `bin/upgrade` does that first and stops if it fails.
+
+| Flag | Effect |
+|---|---|
+| `--path=` | Which installation. Defaults to the checkout this script is in |
+| `--skip-apt` | Do not touch system packages |
+| `--skip-backup` | Passed through to `bin/upgrade` |
+| `--dry-run` | Say what would happen |
+
 ### `bin/setup`
 
 Takes a fresh clone to a running application: prerequisites, `.env` (generating `JWT_SECRET`), dependencies, database creation, migrations, then verification.
@@ -117,6 +161,21 @@ See [Backup & Upgrade](operations.md) for the encryption caveat.
 ### `composer db:collation`
 
 Normalises every table to the server-default utf8mb4 collation. Idempotent.
+
+
+### `bin/housekeeping`
+
+The nightly sweep, and the only thing `bin/setup.sh` puts in cron. One entry point because four scheduled jobs mean four crontab lines to keep in step with the code.
+
+Targets: `tokens` (expired refresh and password-reset rows), `backup` (`db-tools`, then a check that the archive is not an empty dump), `exports`, `cache`, and `own-log` (its own cron log, trimmed rather than rotated — the application's handler does not write it).
+
+Retention is one array at the top of the file. Every target is idempotent, and a target that fails does not stop the others.
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Say what would go, delete nothing |
+| `--only=` | One target. Repeatable |
+| `--quiet` | Report problems only. This is how cron runs it |
 
 ## Accounts
 
