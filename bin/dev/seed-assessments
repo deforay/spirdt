@@ -29,7 +29,9 @@ declare(strict_types=1);
  *
  * Options:
  *   --org      Organisation code. Required.
- *   --count    How many visits. Default 60.
+ *   --count    How many visits. Default 60. Sites are cycled, so asking for
+ *              more visits than there are sites gives each site a history
+ *              rather than capping at one visit apiece.
  *   --months   Spread them over this many months back. Default 12.
  *   --centre   "lat,lng" the coordinates scatter around. Default Lusaka.
  *   --clear    Remove previously seeded visits and write nothing.
@@ -160,7 +162,6 @@ $sites = Capsule::table('testing_sites')
     ->where('programme_id', $programmeId)
     ->where('is_active', 1)
     ->inRandomOrder()
-    ->limit($count)
     ->get(['id', 'facility_id']);
 
 if ($sites->isEmpty()) {
@@ -203,12 +204,38 @@ function seed_jitter(float $degrees): float
 $made = 0;
 $failed = 0;
 
-foreach ($sites as $index => $site) {
-    $quality = seed_quality();
+/**
+ * A quality per SITE, held across that site's visits.
+ *
+ * Rolling it per visit made every site's history a random walk, which is the
+ * one thing this data must not be: the instrument exists to say whether a
+ * laboratory is better than it was a year ago, and a demo where every site
+ * jumps between Level 0 and Level 4 at random says the score means nothing.
+ * A site has a standard, and its visits vary around it.
+ */
+$siteQuality = [];
+
+for ($index = 0; $index < $count; $index++) {
+    // Round-robin rather than one visit per site. --count means visits, which
+    // is what the flag says and what a dashboard needs: a site assessed once
+    // is a dot, and a site assessed four times over a year is the trend the
+    // charts are drawn to show.
+    $site = $sites[$index % $sites->count()];
+    $siteKey = (string) $site->id;
+
+    $siteQuality[$siteKey] ??= seed_quality();
+
+    // Within a tenth of the site's own standard, up or down. Enough movement
+    // to make a trend line worth looking at, not enough to cross three bands.
+    $quality = min(0.99, max(0.2, $siteQuality[$siteKey] + (random_int(-8, 10) / 100)));
+
+    // Spread evenly across the window rather than randomly, so every month has
+    // visits in it. Clumping is what makes a twelve-column chart show four.
+    $monthsBack = $months - 1 - intdiv($index * $months, max(1, $count));
 
     $assessedOn = date(
         'Y-m-d',
-        strtotime('-' . random_int(0, $months * 30) . ' days'),
+        strtotime('-' . $monthsBack . ' months -' . random_int(0, 27) . ' days'),
     );
 
     $pathogens = random_int(0, 1) === 1
