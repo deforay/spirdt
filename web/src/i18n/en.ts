@@ -25,12 +25,17 @@ export const messages = {
 
     'signIn.subtitle': 'Sign in to start an assessment.',
     'signIn.tagline': 'The stepwise assessment of rapid diagnostic testing sites.',
+    'signIn.panelNote': 'Scored the same way in every laboratory, so one site can be compared with another and with itself a year later.',
     'signIn.email': 'Email',
     'signIn.password': 'Password',
     'signIn.organization': 'Org code',
     'signIn.submit': 'Sign in',
     'signIn.submitting': 'Signing in',
     'signIn.failed': 'Could not sign in.',
+    'signIn.showPassword': 'Show password',
+    'signIn.hidePassword': 'Hide password',
+    'signIn.organizationHint': 'Your address exists in more than one organisation. Enter the code you were given.',
+    'signIn.onlineNote': 'Signing in needs a connection. After that, assessments work offline.',
 
     'noAccess.title': 'This account has no screens yet',
     'noAccess.body': 'Nobody has given it access to anything. Ask your administrator, who can grant it from the people screen.',

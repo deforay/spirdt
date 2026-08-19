@@ -22,12 +22,17 @@ export const messages: Messages = {
     'signIn.subtitle': 'Connectez-vous pour commencer une évaluation.',
 
     'signIn.tagline': "L'évaluation par étapes des sites de tests de diagnostic rapide.",
+    'signIn.panelNote': 'Évalué de la même manière dans chaque laboratoire, afin de comparer un site à un autre et à lui-même un an plus tard.',
     'signIn.email': 'E-mail',
     'signIn.password': 'Mot de passe',
     'signIn.organization': 'Code org.',
     'signIn.submit': 'Se connecter',
     'signIn.submitting': 'Connexion en cours',
     'signIn.failed': 'Connexion impossible.',
+    'signIn.showPassword': 'Afficher le mot de passe',
+    'signIn.hidePassword': 'Masquer le mot de passe',
+    'signIn.organizationHint': 'Votre adresse existe dans plusieurs organisations. Saisissez le code qui vous a été communiqué.',
+    'signIn.onlineNote': 'La connexion nécessite Internet. Ensuite, les évaluations fonctionnent hors ligne.',
 
     'noAccess.title': 'Ce compte n\u2019a encore aucun \u00e9cran',
     'noAccess.body': 'Personne ne lui a donn\u00e9 acc\u00e8s \u00e0 quoi que ce soit. Demandez \u00e0 votre administrateur, qui peut le faire depuis l\u2019\u00e9cran des personnes.',

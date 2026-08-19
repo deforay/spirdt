@@ -20,12 +20,17 @@ export const messages: Messages = {
     'signIn.subtitle': 'Inicie sessão para começar uma avaliação.',
 
     'signIn.tagline': 'A avaliação faseada dos locais de testes de diagnóstico rápido.',
+    'signIn.panelNote': 'Pontuado da mesma forma em cada laboratório, para comparar um local com outro e consigo próprio um ano depois.',
     'signIn.email': 'E-mail',
     'signIn.password': 'Palavra-passe',
     'signIn.organization': 'Código org.',
     'signIn.submit': 'Iniciar sessão',
     'signIn.submitting': 'A iniciar sessão',
     'signIn.failed': 'Não foi possível iniciar sessão.',
+    'signIn.showPassword': 'Mostrar a palavra-passe',
+    'signIn.hidePassword': 'Ocultar a palavra-passe',
+    'signIn.organizationHint': 'O seu endereço existe em mais do que uma organização. Introduza o código que lhe foi fornecido.',
+    'signIn.onlineNote': 'Iniciar sessão requer ligação. Depois, as avaliações funcionam sem ligação.',
 
     'noAccess.title': 'Esta conta ainda n\u00e3o tem ecr\u00e3s',
     'noAccess.body': 'Ningu\u00e9m lhe deu acesso a nada. Pe\u00e7a ao seu administrador, que o pode conceder no ecr\u00e3 das pessoas.',
