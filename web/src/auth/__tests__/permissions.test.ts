@@ -142,7 +142,15 @@ describe('landing', () => {
         expect(landing()).not.toBe('no-access')
     })
 
-    it('sends a signed-out visitor nowhere in particular', () => {
+    /**
+     * Truthful, and nobody asks it. A visitor with no session holds no
+     * permissions, so the honest answer to "which of these can you open" is
+     * none of them — which is why "/" checks for a session before it asks, and
+     * sends a signed-out visitor to the sign-in page instead. Kept as a test
+     * because the reason this function must not be the one deciding where a
+     * signed-out visitor goes is exactly this answer.
+     */
+    it('has no answer for a visitor who is not signed in', () => {
         session.value = null
 
         expect(landing()).toBe('no-access')

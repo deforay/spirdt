@@ -5,27 +5,32 @@ import { refresh } from '@/api/client'
 import { permissionsUnknown } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import ChangePassword from '@/components/ChangePassword.vue'
-import SignIn from '@/components/SignIn.vue'
 import { applyDefaultLocale } from '@/i18n'
 import { router } from '@/router'
 
 /**
  * The shell.
  *
- * Three states, in order, and only the last one has routes in it:
+ * Two states, and the router owns the second one:
  *
- *   Not signed in            → sign in
  *   Signed in, password set  → replace it, because until then the server
  *   by somebody else            refuses every other request
- *   Signed in properly       → the best screen this account can open
+ *   Otherwise                → whatever the route resolved to, which for a
+ *                               visitor with no session is /login
  *
- * The first two sit ABOVE the router rather than being routes of their own.
- * They are not places you navigate to — there is nowhere else to be while
- * either is true, and making them routes would mean every other route needing
- * a guard against them.
+ * The password change sits ABOVE the router rather than being a route of its
+ * own. It is not a place you navigate to: it interrupts a session that already
+ * exists, there is nowhere else to be while it is true, and making it a route
+ * would mean every other route needing a guard against it.
+ *
+ * SIGNING IN USED TO SIT HERE TOO, and the cost of that was the URL. The form
+ * was painted over whatever route had already resolved underneath it, so the
+ * address bar described a screen nobody was looking at — and for the visitor
+ * who just opens the site, that address was /no-access, because "/" asks which
+ * of nine screens this account can open and an account that does not exist yet
+ * can open none of them. It is a route now; the router turns everybody else
+ * away, in one place, in a way that can be read.
  */
-
-const signedIn = computed(() => session.value !== null)
 
 /**
  * Repair a session saved before permissions existed.
@@ -75,21 +80,39 @@ watch(
 const mustChangePassword = computed(() => session.value?.user.mustChangePassword === true)
 
 /**
- * Re-run the route decision now that the permissions are known.
+ * Re-run the route decision now that the account can actually be used.
  *
- * Sign-in happens outside the router, so nothing has yet chosen between the
- * assessor and management halves — and `/` resolved before the session existed
- * would have sent an administrator to the checklist.
+ * The screen this interrupted was resolved for a session the server was
+ * refusing every request from, so it is not necessarily the screen to go back
+ * to. "/" asks the question again from scratch.
  */
 function onReady(): void {
     void router.replace({ name: 'home' })
 }
+
+/**
+ * Follow a session that has ended.
+ *
+ * Sign-out clears the session and so does a refresh token the server rejects,
+ * and neither of them navigates — they had no need to when the sign-in form was
+ * an overlay that simply appeared. Now that it is a route, nothing moves unless
+ * something moves it, and without this the app sits on a management screen
+ * whose every request comes back 401.
+ *
+ * Watched rather than pushed from the three places that sign out, because the
+ * fourth is api/client.ts giving up on a refresh in the background, and a rule
+ * that has to be remembered at each call site is a rule that will be missed at
+ * the next one.
+ */
+watch(session, (current) => {
+    if (current === null) {
+        void router.replace({ name: 'login' })
+    }
+})
 </script>
 
 <template>
-    <SignIn v-if="!signedIn" @signed-in="onReady" />
-
-    <ChangePassword v-else-if="mustChangePassword" @changed="onReady" />
+    <ChangePassword v-if="mustChangePassword" @changed="onReady" />
 
     <RouterView v-else />
 </template>

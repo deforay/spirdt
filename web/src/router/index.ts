@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import { can, landing, PERMISSION, type PermissionKey } from '@/auth/permissions'
 import { session } from '@/auth/session'
+import LoginView from '@/views/LoginView.vue'
 
 /**
  * One application, two audiences, separated by role.
@@ -31,7 +32,33 @@ const routes: RouteRecordRaw[] = [
         name: 'home',
         // Nothing of its own: it decides where this person belongs and sends
         // them there, so a shared bookmark works for everybody.
-        redirect: () => ({ name: landing() }),
+        //
+        // WHETHER ANYBODY IS SIGNED IN IS ASKED FIRST, and that is not a
+        // special case so much as the absence of the thing landing() reads. A
+        // visitor with no session holds no permissions, so landing() walked all
+        // nine and truthfully answered 'no-access' — which is how the front
+        // page of the application came to announce itself as a dead end to
+        // everybody who had not signed in yet. There is nothing to decide about
+        // an account until there is an account.
+        redirect: () => ({ name: session.value === null ? 'login' : landing() }),
+    },
+    {
+        // The one screen that works without a session, and therefore the only
+        // place the guard below can send somebody who has none.
+        //
+        // It has an address of its own because the alternative was that it did
+        // not: the form used to be painted over whatever route had resolved
+        // underneath it, which left the URL describing a screen nobody was
+        // looking at. A page has to be able to say what it is.
+        path: '/login',
+        name: 'login',
+        // NOT lazy, unlike everything else here. The rule above is that a
+        // screen is downloaded by the people who can open it, and this is the
+        // screen every single visitor opens first — deferring it buys nothing
+        // and costs a second round trip before anybody can see a password
+        // field, on the one screen that has to work over the connection the
+        // rest of the app exists to do without.
+        component: LoginView,
     },
     {
         // No permission: everybody who can sign in has an account, and the
@@ -202,9 +229,12 @@ const routes: RouteRecordRaw[] = [
     // except knowing another URL.
     {
         path: '/admin',
-        // The same decision "/" makes. Fixed at reports it sent an account
-        // without reports.read to a screen that immediately bounced it.
-        redirect: () => ({ name: landing() }),
+        // The same decision "/" makes — made by pointing at it rather than by
+        // repeating it. Fixed at reports, it sent an account without
+        // reports.read to a screen that immediately bounced it; asking
+        // landing() here in its own right meant this path went on sending
+        // signed-out visitors to the dead end after "/" had stopped.
+        redirect: { name: 'home' },
     },
 
     /**
@@ -232,10 +262,22 @@ export const router = createRouter({
 })
 
 router.beforeEach((to) => {
-    // Signed out, and not signed in yet: App.vue shows the sign-in screen over
-    // the top of whatever route this is, so there is nothing to redirect to.
+    // Signed out. There is exactly one screen that works, and every other
+    // address is something to come back to rather than something to render now.
+    //
+    // The path travels in the query so the deep link survives the detour: an
+    // assessor sent a link to a particular site opens that site after signing
+    // in, rather than the dashboard and an explanation. LoginView decides
+    // whether to honour it — see the note there on why it is not trusted.
     if (session.value === null) {
-        return true
+        return to.name === 'login' ? true : { name: 'login', query: { next: to.fullPath } }
+    }
+
+    // Signed in and asking for the front door anyway: a bookmark, a back
+    // button, or a browser restoring the tab it was closed on. Showing the form
+    // to somebody who already has a session offers them a second one.
+    if (to.name === 'login') {
+        return { name: landing() }
     }
 
     // THE DEAD END HAS TO BE LEAVEABLE. /no-access asks for no permission, so
