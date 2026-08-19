@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { PhArrowLeft, PhCaretDown, PhChartBar, PhSignOut, PhUserCircle } from '@phosphor-icons/vue'
+import {
+    PhArrowLeft,
+    PhCaretDown,
+    PhChartBar,
+    PhGauge,
+    PhSignOut,
+    PhUserCircle,
+} from '@phosphor-icons/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { signOut } from '@/auth/login'
+import { canManage, landing } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import StorageNotice from '@/components/StorageNotice.vue'
@@ -193,6 +201,36 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                         </p>
 
 
+
+                        <!--
+                            The way back to the console, for an account that
+                            holds both sides.
+
+                            The console has linked into the assessor app since
+                            it grew a menu; nothing linked the other way, so an
+                            administrator who started a visit — or opened one
+                            from a bookmark — could reach their own account and
+                            the door out, and no management screen at all
+                            without typing an address. A capability nobody can
+                            find is one nobody has, and that was as true in this
+                            direction as it was in the other.
+
+                            It goes wherever this account belongs rather than
+                            to the dashboard by name: the same answer the app
+                            gives at sign-in, so somebody who cannot read
+                            reports lands on the first screen they can open
+                            instead of one that refuses them.
+                        -->
+                        <RouterLink
+                            v-if="canManage()"
+                            :to="{ name: landing() }"
+                            role="menuitem"
+                            class="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-[16px]"
+                            @click="open = false"
+                        >
+                            <PhGauge :size="16" class="shrink-0 text-label-3" aria-hidden="true" />
+                            {{ t('admin.console') }}
+                        </RouterLink>
 
                         <RouterLink
                             :to="{ name: 'account' }"

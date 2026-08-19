@@ -235,6 +235,7 @@ export const messages: Messages = {
     'admin.users': 'Personnes',
     'admin.usersSubtitle': 'Qui peut se connecter, et à quel titre.',
     'admin.signOut': 'Se déconnecter',
+    'admin.console': 'Console de gestion',
     'nav.registry': 'Registre',
     'nav.access': 'Accès',
     'nav.menu': 'Menu',
