@@ -52,7 +52,7 @@ export const messages: Messages = {
     'sites.subtitle': 'Elija el sitio que está evaluando.',
     'sites.search': 'Buscar',
     'sites.unfinished': 'Visitas sin terminar',
-    'sites.startNew': 'Iniciar una visita',
+    'sites.startNew': 'Iniciar una nueva auditoría',
     'sites.draftProgress': '{answered} de {total} respondidas',
     'sites.showAll': 'Mostrar todos los sitios ({count} más)',
     'sites.showMine': 'Mostrar solo mis sitios',

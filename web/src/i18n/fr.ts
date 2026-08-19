@@ -54,7 +54,7 @@ export const messages: Messages = {
     'sites.subtitle': 'Choisissez le site que vous évaluez.',
     'sites.search': 'Rechercher',
     'sites.unfinished': 'Visites inachevées',
-    'sites.startNew': 'Commencer une visite',
+    'sites.startNew': 'Commencer un nouvel audit',
     'sites.draftProgress': '{answered} sur {total} renseignées',
     'sites.showAll': 'Afficher tous les sites ({count} de plus)',
     'sites.showMine': 'Afficher seulement mes sites',

@@ -56,7 +56,7 @@ export const messages = {
     'sites.subtitle': 'Choose the site you are assessing.',
     'sites.search': 'Search',
     'sites.unfinished': 'Unfinished visits',
-    'sites.startNew': 'Start a new visit',
+    'sites.startNew': 'Start a new audit',
     'sites.draftProgress': '{answered} of {total} answered',
     'sites.showAll': 'Show all sites ({count} more)',
     'sites.showMine': 'Show only my sites',
