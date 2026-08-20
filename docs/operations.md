@@ -1,4 +1,4 @@
-# Backup & Upgrade
+# Backup and upgrade
 
 ## Backups
 

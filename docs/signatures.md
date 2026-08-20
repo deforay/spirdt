@@ -114,4 +114,3 @@ fax is not what anyone wants against their name.
 
 - **Photographs.** The `photo` kind, `question_code` and the 5 MB limit are all
   in place server-side; nothing captures one.
-- **Signatures in the report.** No report exists yet.

@@ -6,9 +6,10 @@
 |---|---|
 | Backend | Slim 4, PHP 8.4 |
 | Database | MySQL 8 |
-| Frontend | Vue 3 + Vite + TypeScript *(not yet scaffolded)* |
-| Assessor app | Offline-first PWA *(not yet scaffolded)* |
-| Runtime | Docker Compose, or native PHP + MySQL |
+| Frontend | Vue 3, Vite, TypeScript |
+| Assessor app | Offline-first PWA. Dexie over IndexedDB |
+| Styling | Tailwind v4, Reka UI primitives, Phosphor icons |
+| Runtime | Apache with mod_php, nginx, Docker Compose, or PHP's own server |
 | Backups | `amitdugar/db-tools` |
 
 The API is the product; the UIs are clients. Every capability becomes an endpoint before it becomes a screen.
@@ -32,10 +33,11 @@ A user belongs to exactly one organisation. Email is unique **per organisation**
 Discipline is not a control, so the isolation is structural:
 
 1. A global model scope applied automatically to every tenant-scoped model. Hand-written `where('organization_id', …)` in application code is a smell — if it is being written, the scope is not wired up.
-2. A CI code-guard that fails the build when a tenant-scoped model is queried outside the scope, or when a migration adds a tenant-scoped table without `organization_id` plus an index.
-3. Composite indexes lead with `organization_id` — correct for performance, and it makes the scoped access path the natural one.
-4. A standing cross-tenant isolation test that creates two organisations and table-drives over the full route list, asserting every endpoint returns 404/403 for cross-org access.
-5. IDs are unguessable (UUIDv7), but that is never treated as the control. Scope enforcement is the control; opaque IDs are defence in depth.
+2. Composite indexes lead with `organization_id` — correct for performance, and it makes the scoped access path the natural one.
+3. Tests that create two organisations and assert the second cannot reach the first. `TenantStampingTest` covers the stamping, `ProgrammeScopeTest` the registry's separate scope, and the feature suite covers the admin routes.
+4. IDs are unguessable (UUIDv7), but that is never treated as the control. Scope enforcement is the control; opaque IDs are defence in depth.
+
+Two further guards are intended and not built: a code-guard that fails a build when a tenant-scoped model is queried outside the scope or a migration adds a tenant-scoped table without `organization_id`, and a table-driven isolation test over the full route list rather than the routes a test happens to name. Until both exist, the suite proves the cases it was written for rather than the whole surface.
 
 ### Roles
 
@@ -44,13 +46,13 @@ Discipline is not a control, so the isolation is structural:
 | Platform admin | Installation | Create organisations and their first superadmin, suspend an organisation. **No access to assessment data** |
 | Organisation superadmin | One org | Full control within their organisation |
 | Admin | One org | Day-to-day administration |
-| Assessor | Org + geographic scope | Conduct assessments |
-| Viewer | Org + geographic scope | Read-only dashboards and reports |
+| Assessor | One org | Conduct assessments |
+| Viewer | One org | Read-only dashboards and reports |
 | Site user | Org + their facility | View and close findings assigned to them |
 
 Two hard rules: an organisation superadmin cannot escalate to platform admin, and cannot see another organisation.
 
-Role alone is insufficient — a user has an organisation **and** a geographic scope. A district viewer sees one district of one organisation.
+`users.geo_unit_id` exists for narrowing a user to one district of one organisation, and nothing reads it yet. What narrows an assessor's work today is an **assignment** against a testing site, which is a default rather than a boundary: every site in the programme stays reachable, because an assessor who arrives somewhere unplanned must still be able to work.
 
 Platform admins live in a **separate table** from users, not as a flag. That makes "platform admin cannot read assessment data" structural rather than a permission check someone can get wrong: they hold no `organization_id`, so the tenant scope has nothing to resolve. It also keeps `users.organization_id` `NOT NULL` — the one column the whole isolation model rests on.
 

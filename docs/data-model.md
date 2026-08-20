@@ -1,24 +1,8 @@
-# Data Model
+# Data model
 
-27 tables across thirteen migrations. Plain SQL, semver-named, applied in order by `bin/migrate`.
-
-| Migration | Covers |
-|---|---|
-| `0.1.0-baseline` | Tenancy, identity, RBAC, auth |
-| `0.1.1-registry` | Facilities and testing sites |
-| `0.1.2-templates` | Question catalog and versioned templates |
-| `0.1.3-assessments` | Campaigns, assessments, answers, findings, scores |
-| `0.1.4-ops` | Audit log and API logs |
-| `0.1.5-submissions` | Raw payloads kept as an audit record |
-| `0.1.6-attachment-signer` | Who a signature claims to be |
-| `0.1.7-programmes` | A level above organisations, sharing the registry |
-| `0.1.8-site-assignments` | Who covers which site, and when |
-| `0.1.9-finding-urgency` | When a finding must be acted on, alongside whose job it is |
-| `0.1.10-facility-contacts` | How to reach a facility |
-| `0.1.11-registry-provenance` | Keeps the shared registry when an organisation is deleted |
-| `0.1.12-finding-identity` | Which side minted a finding's id, so a re-keyed one is not stored twice |
-
-Each migration file opens with a comment explaining *why*, not just what. Read them in order — later files carry foreign keys into earlier ones.
+27 tables, defined by plain SQL migrations under `migrations/` and applied in
+semver order by `bin/migrate`. Each migration file opens with a comment explaining
+*why*, not just what.
 
 ## Identifiers
 
