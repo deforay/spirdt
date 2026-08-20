@@ -207,8 +207,35 @@ export function text(value: Localised | undefined): string {
     return value[locale.value] ?? value[FALLBACK_LOCALE] ?? Object.values(value)[0] ?? ''
 }
 
+/**
+ * The region a language is written for, for anything Intl formats.
+ *
+ * A language is not a format. Asked for `en`, every browser answers with the
+ * American conventions — 8/20/2026, weeks beginning on Sunday — and this app
+ * is written in British English for assessors working in Africa, where a date
+ * is written day first and a week starts on Monday. The date field makes the
+ * mismatch impossible to ignore, because it is not printing a date but asking
+ * for one: the segments come out in the order named here, and an assessor
+ * typing 08 into the first box of a form that wanted the day has written down
+ * the wrong date with no way of telling.
+ *
+ * One tag per language, used by every formatter and by the date and time
+ * fields, so a date the assessor enters and the same date printed back on the
+ * review screen are written the same way round.
+ */
+const REGIONS: Record<string, string> = {
+    en: 'en-GB',
+    fr: 'fr-FR',
+    pt: 'pt-PT',
+    es: 'es-ES',
+}
+
+export const formattingLocale = computed<string>(
+    () => REGIONS[locale.value] ?? REGIONS[FALLBACK_LOCALE]!,
+)
+
 export function formatNumber(value: number, decimals = 0): string {
-    return new Intl.NumberFormat(locale.value, {
+    return new Intl.NumberFormat(formattingLocale.value, {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
     }).format(value)
@@ -216,7 +243,7 @@ export function formatNumber(value: number, decimals = 0): string {
 
 /** The score, written the way the reader's language writes it: 78.26% or 78,26 %. */
 export function formatPercent(value: number, decimals: number): string {
-    return new Intl.NumberFormat(locale.value, {
+    return new Intl.NumberFormat(formattingLocale.value, {
         style: 'percent',
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
@@ -224,7 +251,7 @@ export function formatPercent(value: number, decimals: number): string {
 }
 
 export function formatTime(value: Date): string {
-    return value.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
+    return value.toLocaleTimeString(formattingLocale.value, { hour: '2-digit', minute: '2-digit' })
 }
 
 /**
@@ -243,7 +270,7 @@ export function formatDate(value: string): string {
         return value
     }
 
-    return new Date(year, month - 1, day).toLocaleDateString(locale.value, {
+    return new Date(year, month - 1, day).toLocaleDateString(formattingLocale.value, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
