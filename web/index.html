@@ -3,8 +3,23 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#F1EFE9" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#10141B" media="(prefers-color-scheme: dark)" />
+        <!-- The ground, both ways round, so the browser's own bar matches the
+             page under it. These are --c-ground from styles/app.css written
+             out by hand: the tag is read before any stylesheet, so it cannot
+             ask for the token and has to be kept in step with it. -->
+        <meta name="theme-color" content="#F9FAFB" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#101828" media="(prefers-color-scheme: dark)" />
+
+        <!--
+            The mark the app wears at its top left. SVG first, because it is
+            the one that stays sharp on a retina tab and in a bookmark list;
+            the PNG is there for anything that will not take one, and the touch
+            icon for a tablet that has been added to a home screen — which is
+            how this app is opened in the field.
+        -->
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.png" sizes="64x64" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <title>SPI-RDT</title>
         <!--
             Stamps the stored theme before anything paints. Inline and first

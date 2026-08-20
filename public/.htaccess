@@ -97,6 +97,16 @@ Options -Indexes
     <FilesMatch "^index\.html$">
         Header set Cache-Control "no-cache"
     </FilesMatch>
+
+    # The icons are the other exception, and they are caught by the rule above
+    # because they are a .svg and a .png. Nothing hashes their names, so a year
+    # of immutable means a device that has ever loaded the site keeps the old
+    # mark until somebody clears it by hand. A day is plenty for a favicon.
+    # This block follows the fingerprint rule deliberately: Header set replaces,
+    # and the last one to match wins.
+    <FilesMatch "^(favicon\.(svg|png)|apple-touch-icon\.png)$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
 </IfModule>
 
 # Belt and braces. These should never be under the document root, but a
