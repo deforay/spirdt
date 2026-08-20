@@ -15,7 +15,7 @@
 # the invocation is as vendor-specific as the name, and baking one shape in would mean the
 # script only works with the tool it was written against, which is the thing being avoided.
 #
-# The brief is EXTRACTED from docs/engineering-standards.md §1 rather than duplicated here.
+# The brief is EXTRACTED from CONTRIBUTING.md §1 rather than duplicated here.
 # Two copies of a review checklist means the one nobody edits is the one that gets used.
 set -euo pipefail
 
@@ -54,10 +54,10 @@ if [ -z "${REVIEW_AGENT:-}" ]; then
 fi
 
 BRIEF="$(awk '/^\*\*The review brief/{found=1; next} found && /^> /{sub(/^> /,""); gsub(/^"|"$/,""); print; exit}' \
-    docs/engineering-standards.md)"
+    CONTRIBUTING.md)"
 
 if [ -z "$BRIEF" ]; then
-    echo "Could not extract the review brief from docs/engineering-standards.md §1." >&2
+    echo "Could not extract the review brief from CONTRIBUTING.md §1." >&2
     echo "Has the '**The review brief**' heading changed?" >&2
     exit 1
 fi
@@ -67,7 +67,7 @@ fi
 # of some PHP: without them it cannot know that a registry query missing the programme
 # scope, or a percentage banded before rounding, is a bug rather than a style choice.
 CONTEXT="Before reviewing, read these for the rules this codebase is held to:
-- docs/engineering-standards.md — the bar, and what counts as a finding
+- CONTRIBUTING.md — the bar, and what counts as a finding
 - docs/data-model.md — the two tenant scopes, and why organization_id on the registry
   is provenance rather than scope
 - docs/scoring.md — integer arithmetic, N/A excluded from both numerator and

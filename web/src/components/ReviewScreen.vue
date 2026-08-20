@@ -27,7 +27,7 @@ import type { ScoreResult, Template } from '@/scoring/types'
  * a site that cannot act on it never closes.
  */
 
-/** Same ramp as ScoreBadge and the checklist footer. See docs/design.md. */
+/** Same ramp as ScoreBadge and the checklist footer. See web/DESIGN.md. */
 const LEVEL_TONES: Record<number, string> = {
     0: 'bg-level-0 text-level-0-ink',
     1: 'bg-level-1 text-level-1-ink',

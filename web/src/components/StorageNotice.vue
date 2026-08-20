@@ -112,7 +112,7 @@ const message = computed(() => {
         The note is deliberately colourless. Green, amber and red mean a
         response on this app and nothing else, so a reassuring green tick here
         would be borrowing a word that is already spoken for — see
-        docs/design.md.
+        web/DESIGN.md.
     -->
     <div
         v-if="tone !== 'none'"

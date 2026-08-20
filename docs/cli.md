@@ -1,4 +1,4 @@
-# CLI Reference
+# CLI reference
 
 Every script in `bin/` carries a docblock and prints it with `--help`:
 
@@ -66,7 +66,7 @@ Takes a fresh clone to a running application: prerequisites, `.env` (generating 
 
 **Idempotent** — every step checks before acting.
 
-Written for **provisioning a machine**: production, or a demo box. It is safe on a development machine but not sufficient there, because it provisions the one database named in `.env` using credentials that must already exist — and development also needs the MySQL user and the separate test database. See [Installation](getting-started.md#option-b-native-no-docker) for the manual path.
+Written for **provisioning a machine**: production, or a demo box. It is safe on a development machine but not sufficient there, because it provisions the one database named in `.env` using credentials that must already exist — and development also needs the MySQL user and the separate test database. See [Installation](getting-started.md#option-b-native) for the manual path.
 
 | Flag | Effect |
 |---|---|
@@ -284,58 +284,6 @@ This is deliberately not a general user-management command. It does those four
 things and nothing else: a recovery tool that can do everything gets used for
 everything, and then it stops being audited as an exception.
 
-### `bin/dev/create-user`
-
-**Local development only.** Creates or updates one user, and creates the
-organisation and roles if they are missing — which is exactly why it does not
-belong on a server: on a typo it invents an organisation rather than refusing.
-Running it against an existing address resets that person's password and role
-rather than creating a duplicate.
-
-```bash
-bin/dev/create-user --org=demo --email=jane@example.org --name="Jane Doe" --role=assessor
-```
-
-Roles: `superadmin`, `admin`, `assessor`, `viewer`, `site_user`. Prompts for the
-password unless `--password` is given. Minimum twelve characters.
-
-Each role is created holding the permissions that role gets by default, so an
-account made this way reaches the same routes as one provisioned properly. The
-grants come from the same map `bin/provision-org` uses. Re-running restores a
-default that was removed by hand, which is another reason this is a development
-helper and not a server tool.
-
-## Review
-
-### `bin/dev/review`
-
-Runs an adversarial review pass against this repository's standing brief.
-
-```bash
-bin/dev/review                  # the working branch against main
-bin/dev/review <commit-sha>     # one commit
-bin/dev/review --uncommitted    # the working tree, before committing
-```
-
-Two settings, both from the untracked `.env` and both falling back to your shell
-profile:
-
-| Variable | What it is |
-|---|---|
-| `REVIEW_AGENT` | The command to run |
-| `REVIEW_AGENT_ARGS` | What that command needs before the prompt — a review subcommand for one tool, a non-interactive flag for another. Empty is fine |
-
-Keeping the invocation shape configurable matters as much as the name: baking
-one shape in would mean the script only works with the tool it was written
-against. Only these two keys are read from `.env` — something reading a diff has
-no business inheriting the database credentials or the JWT secret.
-
-The brief itself lives in
-[Engineering Standards](engineering-standards.md) and is extracted from there
-at run time rather than duplicated here. Two copies of a checklist means the
-one nobody edits is the one that runs — and the script fails loudly rather than
-reviewing with no brief if that heading ever moves.
-
 ## Reference data
 
 ### `bin/dev/publish-template`
@@ -352,26 +300,3 @@ bin/dev/publish-template
 this table, not the one bundled with the app, and a payload naming a template
 that is not here is refused. Re-running replaces the definition for the same
 code and version.
-
-### `bin/dev/seed-sites`
-
-Puts a few facilities and testing sites into an organisation, so the app has
-something to assess before the registry screens exist.
-
-```bash
-bin/dev/seed-sites --org=demo
-```
-
-Matched by facility and name, so running it twice does not duplicate anything.
-
-## Quality
-
-| Command | What it does |
-|---|---|
-| `composer test` | Full PHPUnit suite |
-| `composer test:unit` | Unit suite — no database, fast |
-| `composer test:integration` | Integration suite |
-| `composer test:feature` | Feature suite — full HTTP through the Slim stack |
-| `composer phpstan` | Static analysis at level 6 |
-| `composer cs:check` | Report style drift |
-| `composer cs:fix` | Apply style fixes |
