@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Refuse a commit message that advertises the tooling used to write it.
+#
+# This repository is presented as its author's own work, and a message is a
+# permanent, searchable artefact — a trailer added once is in the history for
+# good, and removing it later means rewriting published commits.
+#
+# Two of the three checks need no list to work, because they match the shape
+# rather than the name: an editor or assistant that appends a co-author trailer
+# or a "generated with" line is caught whichever one it is. The third takes its
+# words from FORBIDDEN_IN_MESSAGES in the untracked .env, for the same reason
+# REVIEW_AGENT lives there: naming a vendor in a tracked file to ban the vendor's
+# name defeats the point.
+#
+# Bypass once, deliberately, with `git commit --no-verify`.
+
+message_file="$1"
+
+# The commented-out diff and instructions git appends are not part of the
+# message, and a word appearing in the diff being committed is a matter for the
+# pre-commit hook rather than this one.
+body=$(grep -v '^#' "$message_file")
+
+# 1. Co-authorship. This repository has one author, so there is no case where a
+#    trailer here is correct, and the ones that get added automatically are the
+#    whole reason this hook exists.
+if printf '%s\n' "$body" | grep -qiE '^[[:space:]]*Co-Authored-By:'; then
+    echo "commit-msg: the message carries a Co-Authored-By trailer." >&2
+    echo "  This repository is single-author. Delete the line and commit again." >&2
+    exit 1
+fi
+
+# 2. The other common marker: a footer crediting the tool, with or without the
+#    robot it usually arrives with.
+if printf '%s\n' "$body" | grep -qiE 'generated with|🤖'; then
+    echo "commit-msg: the message credits the tool that produced it." >&2
+    echo "  Say what changed and why. Delete the line and commit again." >&2
+    exit 1
+fi
+
+# 3. Anything named in FORBIDDEN_IN_MESSAGES, space or comma separated. Read
+#    from the untracked .env, falling back to the environment, so the list
+#    itself never enters the repository.
+read_env() {
+    [ -f .env ] || return 0
+
+    awk -F= -v key="$1" '$0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+        sub(/^[^=]*=[[:space:]]*/, ""); gsub(/^["'\'']|["'\'']$/, ""); print; exit }' .env
+}
+
+words="${FORBIDDEN_IN_MESSAGES:-$(read_env FORBIDDEN_IN_MESSAGES)}"
+
+if [ -n "$words" ]; then
+    for word in $(printf '%s' "$words" | tr ',' ' '); do
+        if printf '%s\n' "$body" | grep -qi -- "$word"; then
+            echo "commit-msg: the message names something FORBIDDEN_IN_MESSAGES rules out." >&2
+            echo "  Rewrite it without that name and commit again." >&2
+            exit 1
+        fi
+    done
+fi
+
+exit 0

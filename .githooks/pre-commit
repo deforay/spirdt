@@ -54,4 +54,37 @@ if [ -n "$frontend" ]; then
     fi
 fi
 
+# The same names the commit-msg hook keeps out of messages are kept out of the
+# tree. A trailer is embarrassing; a tool name in a published document or a
+# source comment is the same artefact somewhere more people read it. The list
+# lives in the untracked .env, so banning a vendor's name does not require
+# writing it down here.
+read_env() {
+    [ -f .env ] || return 0
+
+    awk -F= -v key="$1" '$0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+        sub(/^[^=]*=[[:space:]]*/, ""); gsub(/^["'"'"']|["'"'"']$/, ""); print; exit }' .env
+}
+
+words="${FORBIDDEN_IN_MESSAGES:-$(read_env FORBIDDEN_IN_MESSAGES)}"
+
+# public/ is the compiled bundle and carries whatever its dependencies contain,
+# which is not this repository's prose to answer for.
+if [ -n "$words" ]; then
+    text=$(git diff --cached --name-only --diff-filter=ACM \
+        | grep -vE '^(public/|package-lock\.json|web/package-lock\.json)' || true)
+
+    for word in $(printf '%s' "$words" | tr ',' ' '); do
+        for file in $text; do
+            [ -f "$file" ] || continue
+
+            if grep -qi -- "$word" "$file" 2>/dev/null; then
+                echo "pre-commit: $file names something FORBIDDEN_IN_MESSAGES rules out." >&2
+                echo "  Take it out, or --no-verify if this file genuinely has to say it." >&2
+                exit 1
+            fi
+        done
+    done
+fi
+
 exit 0
