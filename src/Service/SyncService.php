@@ -137,6 +137,7 @@ final class SyncService
             'testing_site_id'  => $this->requireUuid($payload, 'testing_site_id'),
             'facility_id'      => $this->requireUuid($payload, 'facility_id'),
             'assessed_on'      => $this->requireString($payload, 'assessed_on'),
+            'audit_round'      => $this->auditRound($payload),
             'status'           => $status,
             'context'          => $context,
             'refers_specimens' => $this->refersSpecimens($context),
@@ -178,6 +179,34 @@ final class SyncService
         }
 
         return $assessment;
+    }
+
+    /**
+     * Which round this audit belongs to, as the device recorded it.
+     *
+     * Free text because the first round of a programme is usually called the
+     * baseline rather than 1 — see the migration for why that is the ministry's
+     * word to choose and not ours.
+     *
+     * Absent and empty are the same answer here: null. A device that has never
+     * heard of this field sends nothing, and an assessor who left it blank sent
+     * an empty string, and neither means anything other than "not recorded".
+     * Trimmed and cut to the column, because a payload arriving from a device
+     * is not a promise about lengths.
+     *
+     * @param array<string,mixed> $payload
+     */
+    private function auditRound(array $payload): ?string
+    {
+        $value = $payload['audit_round'] ?? null;
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $value = mb_substr(trim($value), 0, 30);
+
+        return $value === '' ? null : $value;
     }
 
     /**

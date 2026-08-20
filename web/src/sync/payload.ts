@@ -22,6 +22,8 @@ export interface SyncPayload {
     template_code: string
     template_version: string
     assessed_on: string
+    /** Omitted when the assessor left it blank; the server reads absent as unrecorded. */
+    audit_round?: string
     status: 'draft' | 'submitted'
     context: Record<string, unknown>
     device_id: string
@@ -99,6 +101,13 @@ export function buildPayload(
             template_code: assessment.templateCode,
             template_version: assessment.templateVersion,
             assessed_on: assessment.assessedOn,
+            // Omitted rather than sent empty. An assessment recorded before
+            // this field existed, and one where it was left blank, are the
+            // same fact — and sending "" would write one over a round an
+            // earlier sync had already stored.
+            ...(assessment.auditRound !== undefined && assessment.auditRound.trim() !== ''
+                ? { audit_round: assessment.auditRound.trim() }
+                : {}),
             // Only a submitted visit is reported as one. Anything still being
             // worked on syncs as a draft, which is a backup, not a submission.
             status: assessment.status === 'submitted' ? 'submitted' : 'draft',

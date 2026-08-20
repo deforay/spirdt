@@ -113,6 +113,13 @@ export const messages: Messages = {
 
     'setup.title': 'Preparar a auditoria',
     'setup.pathogensHeading': 'Testes realizados aqui',
+    'setup.roundHeading': 'Esta auditoria',
+    'setup.auditRound': 'Ronda de auditoria',
+    'setup.auditRoundPlaceholder': 'ex. 1',
+    'setup.auditRoundHint': 'Um número, ou uma palavra como Linha de base. Deixe em branco se o programa não trabalha por rondas.',
+    'review.auditRound': 'Ronda de auditoria',
+    'report.auditRound': 'Ronda de auditoria',
+    'reports.round': 'Ronda',
     'setup.contextHeading': 'Sobre o local',
     'setup.start': 'Começar a lista',
     'setup.backToChecklist': 'Voltar à lista',

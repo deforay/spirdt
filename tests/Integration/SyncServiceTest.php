@@ -114,6 +114,54 @@ final class SyncServiceTest extends TestCase
         self::assertFalse($result['score']['is_complete'], 'a partial visit is not complete');
     }
 
+    public function testTheAuditRoundIsStoredAsTheDeviceWroteIt(): void
+    {
+        $payload = $this->payload();
+        $payload['audit_round'] = '  Baseline  ';
+
+        $result = (new SyncService())->accept($payload);
+        $stored = Assessment::findByUuid($result['assessment_id']);
+
+        self::assertNotNull($stored);
+        self::assertSame(
+            'Baseline',
+            $stored->audit_round,
+            'a round is a word as often as a number, and it arrives with the spacing a phone keyboard gave it',
+        );
+    }
+
+    public function testAnAbsentOrEmptyAuditRoundIsStoredAsNothing(): void
+    {
+        // A device that predates the field sends nothing; an assessor who left
+        // it blank sends an empty string. Both mean "not recorded", and an
+        // empty string in the column would sort and filter as a real value.
+        foreach ([null, ['audit_round' => ''], ['audit_round' => '   ']] as $variant) {
+            $payload = $this->payload();
+
+            if (is_array($variant)) {
+                $payload += $variant;
+            }
+
+            $stored = Assessment::findByUuid((new SyncService())->accept($payload)['assessment_id']);
+
+            self::assertNotNull($stored);
+            self::assertNull($stored->audit_round);
+        }
+    }
+
+    public function testAnOverlongAuditRoundIsCutToTheColumn(): void
+    {
+        // Nothing on the device stops a paste, and a payload arriving from a
+        // phone is not a promise about lengths.
+        $payload = $this->payload();
+        $payload['audit_round'] = str_repeat('R', 60);
+
+        $stored = Assessment::findByUuid((new SyncService())->accept($payload)['assessment_id']);
+
+        self::assertNotNull($stored);
+        self::assertSame(30, mb_strlen((string) $stored->audit_round));
+    }
+
     public function testFindingsAreStoredAndNotDuplicatedOnRetry(): void
     {
         $sync = new SyncService();

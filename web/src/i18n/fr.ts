@@ -116,6 +116,13 @@ export const messages: Messages = {
 
     'setup.title': 'Préparer l’audit',
     'setup.pathogensHeading': 'Tests réalisés ici',
+    'setup.roundHeading': 'Cet audit',
+    'setup.auditRound': 'Cycle d’audit',
+    'setup.auditRoundPlaceholder': 'ex. 1',
+    'setup.auditRoundHint': 'Un chiffre, ou un mot comme Référence. Laissez vide si le programme ne procède pas par cycles.',
+    'review.auditRound': 'Cycle d’audit',
+    'report.auditRound': 'Cycle d’audit',
+    'reports.round': 'Cycle',
     'setup.contextHeading': 'À propos du site',
     'setup.start': 'Commencer la liste',
     'setup.backToChecklist': 'Retour à la liste',

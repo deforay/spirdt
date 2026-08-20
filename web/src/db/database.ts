@@ -51,6 +51,16 @@ export interface StoredAssessment {
     templateVersion: string
     /** The date of the visit, YYYY-MM-DD. Not the date it was synced. */
     assessedOn: string
+    /**
+     * Which round of auditing this belongs to — "1", "Baseline", "Phase II".
+     *
+     * Text, because the first round of a programme is usually not called 1.
+     * Optional, and no Dexie version was added for it: IndexedDB stores whole
+     * objects, so a device carrying audits recorded before this shipped keeps
+     * them and simply has no round on those rows, which is the truth about
+     * them.
+     */
+    auditRound?: string
     /** Part A answers, keyed by field code. */
     context: Record<string, unknown>
     /** In sequence order. Section 4 repeats once per entry. */

@@ -14,6 +14,8 @@ export interface AssessmentRow {
     id: string
     status: string
     assessed_on: string | null
+    /** Which round of auditing this belongs to. Free text; null when unrecorded. */
+    audit_round: string | null
     submitted_at: string | null
     campaign_id: number | null
     campaign: string | null
@@ -125,6 +127,7 @@ export interface Report {
         started_at: string | null
         ended_at: string | null
         submitted_at: string | null
+        audit_round: string | null
         previous_assessed_on: string | null
         refers_specimens: boolean | null
         context: Record<string, unknown>

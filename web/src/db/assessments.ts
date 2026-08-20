@@ -54,6 +54,8 @@ export interface NewAssessment {
     templateVersion: string
     /** Defaults to today. A visit entered the next morning must say so. */
     assessedOn?: string
+    /** Which round of auditing this is. Free text; often "Baseline". */
+    auditRound?: string
     context?: Record<string, unknown>
     pathogens?: StoredPathogen[]
 }
@@ -70,6 +72,7 @@ export async function createAssessment(input: NewAssessment): Promise<StoredAsse
         templateCode: input.templateCode,
         templateVersion: input.templateVersion,
         assessedOn: input.assessedOn ?? now.slice(0, 10),
+        auditRound: input.auditRound ?? '',
         context: input.context ?? {},
         pathogens: input.pathogens ?? [],
         status: 'draft',
@@ -196,6 +199,42 @@ export async function saveContext(
                 kind: 'context',
                 subject: assessmentId,
                 payload: context,
+            })
+        })
+    })
+}
+
+/**
+ * Set which round of auditing this belongs to.
+ *
+ * Its own writer rather than a context field, because it is a fact about the
+ * audit and not an answer to a question the instrument asks: it is stored in a
+ * column, filtered on, and printed at the head of the report. Putting it in
+ * the template's context would have made it invisible to any programme whose
+ * template does not mention it, which is all of them.
+ *
+ * Marks the assessment pending like every other edit, so an audit whose round
+ * is corrected after it synced sends the correction.
+ */
+export async function saveAuditRound(assessmentId: string, input: string): Promise<void> {
+    const auditRound = input.trim().slice(0, 30)
+
+    await chain(`round:${assessmentId}`, async () => {
+        const now = new Date().toISOString()
+
+        await db.transaction('rw', db.assessments, db.journal, async () => {
+            await db.assessments.update(assessmentId, {
+                auditRound,
+                updatedAt: now,
+                syncState: 'pending',
+                syncError: null,
+            })
+            await db.journal.add({
+                assessmentId,
+                at: now,
+                kind: 'context',
+                subject: assessmentId,
+                payload: { auditRound },
             })
         })
     })

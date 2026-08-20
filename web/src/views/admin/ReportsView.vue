@@ -225,13 +225,14 @@ onMounted(async () => {
                         <th>{{ t('registry.siteName') }}</th>
                         <th>{{ t('registry.facilityName') }}</th>
                         <th>{{ t('report.assessedOn') }}</th>
+                        <th>{{ t('reports.round') }}</th>
                         <th>{{ t('admin.status') }}</th>
                         <th class="text-right">{{ t('report.overall') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="!loading && rows.length === 0">
-                        <td colspan="5" class="text-label-2">{{ t('reports.nothingYet') }}</td>
+                        <td colspan="6" class="text-label-2">{{ t('reports.nothingYet') }}</td>
                     </tr>
 
                     <tr v-for="row in rows" :key="row.id">
@@ -250,6 +251,11 @@ onMounted(async () => {
                             </span>
                         </td>
                         <td class="tnum text-label-2">{{ row.assessed_on }}</td>
+                        <!-- An em dash rather than an empty cell. A blank in a
+                             table reads as a rendering fault; this says the
+                             round was not recorded, which for every audit
+                             filed before the field existed is the truth. -->
+                        <td class="text-label-2">{{ row.audit_round || '—' }}</td>
                         <td>
                             <!-- A draft is a state of the document, so it is
                                  stated. Everything else is the ordinary case

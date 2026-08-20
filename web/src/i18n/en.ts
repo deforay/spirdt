@@ -116,6 +116,13 @@ export const messages = {
 
     'setup.title': 'Set up the audit',
     'setup.pathogensHeading': 'Tests performed here',
+    'setup.roundHeading': 'This audit',
+    'setup.auditRound': 'Audit round',
+    'setup.auditRoundPlaceholder': 'e.g. 1',
+    'setup.auditRoundHint': 'A number, or a word like Baseline. Leave it blank if the programme does not run rounds.',
+    'review.auditRound': 'Audit round',
+    'report.auditRound': 'Audit round',
+    'reports.round': 'Round',
     'setup.contextHeading': 'About the site',
     'setup.start': 'Start the checklist',
     'setup.backToChecklist': 'Back to the checklist',

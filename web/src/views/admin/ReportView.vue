@@ -376,6 +376,14 @@ onMounted(load)
                         <dt class="eyebrow text-label-3">{{ t('report.assessedOn') }}</dt>
                         <dd class="tnum mt-0.5">{{ date(report.assessment.assessed_on) }}</dd>
                     </div>
+                    <!-- Beside the date because it is the other half of
+                         when: the date says which day, the round says which
+                         pass through the programme, and a report that is
+                         compared with another is compared within a round. -->
+                    <div v-if="report.assessment.audit_round">
+                        <dt class="eyebrow text-label-3">{{ t('report.auditRound') }}</dt>
+                        <dd class="mt-0.5">{{ report.assessment.audit_round }}</dd>
+                    </div>
                     <div v-if="report.assessment.previous_assessed_on">
                         <dt class="eyebrow text-label-3">{{ t('report.previousVisit') }}</dt>
                         <dd class="tnum mt-0.5">

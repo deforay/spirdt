@@ -44,6 +44,8 @@ const props = defineProps<{
     /** Response by `${questionCode}|${pathogen}`. Passed in rather than re-derived. */
     answersByKey: Map<string, string | null>
     siteName: string
+    /** Which round this audit belongs to. Blank when the programme runs none. */
+    auditRound?: string
     /** The visit this review belongs to, and its Part A answers, for signatures. */
     assessmentId: string
     context: Record<string, unknown>
@@ -264,7 +266,17 @@ function summaryOf(gap: Gap): string {
                 </button>
             </div>
             <h1 class="text-[32px] font-bold tracking-tight">{{ t('review.title') }}</h1>
-            <p class="mt-0.5 text-[14px] text-label-2">{{ siteName }}</p>
+            <p class="mt-0.5 text-[14px] text-label-2">
+                {{ siteName }}
+                <!-- Said on the last screen before submission, because this is
+                     the one field on the setup form that nothing downstream can
+                     infer or correct: a wrong date is visible in the record, a
+                     wrong round is only visible to whoever knows which pass
+                     this was. -->
+                <span v-if="auditRound">
+                    · {{ t('review.auditRound') }} {{ auditRound }}
+                </span>
+            </p>
         </header>
 
         <main

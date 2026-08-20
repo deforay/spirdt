@@ -66,6 +66,7 @@ const applicabilityFields = computed(() =>
 )
 
 const draftContext = ref<Context>({})
+const draftRound = ref('')
 const draftPathogens = ref<StoredPathogen[]>([])
 
 /**
@@ -259,6 +260,7 @@ async function restorePosition(): Promise<boolean> {
     if (wanted === 'setup' || existing.pathogens.length === 0) {
         draftContext.value = { ...existing.context }
         draftPathogens.value = [...existing.pathogens]
+        draftRound.value = existing.auditRound ?? ''
         stage.value = 'setup'
 
         return true
@@ -310,6 +312,7 @@ async function onResume(id: string) {
     if (stage.value === 'setup') {
         draftContext.value = { ...existing.context }
         draftPathogens.value = [...existing.pathogens]
+        draftRound.value = existing.auditRound ?? ''
     }
 }
 
@@ -325,6 +328,7 @@ async function onSiteChosen(site: Site) {
 
     draftContext.value = { assessment_date: new Date().toISOString().slice(0, 10) }
     draftPathogens.value = []
+    draftRound.value = ''
     revisitingSetup.value = false
     stage.value = 'setup'
 }
@@ -371,6 +375,7 @@ async function startChecklist() {
 
     await assessment.updateContext(draftContext.value)
     await assessment.updatePathogens(draftPathogens.value)
+    await assessment.updateAuditRound(draftRound.value)
 
     // Returning from a correction keeps the assessor where they were. Only a
     // visit being set up for the first time starts at the beginning.
@@ -659,6 +664,7 @@ function editSetup() {
 
     draftContext.value = { ...current.context }
     draftPathogens.value = [...current.pathogens]
+    draftRound.value = current.auditRound ?? ''
     revisitingSetup.value = true
     stage.value = 'setup'
 }
@@ -765,7 +771,39 @@ async function onSubmit() {
                 past it — it is the thing the form's last section depends on.
             -->
             <section class="rounded-surface border border-hairline bg-surface p-5 md:sticky md:top-4">
+                <!--
+                    Which round this audit belongs to, asked before what it
+                    covers, because it is the thing that files the audit rather
+                    than a fact about the laboratory. It sits in this card and
+                    not in Part A: Part A is what the instrument asks, and no
+                    instrument asks this.
+
+                    Free text on purpose. The first round of a programme is
+                    usually the baseline and is called that, so a number field
+                    would push the word into a comment somewhere.
+                -->
                 <h2 class="eyebrow pb-3 text-label-3">
+                    {{ t('setup.roundHeading') }}
+                </h2>
+
+                <label class="flex flex-col gap-1.5">
+                    <span class="text-[14px] font-medium text-label-2">
+                        {{ t('setup.auditRound') }}
+                    </span>
+                    <input
+                        v-model="draftRound"
+                        type="text"
+                        maxlength="30"
+                        autocapitalize="words"
+                        class="field"
+                        :placeholder="t('setup.auditRoundPlaceholder')"
+                    />
+                    <span class="text-[13px] leading-snug text-label-3">
+                        {{ t('setup.auditRoundHint') }}
+                    </span>
+                </label>
+
+                <h2 class="eyebrow pb-3 pt-5 text-label-3">
                     {{ t('setup.pathogensHeading') }}
                 </h2>
                 <PathogenSetup
@@ -820,6 +858,7 @@ async function onSubmit() {
         :findings="assessment.findings"
         :answers-by-key="answersByKey"
         :site-name="assessment.assessment.value?.siteName ?? ''"
+        :audit-round="assessment.assessment.value?.auditRound ?? ''"
         :assessment-id="assessment.assessment.value?.id ?? ''"
         :context="assessment.assessment.value?.context ?? {}"
         :submitting="submitting"

@@ -9,6 +9,7 @@ import {
     loadAnswers,
     loadFindings,
     saveAnswer,
+    saveAuditRound,
     saveContext,
     saveLocation,
     questionGroupKey,
@@ -326,6 +327,19 @@ export function useAssessment(template: Template) {
         assessment.value = { ...current, context }
     }
 
+    async function updateAuditRound(auditRound: string) {
+        const current = assessment.value
+
+        if (!current) {
+            return
+        }
+
+        const trimmed = auditRound.trim().slice(0, 30)
+
+        await saveAuditRound(current.id, trimmed)
+        assessment.value = { ...current, auditRound: trimmed }
+    }
+
     const answers = computed<AnswerInput[]>(() =>
         [...responses.entries()]
             .filter(([, value]) => value !== null)
@@ -367,6 +381,7 @@ export function useAssessment(template: Template) {
         setResponse,
         setComment,
         updateContext,
+        updateAuditRound,
         findings,
         findingsFor,
         newFinding,
