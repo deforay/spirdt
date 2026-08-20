@@ -16,7 +16,9 @@ phpstan-baseline.neon
 # mkdocs build output
 /site/
 
-# Source instrument documents are NOT distributed with this repository.
-# Obtain them separately to regenerate the base template.
+# The two source instrument documents are tracked, in resources/source/, so the
+# extracted text and the generated template can be checked against what they came
+# from. A Word file anywhere else is somebody's working copy and stays out.
 *.docx
 *.doc
+!resources/source/*.docx
