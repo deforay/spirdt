@@ -37,23 +37,21 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting Started:
+  - Install and update:
       - Installation: getting-started.md
-      - CLI Reference: cli.md
-  - Operations:
       - Deployment: deployment.md
-      - Backup & Upgrade: operations.md
-  - Reference:
+      - Backup and upgrade: operations.md
+      - CLI reference: cli.md
+  - Using the platform:
+      - Conducting an audit: conducting-an-audit.md
+      - Administering the platform: administering.md
+      - Scoring: scoring.md
+  - Technical:
       - Architecture: architecture.md
-      - Data Model: data-model.md
+      - Data model: data-model.md
       - Templates: templates.md
       - Languages: i18n.md
       - Signatures: signatures.md
-      - Scoring: scoring.md
-      - Design: design.md
-      - Engineering Standards: engineering-standards.md
-  - What's Left: todo.md
-  - Design Brief: design-brief.md
 
 markdown_extensions:
   - admonition

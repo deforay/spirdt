@@ -8,16 +8,20 @@ Replaces a paper checklist and supersedes the older ODK-based SPI-RRT tool.
 
 **<https://deforay.github.io/spirdt/>** — everything below the surface lives there, and this file deliberately does not repeat it. Two copies of an instruction drift, and the copy nobody publishes is the one that goes stale.
 
+The site serves three readers: whoever installs it, whoever uses it, and whoever wants to know how it is built.
+
 | If you want to | Read |
 |---|---|
 | Set this up on a machine | [Installation](https://deforay.github.io/spirdt/getting-started/) |
-| Know why it is built this way | [Design brief](https://deforay.github.io/spirdt/design-brief/) |
-| Understand the scoring | [Scoring](https://deforay.github.io/spirdt/scoring/) |
-| Change the schema | [Data model](https://deforay.github.io/spirdt/data-model/) |
 | Put it on a server | [Deployment](https://deforay.github.io/spirdt/deployment/) |
-| Run a backup or an upgrade | [Operations](https://deforay.github.io/spirdt/operations/) |
-| Work on the front end | [Design](https://deforay.github.io/spirdt/design/) |
-| Know what is left | [What is left](https://deforay.github.io/spirdt/todo/) |
+| Run a backup or an upgrade | [Backup and upgrade](https://deforay.github.io/spirdt/operations/) |
+| Run an audit on a tablet | [Conducting an audit](https://deforay.github.io/spirdt/conducting-an-audit/) |
+| Manage the registry, accounts and reports | [Administering the platform](https://deforay.github.io/spirdt/administering/) |
+| Understand the scoring | [Scoring](https://deforay.github.io/spirdt/scoring/) |
+| Know why it is built this way | [Architecture](https://deforay.github.io/spirdt/architecture/) |
+| Change the schema | [Data model](https://deforay.github.io/spirdt/data-model/) |
+
+Two things are kept out of the published site, because they serve whoever changes the code rather than any of those three: [CONTRIBUTING.md](CONTRIBUTING.md) is the engineering bar and the review that enforces it, and [web/DESIGN.md](web/DESIGN.md) is the design system the assessor app is built to.
 
 The sources are in `docs/`, published to GitHub Pages on push to `main`.
 
@@ -95,10 +99,10 @@ web/            Vue app sources. Builds into public/
 - **Tenant isolation is the top security concern.** The tenant is resolved from the authenticated user in middleware, never from a request parameter.
 - **Maintainability over clever code.** If a junior developer cannot follow it in a year, it is wrong.
 
-Both are expanded, with the reasoning, in the [design brief](https://deforay.github.io/spirdt/design-brief/).
+Both are expanded, with the reasoning, in [Architecture](https://deforay.github.io/spirdt/architecture/).
 
 ## Status
 
-In development, and usable end to end: an assessor can sign in offline, work a visit through all five sections, record findings, sign, and sync. The server scores what arrives, snapshots the result and refuses an incomplete or invalid submission.
+In development, and usable end to end: an assessor can sign in offline, work a visit through all five sections, record findings, sign, and sync. The server scores what arrives, snapshots the result and refuses an incomplete or invalid submission. On the management side the registry, accounts and roles, assignments, the activity trail, the per-visit report and the dashboard are all in place.
 
-Not built yet: the report and certificate, the dashboard, photograph capture, and bulk registry import. [What is left](https://deforay.github.io/spirdt/todo/) is kept current and says why for each.
+Not built yet: the certificate, photograph capture, and bulk registry import.
