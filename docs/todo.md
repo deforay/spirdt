@@ -238,6 +238,27 @@ like.
 
 ## Known weak spots
 
+- **`bin/setup.sh` assumes the server is bare, and the first real one was not.**
+  Run on a box already serving two other applications, it died at
+  `secure_mysql`: MySQL predated the run and its `root` does not authenticate
+  by unix socket, so `mysql --protocol=socket -uroot` was refused. Ubuntu keeps
+  a full-privilege fallback at `/etc/mysql/debian.cnf`, which is what a shared
+  host has to be driven through. Three further steps are wrong on a shared box
+  and were skipped by hand: `secure_mysql` prunes accounts in somebody else's
+  MySQL; `write_vhost` offers to disable `000-default`, which is the fallback
+  for every other site on the machine; and `tune_php_ini` writes a global
+  drop-in that would have *lowered* `upload_max_filesize` from the 1G the host
+  had set to 12M, for every application sharing that PHP. The script needs to
+  detect a pre-existing stack and confine itself to this installation — a
+  per-vhost `php_admin_value` instead of a conf.d file, and no changes to
+  accounts or sites it did not create. Until then it is safe only on a machine
+  with nothing else on it.
+- **`bin/setup.sh` leaves two things for `bin/setup` that it does not do.**
+  `APP_KEY` is never generated, so the settings screen cannot store an SMTP
+  password on a fresh install until somebody writes one by hand; and
+  `bin/dev/publish-template` is not run, so the server has no template to score
+  against and the first sync is refused days later rather than the install
+  failing. Both were done manually on the first deployment.
 - **Non-English wording is unreviewed.** French, Portuguese and Spanish were
   written in one pass and no native speaker has read them. One file each, about
   90 lines. See `docs/i18n.md`.
