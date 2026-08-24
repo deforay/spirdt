@@ -78,6 +78,11 @@ return static function (App $app): void {
         // will not complete cannot hold up the assessment it belongs to.
         // Idempotent on the checksum of what arrives.
         $group->post('/attachments', AttachmentAction::class);
+
+        // Taking one back. Photographs are deleted by the assessor who took
+        // them; signatures are replaced by signing again and this refuses
+        // them, which is why the route names no kind.
+        $group->delete('/attachments/{id}', [AttachmentAction::class, 'destroy']);
     })
         // Inside AuthMiddleware, which is what resolves the permissions. A
         // viewer reads collected data and does not collect it, and a site_user

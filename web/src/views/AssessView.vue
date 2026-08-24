@@ -11,6 +11,7 @@ import ContextForm from '@/components/ContextForm.vue'
 import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
 import SectionActions from '@/components/SectionActions.vue'
+import SectionPhotos from '@/components/SectionPhotos.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
 import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
 import { useAssessment } from '@/composables/useAssessment'
@@ -1000,6 +1001,7 @@ async function onSubmit() {
                 />
             </section>
 
+            <div class="md:mt-0">
             <section class="mt-5 rounded-surface border border-hairline bg-surface p-5 md:mt-0 md:p-6">
                 <h2 class="eyebrow pb-4 text-label-3">
                     {{ t('setup.contextHeading') }}
@@ -1011,6 +1013,18 @@ async function onSubmit() {
                     :problems="contextProblems"
                 />
             </section>
+
+            <!-- The site itself is photographed here, on the screen the
+                 assessor already thinks of as the section before the first
+                 one — the building, the entrance, the bench. Same component,
+                 same five, same offline queue as every section. -->
+            <SectionPhotos
+                v-if="assessment.assessment.value !== null"
+                class="mt-5"
+                :assessment-id="assessment.assessment.value.id"
+                section-code="site"
+            />
+            </div>
         </main>
 
         <footer class="border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6">
@@ -1490,6 +1504,17 @@ async function onSubmit() {
                             </strong>
                         </div>
                     </div>
+
+                    <!-- What was seen, before what is to be done about it.
+                         The assessor photographs the empty shelf and then
+                         agrees the action about it, in that order, standing in
+                         the same room. -->
+                    <SectionPhotos
+                        v-if="assessment.assessment.value !== null"
+                        class="mb-4"
+                        :assessment-id="assessment.assessment.value.id"
+                        :section-code="section.code"
+                    />
 
                     <!-- What is to be done about this section's gaps, asked
                          where the predecessor asked and where the debrief

@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 
 import { deleteSitePhoto, fetchSitePhoto, uploadSitePhoto } from '@/api/registry'
+import { resizedForUpload } from '@/media/image'
 import { t } from '@/i18n'
 
 /**
@@ -16,12 +17,8 @@ import { t } from '@/i18n'
  * phone or tablet straight to its camera, and falls back to the file picker on
  * a desktop, which is the right behaviour on both. Nothing here depends on it.
  *
- * RESIZED BEFORE IT IS SENT, and this is not an optimisation. A photograph off
- * a current phone is several megabytes — past what the server accepts — and
- * none of that detail helps somebody recognise a room. The upload also happens
- * over whatever connection a district office has, so the difference between
- * three megabytes and two hundred kilobytes is the difference between a photo
- * that arrives and one that times out.
+ * RESIZED BEFORE IT IS SENT — see media/image, which does the same job for the
+ * photographs taken during an audit.
  *
  * SENT AS SOON AS IT IS TAKEN, rather than held until Save. The site already
  * exists by the time this is shown, the image is not part of the form's
@@ -40,18 +37,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ change: [hasPhoto: boolean] }>()
-
-/**
- * The long edge, in pixels.
- *
- * Enough to read a label on a shelf, and about a fifth of what the camera
- * produced. A room is recognisable well below this; a serial number on a
- * machine is not, and that is what pushes it above a thumbnail.
- */
-const MAX_EDGE = 1600
-
-/** Visibly indistinguishable from the original at this size, and a third of the bytes. */
-const QUALITY = 0.82
 
 const imageUrl = ref<string | null>(null)
 const busy = ref(false)
@@ -78,55 +63,6 @@ async function load(): Promise<void> {
     show(await fetchSitePhoto(props.siteId))
 }
 
-/**
- * The same picture, small enough to send.
- *
- * `imageOrientation` matters more than it looks: a photograph taken with the
- * phone on its side is stored upright with a rotation flag in its EXIF, and a
- * canvas that ignores that produces a sideways image with no flag left to fix
- * it. Decoding with the orientation applied bakes it in the right way up.
- *
- * Falls back to the original bytes rather than failing. A browser without
- * createImageBitmap or toBlob still gets to send a photograph, and the server
- * refuses it with a size message if it is too big — which is a worse outcome
- * than resizing and a much better one than a button that does nothing.
- */
-async function resized(file: File): Promise<Blob> {
-    if (typeof createImageBitmap !== 'function') {
-        return file
-    }
-
-    let bitmap: ImageBitmap
-
-    try {
-        bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    } catch {
-        return file
-    }
-
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(bitmap.width * scale)
-    canvas.height = Math.round(bitmap.height * scale)
-
-    const context = canvas.getContext('2d')
-
-    if (context === null) {
-        bitmap.close()
-
-        return file
-    }
-
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-    bitmap.close()
-
-    const encoded = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', QUALITY),
-    )
-
-    return encoded ?? file
-}
-
 async function onPicked(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0] ?? null
@@ -149,7 +85,7 @@ async function onPicked(event: Event): Promise<void> {
     busy.value = true
 
     try {
-        const image = await resized(file)
+        const image = await resizedForUpload(file)
         await uploadSitePhoto(props.siteId, image)
         show(image)
         emit('change', true)

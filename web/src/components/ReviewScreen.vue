@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import SignatureSection from '@/components/SignatureSection.vue'
-import type { StoredFinding } from '@/db/database'
+import { photosForAssessment } from '@/db/attachments'
+import type { StoredAttachment, StoredFinding } from '@/db/database'
 import { formatNumber, formatPercent, t, text } from '@/i18n'
 import type { ScoreResult, Template } from '@/scoring/types'
 
@@ -72,6 +73,101 @@ const questionText = computed(() => {
     }
 
     return index
+})
+
+/**
+ * Every photograph of the visit, gathered by the part of the audit it belongs
+ * to.
+ *
+ * CLOSED UNTIL SOMEBODY ASKS. Five sections at five photographs each is
+ * twenty-five images, and a review screen that decoded all of them on open
+ * would spend several seconds and a hundred megabytes doing it — on the screen
+ * an assessor reaches at the end of a long day, on the device with the least
+ * to spare. So each group says how many it holds and hands over the pictures
+ * when it is opened.
+ *
+ * Object URLs are minted on opening and revoked on closing for the same
+ * reason. They are references the document keeps alive until told otherwise;
+ * left to accumulate they are the whole visit's images held in memory at once.
+ */
+const photos = ref<StoredAttachment[]>([])
+const openSections = ref(new Set<string>())
+const previews = ref(new Map<string, string>())
+
+watch(
+    () => props.assessmentId,
+    async (id) => {
+        photos.value = id === '' ? [] : await photosForAssessment(id)
+    },
+    { immediate: true },
+)
+
+interface PhotoGroup {
+    code: string
+    label: string
+    rows: StoredAttachment[]
+}
+
+/**
+ * In the order the audit is worked: the site first, then the sections.
+ *
+ * 'site' is the setup screen, which the assessor sees as the section before
+ * the first one and which is where the building and the bench are
+ * photographed.
+ */
+const photoGroups = computed<PhotoGroup[]>(() => {
+    const order = ['site', ...props.template.sections.map((section) => section.code)]
+    const titles = new Map(props.template.sections.map((s) => [s.code, text(s.title)]))
+    const groups: PhotoGroup[] = []
+
+    for (const code of order) {
+        const rows = photos.value.filter((row) => row.sectionCode === code)
+
+        if (rows.length === 0) {
+            continue
+        }
+
+        groups.push({
+            code,
+            label: code === 'site' ? t('checklist.editSetup') : (titles.get(code) ?? code),
+            rows,
+        })
+    }
+
+    return groups
+})
+
+function togglePhotos(group: PhotoGroup): void {
+    if (openSections.value.has(group.code)) {
+        openSections.value.delete(group.code)
+
+        for (const row of group.rows) {
+            const url = previews.value.get(row.key)
+
+            if (url !== undefined) {
+                URL.revokeObjectURL(url)
+                previews.value.delete(row.key)
+            }
+        }
+
+        return
+    }
+
+    openSections.value.add(group.code)
+
+    for (const row of group.rows) {
+        if (!previews.value.has(row.key)) {
+            previews.value.set(row.key, URL.createObjectURL(row.blob))
+        }
+    }
+}
+
+onBeforeUnmount(() => {
+    for (const url of previews.value.values()) {
+        URL.revokeObjectURL(url)
+    }
+
+    previews.value.clear()
 })
 
 interface Gap {
@@ -463,6 +559,73 @@ function summaryOf(gap: Gap): string {
                 </div>
 
                 <p v-else class="px-1 text-[16px] text-label-2">{{ t('review.noGaps') }}</p>
+            </section>
+
+            <!--
+                What was seen, section by section, on request.
+
+                Grouped rather than listed flat because "show me the pictures
+                from Safety" is the question somebody actually has in front of
+                a report, and closed by default because a visit's worth of
+                photographs is more than this screen should decode before
+                anybody has asked for one.
+            -->
+            <section class="mb-4">
+                <h2 class="flex items-baseline justify-between gap-3 pb-2.5">
+                    <span class="eyebrow text-label-3">{{ t('photos.reviewHeading') }}</span>
+                    <span v-if="photos.length > 0" class="tnum text-[13px] text-label-3">
+                        {{ t('photos.reviewCount', { count: photos.length }) }}
+                    </span>
+                </h2>
+
+                <div
+                    v-if="photoGroups.length > 0"
+                    class="overflow-hidden rounded-surface border border-hairline bg-surface"
+                >
+                    <div
+                        v-for="(group, index) in photoGroups"
+                        :key="group.code"
+                        :class="index > 0 ? 'border-t border-hairline' : ''"
+                    >
+                        <button
+                            type="button"
+                            class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
+                            :aria-expanded="openSections.has(group.code)"
+                            @click="togglePhotos(group)"
+                        >
+                            <span class="min-w-0 flex-1 truncate text-[16px]">{{ group.label }}</span>
+                            <span class="tnum shrink-0 text-[14px] text-label-2">
+                                {{ t('photos.reviewCount', { count: group.rows.length }) }}
+                            </span>
+                            <span class="shrink-0 text-label-3" aria-hidden="true">
+                                {{ openSections.has(group.code) ? '‹' : '›' }}
+                            </span>
+                        </button>
+
+                        <div
+                            v-if="openSections.has(group.code)"
+                            class="grid gap-3 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3"
+                        >
+                            <figure
+                                v-for="row in group.rows"
+                                :key="row.key"
+                                class="overflow-hidden rounded-card border border-hairline bg-surface-2"
+                            >
+                                <img
+                                    :src="previews.get(row.key)"
+                                    :alt="row.caption ?? t('photos.untitled')"
+                                    class="block h-40 w-full bg-white object-cover"
+                                />
+                                <figcaption class="px-2.5 py-2 text-[14px] leading-snug">
+                                    <span v-if="row.caption">{{ row.caption }}</span>
+                                    <span v-else class="text-label-3">{{ t('photos.untitled') }}</span>
+                                </figcaption>
+                            </figure>
+                        </div>
+                    </div>
+                </div>
+
+                <p v-else class="px-1 text-[16px] text-label-2">{{ t('photos.reviewEmpty') }}</p>
             </section>
           </div>
 

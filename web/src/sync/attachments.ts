@@ -1,9 +1,14 @@
 import { ApiError, apiRequest } from '../api/client'
-import { dirtyAttachments, markAttachmentFailed, markAttachmentSynced } from '../db/attachments'
+import {
+    dirtyAttachments,
+    forgetAttachment,
+    markAttachmentFailed,
+    markAttachmentSynced,
+} from '../db/attachments'
 import type { StoredAttachment } from '../db/database'
 
 /**
- * Getting signatures off the device.
+ * Getting signatures and photographs off the device.
  *
  * A separate channel from the assessment, which is the whole point of the
  * design: an image is orders of magnitude larger than the payload it belongs
@@ -23,6 +28,9 @@ interface UploadAck {
     kind: string
     role: string | null
     signed_name: string | null
+    section_code: string | null
+    caption: string | null
+    client_key: string | null
     checksum: string
     byte_size: number
 }
@@ -46,10 +54,24 @@ async function upload(row: StoredAttachment): Promise<void> {
         form.append('question_code', row.questionCode)
     }
 
+    if (row.sectionCode !== null) {
+        form.append('section_code', row.sectionCode)
+
+        // The identity of this photograph, minted here before it was ever
+        // uploaded. It is what makes a retry free: the server matches on it
+        // rather than on the bytes, which cannot distinguish two pictures of
+        // the same shelf taken a minute apart by a phone that did not move.
+        form.append('client_key', row.key)
+    }
+
+    if (row.caption !== null) {
+        form.append('caption', row.caption)
+    }
+
     // The filename is required by the multipart encoding and ignored by the
     // server, which mints its own — a name chosen by a client is how a path
     // traversal gets in, and nothing about this one is information.
-    form.append('file', row.blob, 'signature.png')
+    form.append('file', row.blob, row.kind === 'photo' ? 'photo.jpg' : 'signature.png')
 
     const ack = await apiRequest<UploadAck>('/sync/attachments', {
         body: form,
@@ -73,10 +95,32 @@ async function upload(row: StoredAttachment): Promise<void> {
  * Throwing also stops the remaining images. A device with no signal would
  * otherwise attempt each one in turn and upload nothing several times over.
  */
+/**
+ * Tell the server about a photograph the assessor deleted.
+ *
+ * The row survives locally until this is acknowledged, then goes. A delete
+ * that never arrived would otherwise leave the picture on the report with
+ * nothing on the device able to reach it — the one case here where losing the
+ * message loses the intent rather than merely delaying it.
+ */
+async function remove(row: StoredAttachment): Promise<void> {
+    if (row.remoteId !== null) {
+        await apiRequest(`/sync/attachments/${encodeURIComponent(row.remoteId)}`, {
+            method: 'DELETE',
+        })
+    }
+
+    await forgetAttachment(row.key)
+}
+
 export async function pushAttachments(assessmentId: string): Promise<void> {
     for (const row of await dirtyAttachments(assessmentId)) {
         try {
-            await upload(row)
+            if (row.deleted === true) {
+                await remove(row)
+            } else {
+                await upload(row)
+            }
         } catch (error) {
             // 401 is excluded: the client refreshes and retries once on its
             // own, and a second 401 means the session went, not the image.

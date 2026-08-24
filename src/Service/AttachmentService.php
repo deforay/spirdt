@@ -75,6 +75,9 @@ final class AttachmentService
         $role = $this->requireRole($meta, $kind);
         $signedName = $this->requireSignedName($meta, $kind);
         $questionCode = $this->questionCode($meta, $kind);
+        $sectionCode = $this->sectionCode($meta);
+        $caption = $this->caption($meta);
+        $clientKey = $this->clientKey($meta);
 
         // The scope means an assessment belonging to another organisation
         // resolves to null. Refused as not-found rather than forbidden: the
@@ -95,6 +98,29 @@ final class AttachmentService
 
         $checksum = hash('sha256', $bytes);
 
+        // A photograph is identified by the key the DEVICE minted, and nothing
+        // else can do the job. Several per section means role is not unique,
+        // and two photographs of the same shelf a minute apart are plausibly
+        // byte-identical from a phone that did not move — so matching on
+        // checksum would silently fold the second into the first. With the
+        // key, a retry is free and the caption can be corrected by sending it
+        // again.
+        if ($clientKey !== null) {
+            $known = Attachment::query()
+                ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
+                ->where('client_key', $clientKey)
+                ->first();
+
+            if ($known instanceof Attachment) {
+                return $this->acknowledge($this->recaption($known, $caption));
+            }
+
+            // Only a NEW photograph counts against the limit. A retry of one
+            // already stored is not a sixth, and refusing it would leave the
+            // device trying forever.
+            $this->refuseBeyondSectionLimit($assessmentId, $sectionCode);
+        }
+
         // Idempotency, checked before anything is written. A retried upload
         // must cost one hash and one indexed lookup, not a second file.
         //
@@ -111,8 +137,9 @@ final class AttachmentService
             ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
             ->where('checksum', $checksum);
 
-        $existing = ($role === null ? $query->whereNull('role') : $query->where('role', $role))
-            ->first();
+        $existing = $clientKey !== null
+            ? null
+            : ($role === null ? $query->whereNull('role') : $query->where('role', $role))->first();
 
         if ($existing instanceof Attachment) {
             return $this->acknowledge($existing);
@@ -131,7 +158,7 @@ final class AttachmentService
 
         try {
             $attachment = Capsule::connection()->transaction(
-                function () use ($id, $organizationId, $assessmentId, $kind, $role, $signedName, $questionCode, $relative, $mime, $bytes, $checksum): Attachment {
+                function () use ($id, $organizationId, $assessmentId, $kind, $role, $signedName, $questionCode, $sectionCode, $caption, $clientKey, $relative, $mime, $bytes, $checksum): Attachment {
                     if ($kind === 'signature') {
                         $this->replaceSignature($assessmentId, $role);
                     }
@@ -145,6 +172,9 @@ final class AttachmentService
                         'role'            => $role,
                         'signed_name'     => $signedName,
                         'question_code'   => $questionCode,
+                        'section_code'    => $sectionCode,
+                        'caption'         => $caption,
+                        'client_key'      => $clientKey,
                         'storage_path'    => $relative,
                         'mime_type'       => $mime,
                         'byte_size'       => strlen($bytes),
@@ -195,6 +225,45 @@ final class AttachmentService
     }
 
     /**
+     * Take one photograph back off the server.
+     *
+     * An assessor deletes a picture that is out of focus, or of the wrong
+     * shelf, and it may already have synced — so removing it on the device
+     * alone would leave the evidence on the report with no way to reach it.
+     * Scoped by the organisation like everything else here, so an id belonging
+     * to somebody else is simply "no".
+     *
+     * Idempotent: deleting one that is already gone is a success, because a
+     * device retrying a delete it never saw acknowledged must not be stuck.
+     */
+    public function remove(string $attachmentId): bool
+    {
+        if (!BinaryUuid::isValid($attachmentId)) {
+            return false;
+        }
+
+        $attachment = Attachment::query()
+            ->where('id', BinaryUuid::toBytes($attachmentId))
+            ->first();
+
+        if (!$attachment instanceof Attachment) {
+            return true;
+        }
+
+        // Signatures are replaced rather than deleted, and a report that lost
+        // one would be a countersigned document with the countersignature
+        // missing. Nothing offers this for them and nothing should.
+        if ((string) $attachment->kind === 'signature') {
+            throw new InvalidArgumentException('A signature is replaced by signing again, not deleted.');
+        }
+
+        @unlink(ImageUpload::absolute($this->baseDirectory, (string) $attachment->storage_path));
+        $attachment->delete();
+
+        return true;
+    }
+
+    /**
      * Drop whatever was previously signed for this role, file and row.
      *
      * A signature is a statement by one person, not a collection. Keeping the
@@ -219,13 +288,132 @@ final class AttachmentService
     private function acknowledge(Attachment $attachment): array
     {
         return [
-            'id'          => (string) $attachment->id,
-            'kind'        => (string) $attachment->kind,
-            'role'        => $attachment->role,
-            'signed_name' => $attachment->signed_name,
-            'checksum'    => (string) $attachment->checksum,
-            'byte_size'   => (int) $attachment->byte_size,
+            'id'           => (string) $attachment->id,
+            'kind'         => (string) $attachment->kind,
+            'role'         => $attachment->role,
+            'signed_name'  => $attachment->signed_name,
+            'section_code' => $attachment->section_code,
+            'caption'      => $attachment->caption,
+            // Handed back so the device can match the acknowledgement to the
+            // row it sent, which is the only thing it knows the image by.
+            'client_key'   => $attachment->client_key,
+            'checksum'     => (string) $attachment->checksum,
+            'byte_size'    => (int) $attachment->byte_size,
         ];
+    }
+
+    /**
+     * Five photographs to a section.
+     *
+     * A limit rather than a hope: an assessor with a tablet and a bad morning
+     * can take forty pictures of the same fridge, and every one of them is
+     * queued on a device that may be offline all day and then uploaded over a
+     * district office's connection. Five is enough to show a room, a shelf,
+     * a log book and two things that surprised them.
+     *
+     * Enforced here as well as on the screen, because the screen is not the
+     * only thing that can reach this endpoint and a device carrying a queue
+     * from an older version of the app is a real case.
+     */
+    public const MAX_PER_SECTION = 5;
+
+    /** @throws InvalidArgumentException */
+    private function refuseBeyondSectionLimit(string $assessmentId, ?string $sectionCode): void
+    {
+        if ($sectionCode === null) {
+            return;
+        }
+
+        $held = Attachment::query()
+            ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
+            ->where('section_code', $sectionCode)
+            ->count();
+
+        if ($held >= self::MAX_PER_SECTION) {
+            throw new InvalidArgumentException(
+                sprintf('That section already has %d photographs.', self::MAX_PER_SECTION),
+            );
+        }
+    }
+
+    /**
+     * The same photograph, sent again with the assessor's words changed.
+     *
+     * Only the caption. The image is identified by the key and its bytes are
+     * already on disk, so a re-upload is a correction to what was said about
+     * it rather than a second picture.
+     */
+    private function recaption(Attachment $attachment, ?string $caption): Attachment
+    {
+        if ($caption !== null && $caption !== (string) $attachment->caption) {
+            $attachment->caption = $caption;
+            $attachment->save();
+        }
+
+        return $attachment;
+    }
+
+    /**
+     * Which section of the instrument this belongs to.
+     *
+     * Free text against the template's own codes rather than an enumeration,
+     * because the instrument is a versioned document and the server does not
+     * hold its shape. 'site' is the setup screen, which the assessor sees as
+     * the section before the first one.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private function sectionCode(array $meta): ?string
+    {
+        $code = $meta['section_code'] ?? null;
+        $code = is_string($code) ? trim($code) : '';
+
+        if ($code === '') {
+            return null;
+        }
+
+        if (mb_strlen($code) > 10) {
+            throw new InvalidArgumentException('section_code must be 10 characters or fewer.');
+        }
+
+        return $code;
+    }
+
+    /**
+     * What the assessor says is in the picture.
+     *
+     * Distinct from a finding, which says what will be done about it. This
+     * says what is there, and without it a photograph is a picture of a shelf
+     * that means nothing to anybody a year later.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private function caption(array $meta): ?string
+    {
+        $caption = $meta['caption'] ?? null;
+        $caption = is_string($caption) ? trim($caption) : '';
+
+        return $caption === '' ? null : mb_substr($caption, 0, 500);
+    }
+
+    /**
+     * The identity of one photograph, minted on the device.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private function clientKey(array $meta): ?string
+    {
+        $key = $meta['client_key'] ?? null;
+
+        if (!is_string($key) || trim($key) === '') {
+            return null;
+        }
+
+        if (!BinaryUuid::isValid(trim($key))) {
+            throw new InvalidArgumentException('client_key must be a UUID.');
+        }
+
+        return trim($key);
     }
 
     /** @param array<string,mixed> $meta */

@@ -412,6 +412,148 @@ final class AttachmentServiceTest extends TestCase
 
     // ─── fixtures ───
 
+    /**
+     * The identity is the key the device minted, and it has to be, because
+     * nothing about the image can do the job: a section holds several
+     * photographs and two taken a minute apart by a phone that did not move
+     * are byte-identical.
+     */
+    public function testAPhotographIsIdentifiedByItsClientKey(): void
+    {
+        $key = '019fd300-0000-7000-8000-000000000001';
+        $bytes = $this->pngBytes(6, 6);
+
+        $first = $this->service->store($this->upload($bytes, 'photo.png', 'image/png'), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'photo',
+            'section_code'  => '2',
+            'caption'       => 'Fridge with no log',
+            'client_key'    => $key,
+        ]);
+
+        $second = $this->service->store($this->upload($bytes, 'photo.png', 'image/png'), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'photo',
+            'section_code'  => '2',
+            'caption'       => 'Fridge with no temperature log',
+            'client_key'    => $key,
+        ]);
+
+        $this->assertSame($first['id'], $second['id']);
+        // The words are a correction; the picture is the same picture.
+        $this->assertSame('Fridge with no temperature log', $second['caption']);
+        $this->assertCount(1, $this->storedFiles());
+    }
+
+    /**
+     * Two photographs of the same shelf are two photographs. Folding them
+     * together on checksum would lose one, and the assessor took it on purpose.
+     */
+    public function testIdenticalBytesUnderDifferentKeysAreTwoPhotographs(): void
+    {
+        $bytes = $this->pngBytes(7, 7);
+
+        foreach (['019fd300-0000-7000-8000-00000000000a', '019fd300-0000-7000-8000-00000000000b'] as $key) {
+            $this->service->store($this->upload($bytes, 'photo.png', 'image/png'), [
+                'assessment_id' => $this->assessmentA,
+                'kind'          => 'photo',
+                'section_code'  => '3',
+                'client_key'    => $key,
+            ]);
+        }
+
+        $this->assertSame(2, Attachment::query()->where('section_code', '3')->count());
+    }
+
+    /**
+     * Enforced here as well as on the screen: the screen is not the only thing
+     * that can reach this endpoint, and a device carrying a queue from an
+     * older build is a real case.
+     */
+    public function testRefusesMoreThanFivePhotographsInASection(): void
+    {
+        for ($taken = 0; $taken < AttachmentService::MAX_PER_SECTION; $taken++) {
+            $this->service->store($this->png(4 + $taken, 4 + $taken), [
+                'assessment_id' => $this->assessmentA,
+                'kind'          => 'photo',
+                'section_code'  => '4',
+                'client_key'    => sprintf('019fd300-0000-7000-8000-0000000001%02d', $taken),
+            ]);
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->service->store($this->png(20, 20), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'photo',
+            'section_code'  => '4',
+            'client_key'    => '019fd300-0000-7000-8000-0000000001ff',
+        ]);
+    }
+
+    /** A full section must still accept retries of what it already holds. */
+    public function testAFullSectionStillAcceptsARetry(): void
+    {
+        $keys = [];
+
+        for ($taken = 0; $taken < AttachmentService::MAX_PER_SECTION; $taken++) {
+            $keys[] = $key = sprintf('019fd300-0000-7000-8000-0000000002%02d', $taken);
+
+            $this->service->store($this->png(4 + $taken, 4 + $taken), [
+                'assessment_id' => $this->assessmentA,
+                'kind'          => 'photo',
+                'section_code'  => '5',
+                'client_key'    => $key,
+            ]);
+        }
+
+        $again = $this->service->store($this->png(4, 4), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'photo',
+            'section_code'  => '5',
+            'client_key'    => $keys[0],
+        ]);
+
+        $this->assertSame($keys[0], $again['client_key']);
+        $this->assertSame(AttachmentService::MAX_PER_SECTION, Attachment::query()->where('section_code', '5')->count());
+    }
+
+    public function testRemovesAPhotographAndItsFile(): void
+    {
+        $stored = $this->service->store($this->png(9, 9), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'photo',
+            'section_code'  => '1',
+            'client_key'    => '019fd300-0000-7000-8000-000000000cc1',
+        ]);
+
+        $this->assertTrue($this->service->remove($stored['id']));
+        $this->assertSame([], $this->storedFiles());
+        $this->assertSame(0, Attachment::query()->count());
+
+        // Deleting one that is already gone is a success: a device retrying a
+        // delete it never saw acknowledged must not be stuck on it.
+        $this->assertTrue($this->service->remove($stored['id']));
+    }
+
+    /**
+     * A report whose countersignature can be deleted is not a countersigned
+     * report. Signatures are replaced by signing again.
+     */
+    public function testWillNotDeleteASignature(): void
+    {
+        $stored = $this->service->store($this->png(), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'signature',
+            'role'          => 'assessor_1',
+            'signed_name'   => 'Grace Phiri',
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->service->remove($stored['id']);
+    }
+
     private function pngBytes(int $width = 2, int $height = 2): string
     {
         $image = imagecreatetruecolor($width, $height);

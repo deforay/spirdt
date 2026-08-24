@@ -96,6 +96,30 @@ final class AttachmentAction
             ->withHeader('X-Content-Type-Options', 'nosniff');
     }
 
+    /**
+     * Remove one photograph.
+     *
+     * A DELETE rather than a flag, because the assessor's intent is that the
+     * picture is gone: it was out of focus, or of the wrong shelf, and leaving
+     * it on the report with a marker saying "ignore this" is not what they
+     * asked for. The bytes go with the row.
+     *
+     * @param array<string,string> $args
+     */
+    public function destroy(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        try {
+            $this->service()->remove((string) ($args['id'] ?? ''));
+        } catch (InvalidArgumentException $e) {
+            return $this->json($response, 422, ['error' => ['message' => $e->getMessage()]]);
+        }
+
+        return $this->json($response, 200, ['deleted' => true]);
+    }
+
     private function service(): AttachmentService
     {
         return $this->attachments ?? new AttachmentService(dirname(__DIR__, 3) . '/var/uploads');

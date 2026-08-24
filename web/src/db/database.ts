@@ -193,13 +193,29 @@ export type SignatureRole = 'assessor_1' | 'assessor_2' | 'site_representative'
  * sync must not lose the signature.
  */
 export interface StoredAttachment {
-    /** `${assessmentId}|${kind}|${role}` — one per role, replaced when redrawn. */
+    /**
+     * A SIGNATURE is keyed `${assessmentId}|${kind}|${role}` — one per role,
+     * replaced when redrawn. A PHOTOGRAPH is keyed by its own UUID, because a
+     * section holds several and two of them may be byte-identical: a phone
+     * that did not move between shots produces the same bytes, so nothing
+     * derived from the image can tell a retry from a second picture. The key
+     * travels to the server as `client_key` and is what makes an upload
+     * idempotent.
+     */
     key: string
     assessmentId: string
     kind: 'signature' | 'photo'
     role: SignatureRole | string
     /** For a photo: the question it is evidence for. Null for a signature. */
     questionCode: string | null
+    /**
+     * Which part of the audit a photograph belongs to — a section code, or
+     * 'site' for the setup screen, which the assessor sees as the section
+     * before the first one. Null for a signature.
+     */
+    sectionCode: string | null
+    /** The assessor's words about what is in the picture. Null for a signature. */
+    caption: string | null
     /** Printed beside the mark. Read from the session or Part A, never typed twice. */
     signedName: string
     blob: Blob
@@ -221,6 +237,16 @@ export interface StoredAttachment {
      * drawing again, and nobody else will ever see it.
      */
     syncError: string | null
+    /**
+     * Deleted on the device, not yet on the server.
+     *
+     * A photograph the assessor removed after it had synced cannot simply
+     * vanish from the table: the server still holds it, and the report would
+     * carry evidence nobody can reach. So the row stays, dirty, until the
+     * delete has been acknowledged — and only then is it dropped. One that was
+     * never uploaded is removed outright, with nothing to tell anybody about.
+     */
+    deleted?: boolean
 }
 
 /**
@@ -372,6 +398,37 @@ export class SpirdtDatabase extends Dexie {
                         revision: Number(row.revision ?? 0) + 1,
                     })),
                 )
+            })
+
+        // Version 6 lets an audit carry photographs: several per section, each
+        // with the assessor's own words about what is in it.
+        //
+        // The compound index is what the section screen reads on every render
+        // — "the photographs of section 2 of this visit" — and what the review
+        // screen groups by. Without it that is a scan of every image on the
+        // device, and images are the largest rows here by three orders of
+        // magnitude.
+        //
+        // The upgrade fills the two new fields on the signatures already on
+        // the device rather than leaving them undefined. A row half-described
+        // is a row that fails to sync later with nothing on screen to say why,
+        // which is the same reasoning version 2 gives at greater length.
+        this.version(6)
+            .stores({
+                assessments: 'id, status, syncState, syncedAt, updatedAt',
+                answers: 'key, assessmentId, dirty, [assessmentId+questionCode]',
+                findings: 'key, assessmentId, [assessmentId+questionKey]',
+                attachments: 'key, assessmentId, [assessmentId+sectionCode]',
+                journal: '++id, assessmentId, at',
+            })
+            .upgrade(async (transaction) => {
+                await transaction
+                    .table('attachments')
+                    .toCollection()
+                    .modify((row: Record<string, unknown>) => {
+                        row.sectionCode ??= null
+                        row.caption ??= null
+                    })
             })
     }
 }
