@@ -113,10 +113,17 @@ const guidanceText = computed(() => localised(props.question.guidance ?? {}))
                 </span>
             </div>
 
+            <!--
+                The disclosure, for the widths where the guidance is hidden
+                until asked for. Past 1280px it is not hidden — it stands open
+                in its own column with its own heading — so a second control
+                saying "What to look for" above a pane already headed "WHAT TO
+                LOOK FOR" is a button that appears to do nothing.
+            -->
             <button
                 v-if="hasGuidance"
                 type="button"
-                class="ml-[46px] self-start text-left text-[13.5px] font-semibold text-accent transition-colors hover:text-accent-hover"
+                class="ml-[46px] self-start text-left text-[13.5px] font-semibold text-accent transition-colors hover:text-accent-hover xl:hidden"
                 :aria-expanded="open"
                 @click="open = !open"
             >
@@ -205,6 +212,24 @@ const guidanceText = computed(() => localised(props.question.guidance ?? {}))
             >
                 {{ guidanceText }}
             </p>
+
+            <!--
+                The way to the rest of it, inside the pane that is cutting it
+                off. The clamp keeps a row of questions to a readable height,
+                but a paragraph ending in an ellipsis with the only control
+                somewhere above it is a paragraph nobody can finish reading —
+                and some of this guidance is the difference between a Partial
+                and a No.
+            -->
+            <button
+                type="button"
+                class="mt-1.5 hidden text-left text-[13px] font-semibold text-accent transition-colors hover:text-accent-hover xl:block"
+                :aria-expanded="open"
+                @click="open = !open"
+            >
+                {{ open ? t('question.guidanceLess') : t('question.guidanceMore') }}
+                <span aria-hidden="true">{{ open ? '‹' : '›' }}</span>
+            </button>
         </aside>
     </div>
 </template>

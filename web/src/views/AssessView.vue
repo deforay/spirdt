@@ -361,8 +361,20 @@ const missingContext = computed(() =>
  */
 const contextProblems = computed(() => validateContext(template, draftContext.value))
 
+/**
+ * The round is required, and it is the only field on this screen that the
+ * instrument does not ask for.
+ *
+ * Everything else here can be recovered later from the record: a wrong date is
+ * visible in the answers, a missing pathogen shows as an unanswered section. A
+ * missing round cannot — nothing downstream can infer which pass of a national
+ * programme a visit belonged to, and the whole point of rounds is comparing
+ * one against the next. Asked once, at the start, rather than discovered to be
+ * absent a year later when somebody tries to report on round two.
+ */
 const setupReady = computed(
     () =>
+        draftRound.value.trim() !== '' &&
         missingContext.value.length === 0 &&
         contextProblems.value.length === 0 &&
         draftPathogens.value.length > 0,
@@ -414,6 +426,44 @@ const visitFilled = computed(() =>
 /** Where the section on screen sits in the visit, for the eyebrow above it. */
 const sectionNumber = computed(
     () => visibleSections.value.findIndex((entry) => entry.code === activeSection.value) + 1,
+)
+
+/**
+ * Which section the setup screen leads to, by name.
+ *
+ * Returning to one that was left mid-question, or the first one on a visit
+ * that has not started. Either way the button says where it lands.
+ */
+const setupNextSection = computed(() =>
+    text(
+        (revisitingSetup.value
+            ? section.value
+            : (visibleSections.value[0] ?? template.sections[0]!)
+        ).title,
+    ),
+)
+
+/**
+ * What the way out of the setup screen is called.
+ *
+ * NOT "the checklist", in either direction, and that is the point. Naming this
+ * form's exit "Start the checklist" said that the audit begins on the next
+ * screen — but Part A is the instrument's own first questions, and an assessor
+ * who has just answered twenty of them has been auditing for ten minutes. It
+ * also made "Back to the checklist" useless in the other direction: the
+ * checklist is five sections and they left one of them mid-question.
+ *
+ * So both directions name the SECTION. Continuing goes to a section by name,
+ * coming back goes to the section they were in, and nothing on the screen
+ * claims the audit has not started yet.
+ *
+ * On a first visit the label is the site instead, because the top of the
+ * screen is a way out of the visit rather than a step through it.
+ */
+const setupBackLabel = computed(() =>
+    revisitingSetup.value
+        ? t('setup.backToSection', { section: setupNextSection.value })
+        : (assessment.assessment.value?.siteName ?? ''),
 )
 
 /**
@@ -675,6 +725,25 @@ async function leaveVisit() {
     stage.value = 'site'
 }
 
+/**
+ * The way out in the top bar, which on a phone is the only one.
+ *
+ * It has to mean the same thing as the button the screen below would have
+ * drawn for itself: on setup, an assessor who came here to correct something
+ * mid-visit is going back to the checklist rather than out of the visit
+ * entirely. Two doors marked with the same site name that led to different
+ * places would be worse than one.
+ */
+async function onShellBack(): Promise<void> {
+    if (stage.value === 'setup' && revisitingSetup.value) {
+        await startChecklist()
+
+        return
+    }
+
+    await leaveVisit()
+}
+
 function jumpTo(sectionCode: string) {
     activeSection.value = sectionCode
     stage.value = 'checklist'
@@ -707,11 +776,13 @@ async function onSubmit() {
     :save-state="assessment.saveState.value"
     :save-error="assessment.saveError.value"
     :back-label="
-        stage === 'checklist'
-            ? (assessment.assessment.value?.siteName ?? t('checklist.loading'))
-            : undefined
+        stage === 'setup'
+            ? setupBackLabel
+            : stage === 'checklist'
+              ? (assessment.assessment.value?.siteName ?? t('checklist.loading'))
+              : undefined
     "
-    @back="leaveVisit"
+    @back="onShellBack"
   >
 
     <SitePicker v-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
@@ -722,36 +793,58 @@ async function onSubmit() {
         class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[680px] md:max-w-[1536px] md:px-6"
     >
 
-        <header class="flex items-start justify-between gap-3 px-4 pb-3 pt-4 md:px-0 md:pt-6">
-            <div>
-                <!--
-                    A way out at the top, because this form is long and the
-                    only other one was the button past the end of it. Where it
-                    goes depends on how the assessor got here: back to the
-                    checklist when they came to correct something, back to the
-                    site list when the visit has not started.
-                -->
+        <!--
+            Dressed as the checklist and the review are, because it is the same
+            visit. This screen used to wear a plain heading over a plain form
+            while the two screens after it carried an eyebrow, a brass rule and
+            the name of the site being audited — so the first step of a visit
+            was the one that looked like it belonged to something else. It is
+            not a form somebody fills in before an audit; it is the beginning
+            of the audit, and the top of the page now says so.
+        -->
+        <header class="flex flex-col gap-0.5 px-4 pb-3 pt-4 md:px-0 md:pt-6">
+            <!--
+                A way out at the top, because this form is long and the only
+                other one was the button past the end of it. Where it goes
+                depends on how the assessor got here: back to the checklist
+                when they came to correct something, back to the site list when
+                the visit has not started.
+
+                At a desk only. On a phone the same door is in the top bar,
+                where the brand would otherwise sit — the checklist made that
+                trade a while ago and this screen was still spending a row on
+                its own copy.
+            -->
+            <div class="hidden items-center justify-between gap-3 md:flex">
                 <button
                     type="button"
-                    class="-ml-1 flex min-h-11 items-center gap-1 pr-1 text-left text-[14px] text-accent"
+                    class="-ml-1 flex min-h-11 flex-1 items-center gap-1 truncate pr-1 text-left text-[14px] text-accent"
                     @click="revisitingSetup ? startChecklist() : leaveVisit()"
                 >
                     <PhArrowLeft :size="14" class="shrink-0" aria-hidden="true" />
-                    <span class="truncate">
-                        {{
-                            revisitingSetup
-                                ? t('setup.backToChecklist')
-                                : (assessment.assessment.value?.siteName ?? '')
-                        }}
-                    </span>
+                    <span class="truncate">{{ setupBackLabel }}</span>
                 </button>
-                <h1 class="text-[32px] font-bold tracking-tight">
-                    {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
-                </h1>
-                <p v-if="instrumentUntranslated" class="mt-1 text-[13px] leading-snug text-label-2">
-                    {{ t('locale.instrumentNote') }}
-                </p>
             </div>
+
+            <span class="eyebrow text-brass">{{ t('setup.eyebrow') }}</span>
+
+            <h1 class="rule-brass self-stretch pb-2 text-[25px] font-extrabold leading-tight md:self-start md:pb-1.5 md:text-[32px]">
+                {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
+            </h1>
+
+            <!-- The same line the review screen carries, in the same place:
+                 which bench this is, and which round it belongs to once that
+                 has been said. -->
+            <p class="text-[14px] text-label-2">
+                {{ assessment.assessment.value?.siteName ?? '' }}
+                <span v-if="draftRound.trim() !== ''">
+                    · {{ t('review.auditRound') }} {{ draftRound.trim() }}
+                </span>
+            </p>
+
+            <p v-if="instrumentUntranslated" class="mt-1 text-[13px] leading-snug text-label-2">
+                {{ t('locale.instrumentNote') }}
+            </p>
         </header>
 
         <!--
@@ -789,6 +882,7 @@ async function onSubmit() {
                 <label class="flex flex-col gap-1.5">
                     <span class="text-[14px] font-medium text-label-2">
                         {{ t('setup.auditRound') }}
+                        <span class="text-no">*</span>
                     </span>
                     <input
                         v-model="draftRound"
@@ -833,9 +927,16 @@ async function onSubmit() {
                 :disabled="!setupReady"
                 @click="startChecklist"
             >
-                {{ revisitingSetup ? t('setup.backToChecklist') : t('setup.start') }}
+                {{
+                    revisitingSetup
+                        ? setupBackLabel
+                        : t('setup.continueTo', { section: setupNextSection })
+                }}
             </button>
-            <p v-if="draftPathogens.length === 0" class="pt-2 text-center text-[14px] text-label-2">
+            <p v-if="draftRound.trim() === ''" class="pt-2 text-center text-[14px] text-label-2">
+                {{ t('setup.needRound') }}
+            </p>
+            <p v-else-if="draftPathogens.length === 0" class="pt-2 text-center text-[14px] text-label-2">
                 {{ t('setup.needPathogen') }}
             </p>
             <p v-else-if="missingContext.length > 0" class="pt-2 text-center text-[14px] text-label-2">

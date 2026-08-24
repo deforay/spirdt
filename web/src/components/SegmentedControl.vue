@@ -121,12 +121,27 @@ const TONES: Record<ResponseCode, string> = {
     NA: 'data-[state=checked]:border-na data-[state=checked]:text-na md:data-[state=checked]:bg-na-soft',
 }
 
-/** The mark keeps its response colour whether or not the option is chosen. */
+/**
+ * The mark takes its colour only once the option is chosen.
+ *
+ * It used to carry the response colour whether or not it was selected, and on
+ * an unanswered question that is three vivid marks — a green tick, an amber
+ * half-circle, a red cross — sitting in a row of pale outlines. Colour is the
+ * strongest signal on the screen, and a screen that spends it on options
+ * nobody has picked is a screen that reads as already answered. Assessors were
+ * scrolling past unanswered questions because the control looked live.
+ *
+ * The SHAPE stays regardless, which is the part that has to: the icons exist
+ * because roughly one man in twelve cannot rely on the green/amber difference,
+ * and a tick is still a tick in grey. What changes is that colour now means
+ * "this is the answer" and nothing else — so an answered question is visible
+ * from across the section, and an unanswered one plainly is not.
+ */
 const MARKS: Record<ResponseCode, string> = {
-    Y: 'text-yes-vivid',
-    P: 'text-partial-vivid',
-    N: 'text-no-vivid',
-    NA: 'text-na',
+    Y: 'text-label-3 group-data-[state=checked]:text-yes-vivid',
+    P: 'text-label-3 group-data-[state=checked]:text-partial-vivid',
+    N: 'text-label-3 group-data-[state=checked]:text-no-vivid',
+    NA: 'text-label-3 group-data-[state=checked]:text-na',
 }
 
 const options = (): ResponseCode[] => (props.naAllowed ? ['Y', 'P', 'N', 'NA'] : ['Y', 'P', 'N'])
@@ -149,7 +164,7 @@ function choose(value: ResponseCode): void {
             :key="value"
             :value="value"
             :class="[
-                'flex min-h-12 cursor-pointer items-center justify-center gap-1.5 px-1',
+                'group flex min-h-12 cursor-pointer items-center justify-center gap-1.5 px-1',
                 'rounded-[8px] border-2 border-transparent text-[15px] font-semibold text-label-2',
                 'max-md:data-[state=checked]:bg-surface max-md:data-[state=checked]:shadow-pick',
                 'md:min-h-12 md:gap-2 md:rounded-card md:border-hairline md:px-2',

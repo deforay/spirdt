@@ -238,18 +238,39 @@ function summaryOf(gap: Gap): string {
 
 <template>
     <!--
-        Two columns from 900px, and the split follows the existing order rather
-        than rearranging it: what is already at the top goes left, the rest goes
-        right. So the phone reads exactly as it did.
+        One column until there is room for three, and the split follows the
+        existing order rather than rearranging it: score and sections left,
+        gaps in the middle, signatures right. So everything narrower than a
+        desk reads exactly as the phone does.
 
-        The left column is sticky. Describing a gap changes the score, and on a
-        long list that feedback is otherwise several screens away from the thing
-        causing it.
+        NO TWO-COLUMN MIDDLE STATE, and that is a layout constraint rather than
+        a preference. Signatures come after the gaps, so in two columns they
+        fall to the second row — whose top is set by the taller of the two
+        cells above, which is the sections rail. That is a band of empty page
+        between the gaps and the signatures on exactly the widths where space
+        is tightest. A wider single column reads better than a short one beside
+        a hole.
+
+        NAMED BREAKPOINTS ONLY, and that is not a style preference. This screen
+        was written with an arbitrary `lg:` variant beside `sm:`, and
+        Tailwind emits arbitrary media blocks BEFORE the named ones — so above
+        900px both matched, the later `sm:max-w-[680px]` won, and every desktop
+        got a 680px column with the widths below dividing it into three narrow
+        strips. That is what "the review screen looks bad on a desktop" was:
+        question text breaking one word to a line and signatories' names
+        truncated to two letters, on a screen with 1200px of unused space
+        beside it.
+
+        The left column is sticky, and scrolls inside itself. Describing a gap
+        changes the score, and on a long list that feedback is otherwise
+        several screens away from the thing causing it — but a rail pinned to
+        the top of a scrolling main is a rail whose last rows can never be
+        reached, which is how the section list came to end mid-row.
     -->
     <div
-        class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[680px] min-[900px]:max-w-[1536px] min-[900px]:px-6"
+        class="mx-auto flex min-h-screen w-full flex-col bg-ground sm:max-w-[680px] lg:max-w-[880px] lg:px-6 xl:max-w-[1600px]"
     >
-        <header class="px-4 pb-3 pt-4 min-[900px]:px-0 min-[900px]:pt-6">
+        <header class="px-4 pb-3 pt-4 lg:px-0 lg:pt-6">
             <div class="mb-2 flex items-center gap-3">
                 <button type="button" class="text-[16px] text-accent" @click="emit('back')">
                     {{ t('review.back') }}
@@ -280,9 +301,9 @@ function summaryOf(gap: Gap): string {
         </header>
 
         <main
-            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 min-[900px]:grid min-[900px]:grid-cols-[21rem_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6 min-[900px]:px-0"
+            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 lg:px-0 xl:grid xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)_minmax(0,26rem)] xl:items-start xl:gap-6"
         >
-          <div class="min-[900px]:sticky min-[900px]:top-0">
+          <div class="scroll-thin xl:sticky xl:top-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pb-2">
             <!-- The score, stated once and plainly. -->
             <div
                 class="mb-5 flex items-end justify-between rounded-surface border border-hairline bg-surface p-5"
@@ -382,7 +403,7 @@ function summaryOf(gap: Gap): string {
 
           </div>
 
-          <div>
+          <div class="xl:min-w-0">
             <!--
                 What was found, read-only.
 
@@ -443,20 +464,23 @@ function summaryOf(gap: Gap): string {
 
                 <p v-else class="px-1 text-[16px] text-label-2">{{ t('review.noGaps') }}</p>
             </section>
+          </div>
 
-
-            <!-- Signed after the gaps have been read out, not before. -->
-            <SignatureSection
-                v-if="assessmentId !== ''"
-                :assessment-id="assessmentId"
-                :context="context"
-            />
-
+          <!--
+              Signed after the gaps have been read out, not before — which is
+              the order everywhere narrower than a desk, where this sits under
+              them. At a desk it moves beside them into a column of its own
+              rather than being squeezed into a third of the width, because a
+              signature panel narrow enough to truncate "Amina Demo" to "A..."
+              is asking somebody to countersign a name they cannot read.
+          -->
+          <div v-if="assessmentId !== ''" class="xl:col-start-3 xl:row-start-1">
+            <SignatureSection :assessment-id="assessmentId" :context="context" />
           </div>
         </main>
 
         <footer
-            class="border-t border-hairline bg-surface px-4 pb-4 pt-3 min-[900px]:rounded-t-surface min-[900px]:border-x min-[900px]:px-6"
+            class="border-t border-hairline bg-surface px-4 pb-4 pt-3 lg:rounded-t-surface lg:border-x lg:px-6"
         >
             <p v-if="submitError !== ''" class="pb-2 text-[14px] font-medium text-no">
                 {{ submitError }}
@@ -464,7 +488,7 @@ function summaryOf(gap: Gap): string {
 
             <button
                 type="button"
-                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 min-[900px]:mx-auto min-[900px]:block min-[900px]:w-auto min-[900px]:px-12"
+                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 lg:mx-auto lg:block lg:w-auto lg:px-12"
                 :disabled="!submittable || submitting"
                 @click="emit('submit')"
             >
