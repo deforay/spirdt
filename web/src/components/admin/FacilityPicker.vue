@@ -91,10 +91,16 @@ function choose(facility: Facility): void {
             </button>
         </div>
 
+        <!-- Same reason, and the same lie, as the place picker: the form
+             around it is enough for the browser to offer a menu of saved
+             addresses over this one. -->
         <input
             v-else
             v-model="term"
             type="search"
+            autocomplete="one-time-code"
+            data-lpignore="true"
+            data-form-type="other"
             :placeholder="t('sitesAdmin.findFacility')"
             class="field"
         />

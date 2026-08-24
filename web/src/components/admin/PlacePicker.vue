@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PhCaretDown, PhMagnifyingGlass, PhMapPin, PhPlus } from '@phosphor-icons/vue'
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 
 import { createGeoUnit, type GeoTree, type GeoUnit } from '@/api/registry'
 import { t } from '@/i18n'
@@ -48,7 +48,65 @@ const emit = defineEmits<{
 
 const term = ref('')
 const open = ref(false)
+const root = useTemplateRef<HTMLElement>('root')
 const search = useTemplateRef<HTMLInputElement>('search')
+
+/**
+ * Anything that is not this picker closes it.
+ *
+ * It had no way of closing but its own Cancel, so a list opened by accident
+ * stayed open over the fields under it while somebody carried on filling in
+ * the form — which is what a dropdown must never do, and what nothing else in
+ * this console does.
+ *
+ * Containment rather than a marker attribute, so a picker nested inside
+ * another one — choosing what a new place sits inside — counts as being
+ * inside both and neither closes.
+ *
+ * The draft in the add panel is DELIBERATELY KEPT. Closing is usually a stray
+ * click, and three fields of typing thrown away by one is worse than finding
+ * the panel where you left it.
+ */
+function isOutside(target: EventTarget | null): boolean {
+    return !(target instanceof Node) || !(root.value?.contains(target) ?? false)
+}
+
+function onDocumentPointerDown(event: MouseEvent): void {
+    if (open.value && isOutside(event.target)) {
+        open.value = false
+    }
+}
+
+function onEscape(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && open.value) {
+        open.value = false
+    }
+}
+
+/** Tabbing out is leaving too, and a keyboard user never fires a click. */
+function onFocusOut(event: FocusEvent): void {
+    // Focus going NOWHERE is not leaving: a click on the panel's own padding,
+    // or the window losing focus, both arrive here with no related target and
+    // would otherwise shut the list on somebody who has not gone anywhere.
+    // A genuine click outside is pointerdown's job.
+    if (event.relatedTarget === null) {
+        return
+    }
+
+    if (open.value && isOutside(event.relatedTarget)) {
+        open.value = false
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('pointerdown', onDocumentPointerDown)
+    document.addEventListener('keydown', onEscape)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('pointerdown', onDocumentPointerDown)
+    document.removeEventListener('keydown', onEscape)
+})
 
 /**
  * Places added here, until the screen that owns the tree reloads it.
@@ -175,7 +233,7 @@ async function onAdd(): Promise<void> {
 </script>
 
 <template>
-    <div class="relative">
+    <div ref="root" class="relative" @focusout="onFocusOut">
         <div v-if="chosen !== null && !open" class="field flex items-center gap-2">
             <PhMapPin :size="17" class="shrink-0 text-label-3" aria-hidden="true" />
             <span class="flex-1 truncate text-[15px]">{{ chosen }}</span>
@@ -199,13 +257,40 @@ async function onAdd(): Promise<void> {
             @click="reveal"
         >
             <PhMagnifyingGlass :size="17" class="shrink-0 text-label-3" aria-hidden="true" />
+            <!--
+                The browser's own address autofill was covering this list.
+
+                It is not an address field, but the form around it has an
+                address, a phone number and an email in it, so Chrome reads the
+                whole thing as an address form and a box labelled "Place" as
+                the state line — then offers a menu of saved addresses on top
+                of the one this control opens.
+
+                `autocomplete="off"` is the standards answer and Chrome does
+                not honour it for a field it has already classified as part of
+                an address — which is documented behaviour, not a bug, and the
+                reason the honest answer does not work here.
+
+                So the token names a category the browser has nothing to offer
+                for. It is a lie about the field and it is the only thing that
+                reliably stops the menu: an unrecognised value would be invalid
+                and send Chrome back to the same guess. `one-time-code` rather
+                than `new-password` because that one brings a password manager
+                with it, and this box wants no help from either.
+
+                The data attributes are for the managers that do respect their
+                own opt-outs.
+            -->
             <input
                 ref="search"
                 v-model="term"
                 type="search"
                 role="combobox"
+                autocomplete="one-time-code"
                 autocapitalize="off"
                 spellcheck="false"
+                data-lpignore="true"
+                data-form-type="other"
                 :aria-expanded="open"
                 :placeholder="placeholder ?? t('registry.searchPlaces')"
                 class="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-label-3"
@@ -228,7 +313,14 @@ async function onAdd(): Promise<void> {
 
                 <label class="mb-2 block">
                     <span class="mb-1 block text-[13px] text-label-2">{{ t('placeForm.name') }}</span>
-                    <input v-model="draftName" type="text" class="field" />
+                    <input
+                        v-model="draftName"
+                        type="text"
+                        autocomplete="off"
+                        data-lpignore="true"
+                        data-form-type="other"
+                        class="field"
+                    />
                 </label>
 
                 <label class="mb-2 block">
@@ -236,6 +328,9 @@ async function onAdd(): Promise<void> {
                     <input
                         v-model="draftLevel"
                         type="text"
+                        autocomplete="off"
+                        data-lpignore="true"
+                        data-form-type="other"
                         :placeholder="suggestedLevel || t('placePicker.levelExample')"
                         class="field"
                     />
