@@ -340,6 +340,41 @@ export function useAssessment(template: Template) {
         assessment.value = { ...current, auditRound: trimmed }
     }
 
+    /**
+     * Ask the device where it is, again.
+     *
+     * A fix is attempted once when the visit is created and never retried,
+     * because nothing waits on it. But the commonest reason it comes back
+     * empty is a laboratory in the middle of a building, and the assessor can
+     * walk to a window — so there has to be a way to ask a second time, and
+     * the setup screen is where they can see whether it worked.
+     *
+     * Resolves false rather than throwing on every refusal, like currentFix
+     * itself: no permission, no hardware, no satellite and no browser support
+     * are the same answer to the screen.
+     */
+    async function captureLocation(): Promise<boolean> {
+        const current = assessment.value
+
+        if (!current) {
+            return false
+        }
+
+        const fix = await currentFix()
+
+        if (fix === null || assessment.value?.id !== current.id) {
+            return false
+        }
+
+        const located = await saveLocation(current.id, fix)
+
+        if (located !== null) {
+            assessment.value = located
+        }
+
+        return located !== null
+    }
+
     const answers = computed<AnswerInput[]>(() =>
         [...responses.entries()]
             .filter(([, value]) => value !== null)
@@ -382,6 +417,7 @@ export function useAssessment(template: Template) {
         setComment,
         updateContext,
         updateAuditRound,
+        captureLocation,
         findings,
         findingsFor,
         newFinding,

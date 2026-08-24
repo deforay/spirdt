@@ -14,6 +14,7 @@ import SectionActions from '@/components/SectionActions.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
 import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
 import { useAssessment } from '@/composables/useAssessment'
+import { COARSE_ACCURACY_M } from '@/db/location'
 import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
 import { formatPercent, formatTime, locale, t, text } from '@/i18n'
@@ -64,6 +65,48 @@ const applicabilityFields = computed(() =>
         .map((section) => section.applicability_field)
         .filter((code): code is string => typeof code === 'string'),
 )
+
+/** Whether the device is being asked where it is, right now. */
+const locating = ref(false)
+
+/**
+ * The position recorded for this visit, if there is one.
+ *
+ * Read off the stored assessment rather than held separately: it is written
+ * when the fix lands, which may be half a minute after the checklist opened,
+ * and the row is what syncs.
+ */
+const fix = computed(() => {
+    const current = assessment.assessment.value
+
+    if (
+        current === null ||
+        typeof current.latitude !== 'number' ||
+        typeof current.longitude !== 'number'
+    ) {
+        return null
+    }
+
+    return {
+        latitude: current.latitude,
+        longitude: current.longitude,
+        accuracyM: typeof current.accuracyM === 'number' ? current.accuracyM : null,
+        // A fix good to two kilometres is a cell tower, not a building. Stored
+        // and shown either way, and labelled, so it cannot pass for the
+        // position of the bench.
+        coarse: typeof current.accuracyM === 'number' && current.accuracyM >= COARSE_ACCURACY_M,
+    }
+})
+
+async function onLocate(): Promise<void> {
+    locating.value = true
+
+    try {
+        await assessment.captureLocation()
+    } finally {
+        locating.value = false
+    }
+}
 
 const draftContext = ref<Context>({})
 const draftRound = ref('')
@@ -828,15 +871,22 @@ async function onSubmit() {
 
             <span class="eyebrow text-brass">{{ t('setup.eyebrow') }}</span>
 
+            <!--
+                THE SITE IS THE HEADING, not the name of the screen. Every
+                other line here is about this laboratory, the assessor is
+                standing in it, and what they need confirmed before answering
+                twenty questions about it is that the tool is pointed at the
+                right bench. "Set up the audit" was set in 32px bold and the
+                site was a grey line under it, which is the wrong way round: a
+                visit filed against the wrong site is the one mistake on this
+                screen that cannot be seen later.
+            -->
             <h1 class="rule-brass self-stretch pb-2 text-[25px] font-extrabold leading-tight md:self-start md:pb-1.5 md:text-[32px]">
-                {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
+                {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
             </h1>
 
-            <!-- The same line the review screen carries, in the same place:
-                 which bench this is, and which round it belongs to once that
-                 has been said. -->
             <p class="text-[14px] text-label-2">
-                {{ assessment.assessment.value?.siteName ?? '' }}
+                {{ revisitingSetup ? t('checklist.editSetup') : t('setup.title') }}
                 <span v-if="draftRound.trim() !== ''">
                     · {{ t('review.auditRound') }} {{ draftRound.trim() }}
                 </span>
@@ -896,6 +946,49 @@ async function onSubmit() {
                         {{ t('setup.auditRoundHint') }}
                     </span>
                 </label>
+
+                <!--
+                    Where the device thinks it is, shown rather than left to be
+                    discovered on a dashboard months later.
+
+                    It is recorded when the visit starts and NOTHING WAITS ON
+                    IT — a visit refused for want of a satellite is a visit that
+                    does not happen. But an assessor who can see it is empty can
+                    walk to a window and press the button, and one who can see
+                    it is a two-kilometre fix knows the pin will say the
+                    district rather than the building. Neither is possible if
+                    the screen never mentions it.
+                -->
+                <h2 class="eyebrow pb-3 pt-5 text-label-3">
+                    {{ t('setup.locationHeading') }}
+                </h2>
+
+                <p v-if="fix !== null" class="text-[15px]">
+                    <span class="tnum">{{ fix.latitude.toFixed(5) }}, {{ fix.longitude.toFixed(5) }}</span>
+                    <span v-if="fix.accuracyM !== null" class="text-label-2">
+                        · {{ t('setup.locationAccuracy', { metres: fix.accuracyM }) }}
+                    </span>
+                    <span v-if="fix.coarse" class="mt-1 block text-[13px] text-label-2">
+                        {{ t('setup.locationCoarse') }}
+                    </span>
+                </p>
+
+                <p v-else class="text-[15px] text-label-3">{{ t('setup.locationNone') }}</p>
+
+                <button
+                    type="button"
+                    class="mt-2 min-h-11 rounded-full bg-surface-2 px-3.5 text-[14px] font-medium text-label-2 transition-colors hover:text-label disabled:opacity-40"
+                    :disabled="locating"
+                    @click="onLocate"
+                >
+                    {{
+                        locating
+                            ? t('setup.locationWorking')
+                            : fix === null
+                              ? t('setup.locationCapture')
+                              : t('setup.locationRetry')
+                    }}
+                </button>
 
                 <h2 class="eyebrow pb-3 pt-5 text-label-3">
                     {{ t('setup.pathogensHeading') }}
