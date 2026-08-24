@@ -13,6 +13,7 @@ import {
 import { session } from '@/auth/session'
 import FormField from '@/components/admin/FormField.vue'
 import FormPage from '@/components/admin/FormPage.vue'
+import { flash } from '@/composables/useFlash'
 import { t } from '@/i18n'
 
 /**
@@ -90,6 +91,7 @@ async function onSave(): Promise<void> {
     saving.value = false
 
     if (saved !== null) {
+        flash(t('flash.saved', { name: form.value.full_name.trim() }))
         await router.push(backTo)
     }
 }
@@ -103,6 +105,9 @@ async function onToggleActive(): Promise<void> {
 
     if (saved !== null) {
         isActive.value = saved.is_active
+        flash(t(saved.is_active ? 'flash.activated' : 'flash.deactivated', {
+            name: form.value.full_name,
+        }))
     }
 }
 

@@ -5,6 +5,7 @@ import {
     PhCaretDown,
     PhCaretRight,
     PhChartBar,
+    PhCheckCircle,
     PhClipboardText,
     PhClockCounterClockwise,
     PhFileText,
@@ -27,6 +28,7 @@ import { can, PERMISSION, type PermissionKey } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import { signOut } from '@/auth/login'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
+import { clearFlash, flashMessage } from '@/composables/useFlash'
 import { t } from '@/i18n'
 
 /**
@@ -457,6 +459,31 @@ onBeforeUnmount(() => {
                         <span class="truncate font-medium text-label">{{ props.title }}</span>
                     </nav>
                 </div>
+
+                <!--
+                    What just happened, said once.
+
+                    In the page rather than over it: these screens are tables,
+                    and a card floating in the corner of one is read by nobody
+                    who is looking at the row they came back to check. It sits
+                    where the error would sit, because it answers the same
+                    question.
+                -->
+                <p
+                    v-if="flashMessage !== ''"
+                    class="mb-4 flex items-start gap-2 rounded-card bg-yes-soft px-4 py-3 text-[15px] font-medium text-yes"
+                    role="status"
+                >
+                    <PhCheckCircle :size="19" weight="fill" class="mt-px shrink-0" aria-hidden="true" />
+                    <span class="min-w-0 flex-1">{{ flashMessage }}</span>
+                    <button
+                        type="button"
+                        class="shrink-0 text-[14px] font-normal underline underline-offset-2"
+                        @click="clearFlash"
+                    >
+                        {{ t('action.dismiss') }}
+                    </button>
+                </p>
 
                 <slot />
             </main>

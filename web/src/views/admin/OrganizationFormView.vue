@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { apiRequest } from '@/api/client'
 import FormField from '@/components/admin/FormField.vue'
 import FormPage from '@/components/admin/FormPage.vue'
+import { flash } from '@/composables/useFlash'
 import { t } from '@/i18n'
 
 /**
@@ -100,6 +101,7 @@ async function onSave(): Promise<void> {
     saving.value = false
 
     if (saved !== null) {
+        flash(t('flash.saved', { name: form.value.name }))
         await router.push(backTo)
     }
 }
@@ -114,6 +116,7 @@ async function onToggleActive(): Promise<void> {
 
     if (saved !== null) {
         isActive.value = !isActive.value
+        flash(t(isActive.value ? 'flash.activated' : 'flash.deactivated', { name: form.value.name }))
     }
 }
 

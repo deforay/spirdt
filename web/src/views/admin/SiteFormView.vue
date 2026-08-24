@@ -6,6 +6,7 @@ import { createTestingSite, getTestingSite, updateTestingSite } from '@/api/regi
 import FacilityPicker from '@/components/admin/FacilityPicker.vue'
 import FormField from '@/components/admin/FormField.vue'
 import FormPage from '@/components/admin/FormPage.vue'
+import { flash } from '@/composables/useFlash'
 import { t } from '@/i18n'
 
 /**
@@ -53,26 +54,27 @@ async function onSave(): Promise<void> {
 
     saving.value = true
 
-    const saved =
-        id.value === null
-            ? await act(() =>
-                  createTestingSite({
-                      name: name.value.trim(),
-                      facility_id: facilityId.value,
-                      location_description: location.value.trim() || null,
-                  }),
-              )
-            : await act(() =>
-                  updateTestingSite(id.value as string, {
-                      name: name.value.trim(),
-                      location_description: location.value.trim() || null,
-                      facility_id: facilityId.value,
-                  }),
-              )
+    const wasNew = id.value === null
+    const saved = wasNew
+        ? await act(() =>
+              createTestingSite({
+                  name: name.value.trim(),
+                  facility_id: facilityId.value,
+                  location_description: location.value.trim() || null,
+              }),
+          )
+        : await act(() =>
+              updateTestingSite(id.value as string, {
+                  name: name.value.trim(),
+                  location_description: location.value.trim() || null,
+                  facility_id: facilityId.value,
+              }),
+          )
 
     saving.value = false
 
     if (saved !== null) {
+        flash(t(wasNew ? 'flash.added' : 'flash.saved', { name: name.value.trim() }))
         await router.push(backTo)
     }
 }
@@ -88,6 +90,7 @@ async function onToggleActive(): Promise<void> {
 
     if (saved !== null) {
         isActive.value = saved.is_active
+        flash(t(saved.is_active ? 'flash.activated' : 'flash.deactivated', { name: name.value }))
     }
 }
 

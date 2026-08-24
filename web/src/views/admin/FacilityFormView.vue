@@ -18,6 +18,7 @@ import {
 import FormField from '@/components/admin/FormField.vue'
 import FormPage from '@/components/admin/FormPage.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
+import { flash } from '@/composables/useFlash'
 import { locale, t } from '@/i18n'
 
 /**
@@ -88,13 +89,18 @@ async function onSave(): Promise<void> {
 
     saving.value = true
 
-    const saved = id.value === null
+    const wasNew = id.value === null
+    const saved = wasNew
         ? await act(() => createFacility(form.value))
         : await act(() => updateFacility(id.value as string, form.value))
 
     saving.value = false
 
     if (saved !== null) {
+        // Said on the list rather than here, because here is about to stop
+        // existing. A facility filed under F lands on page one of a registry
+        // ordered by name, where nothing visibly changed.
+        flash(t(wasNew ? 'flash.added' : 'flash.saved', { name: saved.name }))
         await router.push(backTo)
     }
 }
@@ -108,6 +114,7 @@ async function onToggleActive(): Promise<void> {
 
     if (saved !== null) {
         isActive.value = saved.is_active
+        flash(t(saved.is_active ? 'flash.activated' : 'flash.deactivated', { name: saved.name }))
     }
 }
 
@@ -135,9 +142,11 @@ async function onMerge(into: Facility): Promise<void> {
         return
     }
 
+    const name = form.value.name ?? ''
     const merged = await act(() => mergeFacility(id.value as string, into.id))
 
     if (merged !== null) {
+        flash(t('flash.merged', { name, into: into.name }))
         await router.push(backTo)
     }
 }

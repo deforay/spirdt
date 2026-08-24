@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import { can, landing, PERMISSION, type PermissionKey } from '@/auth/permissions'
 import { session } from '@/auth/session'
+import { settleFlash } from '@/composables/useFlash'
 import LoginView from '@/views/LoginView.vue'
 
 /**
@@ -310,3 +311,11 @@ router.beforeEach((to) => {
     return true
 })
 
+/**
+ * A confirmation set on a form is meant for the screen the form sends you to,
+ * and for that screen only. It rides one navigation and is cleared by the
+ * next.
+ */
+router.afterEach(() => {
+    settleFlash()
+})
