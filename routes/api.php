@@ -10,6 +10,7 @@ use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\ReportsAction;
 use App\Http\Action\Admin\RolesAction;
 use App\Http\Action\Admin\SettingsAction;
+use App\Http\Action\Admin\SitePhotoAction;
 use App\Http\Action\Admin\UsersAction;
 use App\Http\Action\AttachmentAction;
 use App\Http\Action\Auth\ChangePasswordAction;
@@ -136,6 +137,11 @@ return static function (App $app): void {
         $group->post('/facilities/{id}/merge', [RegistryAction::class, 'mergeFacility']);
         $group->post('/testing-sites', [RegistryAction::class, 'createTestingSite']);
         $group->patch('/testing-sites/{id}', [RegistryAction::class, 'updateTestingSite']);
+        // What the bench looks like. Multipart rather than JSON, and its own
+        // route rather than a field on the site, because an image is bytes and
+        // the rest of a site record is a form.
+        $group->post('/testing-sites/{id}/photo', [SitePhotoAction::class, 'store']);
+        $group->delete('/testing-sites/{id}/photo', [SitePhotoAction::class, 'destroy']);
     })
         ->add(new RequirePermissionMiddleware(Permission::REGISTRY_WRITE))
         ->add(new AuthMiddleware());
@@ -169,6 +175,9 @@ return static function (App $app): void {
         $group->get('/facility-options', [RegistryAction::class, 'facilityOptions']);
         $group->get('/facilities/{id}', [RegistryAction::class, 'facility']);
         $group->get('/testing-sites/{id}', [RegistryAction::class, 'testingSite']);
+        // Reading the bench is reading the registry. Changing what it looks
+        // like is in the write group above, with the rest of the corrections.
+        $group->get('/testing-sites/{id}/photo', [SitePhotoAction::class, 'show']);
         $group->get('/testing-sites', [RegistryAction::class, 'testingSites']);
         $group->get('/assignments', [AssignmentsAction::class, 'index']);
     })

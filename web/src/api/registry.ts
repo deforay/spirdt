@@ -1,4 +1,4 @@
-import { apiRequest } from './client'
+import { apiBlob, apiRequest } from './client'
 
 /**
  * The national list, as the management screens see it.
@@ -85,8 +85,18 @@ export interface RegistryTestingSite {
     place: string | null
     name: string
     location_description: string | null
+    /** Whether a photograph of the bench exists. The bytes come from their own route. */
+    has_photo: boolean
+    /** When it was stored, which is not when the shutter closed. */
+    photo_taken_at: string | null
     source: string
     is_active: boolean
+}
+
+export interface SitePhoto {
+    has_photo: boolean
+    photo_taken_at: string | null
+    byte_size: number | null
 }
 
 export interface Assignment {
@@ -256,6 +266,53 @@ export async function updateTestingSite(
             body: patch,
         })
     ).testing_site
+}
+
+/**
+ * The photograph of one bench.
+ *
+ * Uploaded as multipart because it is a file, and on its own route rather than
+ * as a field on the site because a list of two hundred sites has no business
+ * carrying two hundred images. The screen resizes before it sends — a phone
+ * photograph is several megabytes of detail nobody needs to recognise a room.
+ */
+export async function uploadSitePhoto(id: string, image: Blob): Promise<SitePhoto> {
+    const form = new FormData()
+
+    // The server mints the name it stores under and sniffs the type from the
+    // bytes, so nothing here is believed. This one is for the multipart part.
+    form.append('file', image, 'site.jpg')
+
+    return (
+        await apiRequest<{ photo: SitePhoto }>(
+            `/admin/testing-sites/${encodeURIComponent(id)}/photo`,
+            { body: form, timeoutMs: 60_000 },
+        )
+    ).photo
+}
+
+/** The bytes, for an object URL. Null when the site has no photograph. */
+export async function fetchSitePhoto(id: string): Promise<Blob | null> {
+    try {
+        return await apiBlob(`/admin/testing-sites/${encodeURIComponent(id)}/photo`, {
+            method: 'GET',
+        })
+    } catch {
+        // A site with no photograph answers 404, which is an answer rather
+        // than a failure. Anything else here — offline, refused — leaves the
+        // screen with no image either way, and it has the rest of the site
+        // record to show.
+        return null
+    }
+}
+
+export async function deleteSitePhoto(id: string): Promise<SitePhoto> {
+    return (
+        await apiRequest<{ photo: SitePhoto }>(
+            `/admin/testing-sites/${encodeURIComponent(id)}/photo`,
+            { method: 'DELETE' },
+        )
+    ).photo
 }
 
 export async function listAssignments(): Promise<Assignment[]> {

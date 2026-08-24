@@ -82,6 +82,16 @@ describe('catalogues', () => {
                         continue
                     }
 
+                    // The example values a form shows in its empty boxes are
+                    // specimens rather than prose. Half of them are proper
+                    // nouns — a clinic, a road, a person — and a French
+                    // catalogue that renamed the clinic to prove it had been
+                    // translated would be worse, not better. Whether one of
+                    // these should differ is a judgement about the example.
+                    if (key.startsWith('eg.')) {
+                        continue
+                    }
+
                     expect(translated, key).not.toBe(source)
                 }
             })

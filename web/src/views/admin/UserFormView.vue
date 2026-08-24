@@ -167,7 +167,12 @@ const inputClass = 'field'
         </div>
 
         <FormField :label="t('admin.fullName')">
-            <input v-model="form.full_name" type="text" :class="inputClass" />
+            <input
+                v-model="form.full_name"
+                type="text"
+                :placeholder="t('eg.personName')"
+                :class="inputClass"
+            />
         </FormField>
 
         <FormField :label="t('admin.email')" :hint="isNew ? '' : t('userForm.emailFixed')">
@@ -176,6 +181,7 @@ const inputClass = 'field'
                 type="email"
                 autocapitalize="off"
                 spellcheck="false"
+                :placeholder="t('eg.email')"
                 :disabled="!isNew"
                 :class="[inputClass, isNew ? '' : 'opacity-60']"
             />
@@ -190,11 +196,11 @@ const inputClass = 'field'
         </FormField>
 
         <FormField :label="t('userForm.title')">
-            <input v-model="form.title" type="text" :class="inputClass" />
+            <input v-model="form.title" type="text" :placeholder="t('eg.jobTitle')" :class="inputClass" />
         </FormField>
 
         <FormField :label="t('userForm.phone')">
-            <input v-model="form.phone" type="tel" :class="inputClass" />
+            <input v-model="form.phone" type="tel" :placeholder="t('eg.phone')" :class="inputClass" />
         </FormField>
 
         <template #actions>

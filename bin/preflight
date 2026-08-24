@@ -67,6 +67,16 @@ foreach (['pdo_mysql', 'intl', 'zip', 'mbstring', 'bcmath'] as $ext) {
     );
 }
 
+// A warning rather than a failure: uploads work without it, they are simply
+// stored at the size they arrived at. Nothing else in the application decodes
+// an image.
+$hasGd = extension_loaded('gd');
+check(
+    'ext-gd',
+    $hasGd ? PF_OK : PF_WARN,
+    $hasGd ? '' : 'photographs will be stored unresized — see ImageProcessor',
+);
+
 // ─── 2. Dependencies ───
 
 $hasVendor = is_file($root . '/vendor/autoload.php');

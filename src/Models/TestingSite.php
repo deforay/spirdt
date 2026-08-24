@@ -36,6 +36,9 @@ final class TestingSite extends Model
         'facility_id'    => BinaryUuidCast::class,
         'merged_into_id' => BinaryUuidCast::class,
         'is_active'      => 'boolean',
+        // When the site's photograph was stored, which is not when the shutter
+        // closed — EXIF says the latter and EXIF comes from the client.
+        'photo_taken_at' => 'datetime',
     ];
 
     /** @return BelongsTo<Facility, $this> */

@@ -57,6 +57,33 @@ export interface RequestOptions {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    return interpret<T>(await authenticated(path, options))
+}
+
+/**
+ * The same request, when what comes back is an image rather than JSON.
+ *
+ * Files that need a token cannot be fetched by putting the URL in an `img`
+ * tag: the browser sends no Authorization header, and the ones this reaches —
+ * signatures, the photograph of a testing site — sit outside the document root
+ * precisely so that the tenant scope is what stands between them. So the bytes
+ * come back through the same auth-and-refresh path as everything else, and the
+ * caller turns them into an object URL.
+ *
+ * A failure is still described in JSON, so it is interpreted the same way.
+ */
+export async function apiBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+    const response = await authenticated(path, options)
+
+    if (!response.ok) {
+        await interpret<unknown>(response)
+    }
+
+    return response.blob()
+}
+
+/** Send it, and refresh the token once if the server says that is the problem. */
+async function authenticated(path: string, options: RequestOptions): Promise<Response> {
     const { auth = true } = options
 
     if (auth && accessTokenExpired()) {
@@ -76,7 +103,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         }
     }
 
-    return interpret<T>(response)
+    return response
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {

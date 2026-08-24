@@ -164,7 +164,12 @@ const inputClass = 'field'
         </div>
 
         <FormField :label="t('organizations.name')">
-            <input v-model="form.name" type="text" :class="inputClass" />
+            <input
+                v-model="form.name"
+                type="text"
+                :placeholder="t('eg.organizationName')"
+                :class="inputClass"
+            />
         </FormField>
 
         <FormField
@@ -176,13 +181,20 @@ const inputClass = 'field'
                 type="text"
                 autocapitalize="off"
                 spellcheck="false"
+                :placeholder="t('eg.organizationCode')"
                 :disabled="!isNew"
                 :class="[inputClass, isNew ? '' : 'opacity-60']"
             />
         </FormField>
 
         <FormField :label="t('organizationForm.timezone')" :hint="t('organizationForm.timezoneHint')">
-            <input v-model="form.timezone" type="text" spellcheck="false" :class="inputClass" />
+            <input
+                v-model="form.timezone"
+                type="text"
+                spellcheck="false"
+                :placeholder="t('eg.timezone')"
+                :class="inputClass"
+            />
         </FormField>
 
         <FormField :label="t('organizationForm.country')">
@@ -191,13 +203,19 @@ const inputClass = 'field'
                 type="text"
                 maxlength="2"
                 autocapitalize="characters"
+                :placeholder="t('eg.countryCode')"
                 :class="inputClass"
             />
         </FormField>
 
         <template v-if="isNew">
             <FormField :label="t('organizations.adminName')" :hint="t('organizationForm.adminHint')">
-                <input v-model="form.admin_name" type="text" :class="inputClass" />
+                <input
+                    v-model="form.admin_name"
+                    type="text"
+                    :placeholder="t('eg.personName')"
+                    :class="inputClass"
+                />
             </FormField>
 
             <FormField :label="t('organizations.adminEmail')">
@@ -206,6 +224,7 @@ const inputClass = 'field'
                     type="email"
                     autocapitalize="off"
                     spellcheck="false"
+                    :placeholder="t('eg.email')"
                     :class="inputClass"
                 />
             </FormField>

@@ -641,6 +641,11 @@ final class RegistryService
                     : ($places[$facility['geo_unit_id']] ?? null),
                 'name'                 => (string) $site->name,
                 'location_description' => $site->location_description,
+                // Whether there is a photograph rather than the photograph
+                // itself. It is served as bytes from its own route, so a list
+                // of two hundred sites stays a list rather than a download.
+                'has_photo'            => $site->photo_path !== null,
+                'photo_taken_at'       => $site->photo_taken_at?->format('c'),
                 'source'               => (string) $site->source,
                 'is_active'            => (bool) $site->is_active,
             ];

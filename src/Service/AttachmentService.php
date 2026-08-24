@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Models\Assessment;
 use App\Models\Attachment;
 use App\Support\BinaryUuid;
+use App\Support\ImageUpload;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use InvalidArgumentException;
@@ -17,22 +18,12 @@ use Throwable;
 /**
  * Takes a signature or photograph off a device and puts it on disk.
  *
- * Uploads are the part of an API most worth being paranoid about, so nothing
- * the caller says about the file is believed:
- *
- *   The type is sniffed from the bytes, not read from the Content-Type header
- *   or the filename, and then confirmed by actually decoding the image. A file
- *   that claims to be a PNG and is not never reaches disk.
- *
- *   The name on disk is minted here. A client-supplied filename is how a
- *   traversal lands, and there is no reason to keep one — nothing about the
- *   original name is information.
- *
- *   The checksum is computed from what arrived. A checksum the caller can
- *   choose cannot detect anything.
- *
- *   Files live under var/uploads, outside the document root. Even a stored
- *   file that somehow got past the checks above is inert there.
+ * Uploads are the part of an API most worth being paranoid about, and nothing
+ * the caller says about the file is believed. Those checks are ImageUpload's,
+ * shared with the registry's site photographs so the two surfaces cannot drift
+ * into accepting different things — read them there. The checksum is the one
+ * this class adds: computed from what arrived, because a checksum the caller
+ * can choose cannot detect anything.
  *
  * Re-uploading is expected rather than exceptional: a device that cannot tell
  * a failed request from a lost response will send the same signature again.
@@ -41,21 +32,6 @@ use Throwable;
  */
 final class AttachmentService
 {
-    /**
-     * Five megabytes.
-     *
-     * A signature is a few kilobytes; this is sized for the photographs that
-     * will follow it, and to be a limit rather than a hope. Anything larger is
-     * refused before it is read into memory.
-     */
-    public const MAX_BYTES = 5_242_880;
-
-    /** Sniffed type to the extension it is stored under. Nothing else is accepted. */
-    private const ALLOWED_TYPES = [
-        'image/png'  => 'png',
-        'image/jpeg' => 'jpg',
-    ];
-
     private const KINDS = ['signature', 'photo', 'document'];
 
     /**
@@ -71,8 +47,16 @@ final class AttachmentService
     /** The column is VARCHAR(200). Longer than any name, short enough to bound. */
     private const MAX_NAME_LENGTH = 200;
 
-    public function __construct(private readonly string $baseDirectory)
+    private readonly string $baseDirectory;
+
+    private readonly ImageProcessor $images;
+
+    public function __construct(string $baseDirectory, ?ImageProcessor $images = null)
     {
+        $this->baseDirectory = $baseDirectory;
+        // Configured from the environment unless a caller says otherwise,
+        // which only tests do.
+        $this->images = $images ?? ImageProcessor::fromEnvironment();
     }
 
     /**
@@ -101,8 +85,14 @@ final class AttachmentService
             throw new RuntimeException('That assessment is not in this organisation.');
         }
 
-        $bytes = $this->readVerifiedBytes($file);
-        $mime = $this->sniff($bytes);
+        $bytes = ImageUpload::verifiedBytes($file);
+        $mime = ImageUpload::sniff($bytes);
+
+        // Brought down to size before anything else looks at it, so what is
+        // hashed, stored and served are all the same bytes. A device that has
+        // been offline for a day sends whatever it was given.
+        ['bytes' => $bytes, 'mime' => $mime] = $this->images->process($bytes, $mime);
+
         $checksum = hash('sha256', $bytes);
 
         // Idempotency, checked before anything is written. A retried upload
@@ -134,10 +124,10 @@ final class AttachmentService
             $organizationId,
             $assessmentId,
             $id,
-            self::ALLOWED_TYPES[$mime],
+            ImageUpload::extensionFor($mime),
         );
 
-        $this->write($relative, $bytes);
+        ImageUpload::write($this->baseDirectory, $relative, $bytes);
 
         try {
             $attachment = Capsule::connection()->transaction(
@@ -168,7 +158,7 @@ final class AttachmentService
         } catch (Throwable $e) {
             // The row is the record; a file with no row is litter. Remove it
             // rather than leaving the directory to grow on every failure.
-            @unlink($this->absolute($relative));
+            @unlink(ImageUpload::absolute($this->baseDirectory, $relative));
 
             throw $e;
         }
@@ -191,7 +181,7 @@ final class AttachmentService
             return null;
         }
 
-        $path = $this->absolute((string) $attachment->storage_path);
+        $path = ImageUpload::absolute($this->baseDirectory, (string) $attachment->storage_path);
         $bytes = @file_get_contents($path);
 
         if ($bytes === false) {
@@ -220,7 +210,7 @@ final class AttachmentService
             ->get();
 
         foreach ($superseded as $old) {
-            @unlink($this->absolute((string) $old->storage_path));
+            @unlink(ImageUpload::absolute($this->baseDirectory, (string) $old->storage_path));
             $old->delete();
         }
     }
@@ -236,94 +226,6 @@ final class AttachmentService
             'checksum'    => (string) $attachment->checksum,
             'byte_size'   => (int) $attachment->byte_size,
         ];
-    }
-
-    /**
-     * Read the upload, refusing anything oversized before it is in memory.
-     *
-     * @throws InvalidArgumentException
-     */
-    private function readVerifiedBytes(UploadedFileInterface $file): string
-    {
-        if ($file->getError() !== UPLOAD_ERR_OK) {
-            throw new InvalidArgumentException('The file did not arrive intact. Send it again.');
-        }
-
-        $declared = $file->getSize();
-
-        if ($declared !== null && $declared > self::MAX_BYTES) {
-            throw new InvalidArgumentException(
-                sprintf('The file is larger than %d KB.', intdiv(self::MAX_BYTES, 1024)),
-            );
-        }
-
-        $stream = $file->getStream();
-        $stream->rewind();
-        // One byte past the limit, so a stream that lied about its size is
-        // still caught without reading an unbounded amount of it.
-        $bytes = $stream->read(self::MAX_BYTES + 1);
-
-        if (strlen($bytes) > self::MAX_BYTES) {
-            throw new InvalidArgumentException(
-                sprintf('The file is larger than %d KB.', intdiv(self::MAX_BYTES, 1024)),
-            );
-        }
-
-        if ($bytes === '') {
-            throw new InvalidArgumentException('The file is empty.');
-        }
-
-        return $bytes;
-    }
-
-    /**
-     * What the bytes actually are.
-     *
-     * Sniffed, then decoded. finfo reads a magic number, which a crafted file
-     * can carry in front of anything; getimagesize has to parse enough of the
-     * image to report its dimensions, so a file that passes both is an image.
-     *
-     * @throws InvalidArgumentException
-     */
-    private function sniff(string $bytes): string
-    {
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->buffer($bytes);
-
-        if (!is_string($mime) || !isset(self::ALLOWED_TYPES[$mime])) {
-            throw new InvalidArgumentException('Only PNG and JPEG images are accepted.');
-        }
-
-        $size = @getimagesizefromstring($bytes);
-
-        if ($size === false || $size[0] < 1 || $size[1] < 1) {
-            throw new InvalidArgumentException('That file is not a readable image.');
-        }
-
-        return $mime;
-    }
-
-    private function write(string $relative, string $bytes): void
-    {
-        $path = $this->absolute($relative);
-        $directory = dirname($path);
-
-        if (!is_dir($directory) && !@mkdir($directory, 0o750, true) && !is_dir($directory)) {
-            throw new RuntimeException('Could not create the upload directory.');
-        }
-
-        if (@file_put_contents($path, $bytes, LOCK_EX) === false) {
-            throw new RuntimeException('Could not write the file.');
-        }
-
-        // Readable by the web user and its group, by nobody else, and never
-        // executable. These are data files that happen to live on a server.
-        @chmod($path, 0o640);
-    }
-
-    private function absolute(string $relative): string
-    {
-        return rtrim($this->baseDirectory, '/') . '/' . ltrim($relative, '/');
     }
 
     /** @param array<string,mixed> $meta */

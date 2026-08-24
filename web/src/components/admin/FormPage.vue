@@ -36,12 +36,26 @@ const emit = defineEmits<{ save: [] }>()
 
         <p v-if="error" class="mb-4 text-[15px] font-medium text-no">{{ error }}</p>
 
-        <form class="rounded-surface border border-hairline bg-surface p-6" @submit.prevent="emit('save')">
-            <div class="grid gap-5 sm:grid-cols-2">
+        <!-- Raised off the ground rather than drawn on it. The shadow is the
+             one that already exists for surfaces; a form is a sheet on a desk
+             and it should read as one. -->
+        <form
+            class="rounded-surface border border-hairline bg-surface shadow-surface"
+            @submit.prevent="emit('save')"
+        >
+            <div class="grid gap-5 p-6 sm:grid-cols-2">
                 <slot />
             </div>
 
-            <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-4">
+            <!--
+                The actions sit on their own base, not on the same white as the
+                fields. It gives the primary button somewhere to be, and it
+                ends the form somewhere definite — a run of ten controls that
+                simply stops has no bottom to it.
+            -->
+            <div
+                class="flex flex-wrap items-center gap-3 rounded-b-surface border-t border-hairline bg-surface-2 px-6 py-4"
+            >
                 <button
                     type="submit"
                     class="min-h-11 rounded-card bg-accent px-5 text-[16px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40"

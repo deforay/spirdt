@@ -22,6 +22,33 @@ export const messages = {
     'action.remove': 'Remove',
     'action.dismiss': 'Dismiss',
     'action.cancel': 'Cancel',
+    /*
+     * Examples, not instructions.
+     *
+     * Every text box on every management form carries one, because a form
+     * where some boxes have grey text in them and some do not reads as a form
+     * where the empty ones are somehow different. What they show is the SHAPE
+     * of the answer — a code that looks like a code, a phone number with a
+     * country on it — which is the one thing a label above the box cannot say.
+     *
+     * Names and places are examples and stay as they are in every language.
+     * Anything with a word in it is translated.
+     */
+    'eg.facilityName': 'Chilenje Health Centre',
+    'eg.facilityCode': 'ZM-LSK-014',
+    'eg.address': 'Plot 42, Great East Road',
+    'eg.personName': 'Grace Phiri',
+    'eg.phone': '+260 977 123 456',
+    'eg.email': 'lab@example.org',
+    'eg.placeName': 'Chilanga',
+    'eg.placeLevel': 'District',
+    'eg.siteName': 'Main laboratory',
+    'eg.siteLocation': 'Ground floor, east wing',
+    'eg.jobTitle': 'Laboratory manager',
+    'eg.organizationName': 'Ministry of Health',
+    'eg.organizationCode': 'zm-moh',
+    'eg.timezone': 'Africa/Lusaka',
+    'eg.countryCode': 'ZM',
 
     'signIn.subtitle': 'Sign in to start an assessment.',
     'signIn.tagline': 'The stepwise assessment of rapid diagnostic testing sites.',
@@ -465,6 +492,12 @@ export const messages = {
     'sitesAdmin.findFacility': 'Find the facility',
     'registry.change': 'Change',
     'registry.searchPlaces': 'Search places',
+    'placePicker.add': 'Add a place',
+    'placePicker.addTitle': 'New place',
+    'placePicker.addAction': 'Add it',
+    'placePicker.inside': 'Inside',
+    'placePicker.levelExample': 'District, province, region',
+    'placePicker.required': 'A place needs a name and a level.',
     'registry.noPlacesFound': 'No places found. Add them under Geography.',
     'registry.nothingFound': 'Nothing found.',
     'registry.showing': '{from}–{to} of {total}',
@@ -491,6 +524,11 @@ export const messages = {
     'facilityForm.code': 'Facility code',
     'facilityForm.codeHint': 'However this facility is identified in national records.',
     'facilityForm.place': 'Where it is',
+    'facilityForm.placeHint': 'Type a district or province name — the list narrows as you type.',
+    'facilityForm.sectionNames': 'What it is called',
+    'facilityForm.sectionWhere': 'Where it is',
+    'facilityForm.sectionKind': 'What kind of facility',
+    'facilityForm.sectionContact': 'Who to contact',
     'facilityForm.type': 'Type of facility',
     'facilityForm.level': 'Level',
     'facilityForm.affiliation': 'Affiliation',
@@ -518,6 +556,23 @@ export const messages = {
     'siteForm.location': 'Where in the facility',
     'siteForm.locationHint': 'Optional. Helps an assessor find it on arrival.',
     'siteForm.required': 'A name and a facility are required.',
+    'siteForm.visits': 'Where audits of this site happened',
+    'siteForm.visitsEmpty': 'No audit of this site carries a position. Coordinates are recorded when an assessor files one, and fall back to the facility when the registry has them.',
+    'siteForm.visitsHint': 'One pin per submitted audit. Choose one to open its report.',
+    'siteForm.accuracy': 'accurate to {metres} m',
+
+    'sitePhoto.label': 'Photograph of the site',
+    'sitePhoto.hint': 'Optional. What the bench looks like, so an assessor arriving knows they are at the right one.',
+    'sitePhoto.none': 'No photograph yet.',
+    'sitePhoto.saveFirst': 'Save the site first, then add a photograph.',
+    'sitePhoto.take': 'Take or choose a photo',
+    'sitePhoto.replace': 'Replace photo',
+    'sitePhoto.remove': 'Remove',
+    'sitePhoto.removeConfirm': 'Delete this photograph?',
+    'sitePhoto.removeYes': 'Delete',
+    'sitePhoto.working': 'Sending…',
+    'sitePhoto.alt': 'Photograph of {name}',
+    'sitePhoto.notAnImage': 'That file is not an image.',
     'placeForm.addTitle': 'New place',
     'placeForm.subtitle': 'One level of the country\'s hierarchy.',
     'placeForm.name': 'Name',

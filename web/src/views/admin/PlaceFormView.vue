@@ -136,14 +136,14 @@ const inputClass = 'field'
         @save="onSave"
     >
         <FormField :label="t('placeForm.name')">
-            <input v-model="name" type="text" :class="inputClass" />
+            <input v-model="name" type="text" :placeholder="t('eg.placeName')" :class="inputClass" />
         </FormField>
 
         <FormField :label="t('placeForm.level')" :hint="t('placeForm.levelHint')">
             <input
                 v-model="level"
                 type="text"
-                :placeholder="suggestedLevel"
+                :placeholder="suggestedLevel || t('eg.placeLevel')"
                 :class="inputClass"
             />
         </FormField>

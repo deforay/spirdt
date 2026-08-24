@@ -7,6 +7,7 @@ namespace Tests\Integration;
 use App\Models\Attachment;
 use App\Service\AttachmentService;
 use App\Support\BinaryUuid;
+use App\Support\ImageUpload;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use InvalidArgumentException;
@@ -315,7 +316,7 @@ final class AttachmentServiceTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        $oversized = str_repeat('A', AttachmentService::MAX_BYTES + 1024);
+        $oversized = str_repeat('A', ImageUpload::maxBytes() + 1024);
 
         $this->service->store(
             new UploadedFile(

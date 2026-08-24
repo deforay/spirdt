@@ -430,25 +430,44 @@
         white-space: nowrap;
     }
 
-    /* One input, wherever somebody types into a list. */
+    /*
+     * One input, wherever somebody types.
+     *
+     * RECESSED, not flush. A white box with a hairline border sitting on a
+     * white card is the same value as the card, and a form of ten of them
+     * reads as a page with nothing on it — which is how the facility form was
+     * described, and it was right. Setting the control a shade below its
+     * surface is what makes it look like somewhere to put something: the
+     * border draws the edge, the fill says there is a well behind it.
+     *
+     * Both halves swap on focus. The field lifts to the surface colour and the
+     * border takes the accent, so the box being typed into is the lightest
+     * thing on the card rather than merely the one with a ring around it.
+     */
     .field {
         min-height: 44px;
         width: 100%;
         border-radius: var(--radius-card);
-        border: 1px solid var(--c-hairline);
-        background: var(--c-surface);
+        border: 1px solid var(--c-rule);
+        background: var(--c-surface-2);
         padding: 0 14px;
         font-size: 15px;
         color: var(--c-label);
         outline: none;
+        transition: background-color 120ms, border-color 120ms, box-shadow 120ms;
     }
 
     .field::placeholder {
         color: var(--c-label-3);
     }
 
-    .field:focus {
+    /* focus-within as well as focus: a picker is a div wearing this class with
+       its input inside, and it has to light up the same way a plain box does
+       or the two stop looking like the same control. */
+    .field:focus,
+    .field:focus-within {
         border-color: var(--c-accent);
+        background: var(--c-surface);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-accent) 14%, transparent);
     }
 }

@@ -15,8 +15,10 @@ import {
     mergeFacility,
     updateFacility,
 } from '@/api/registry'
+import { can, PERMISSION } from '@/auth/permissions'
 import FormField from '@/components/admin/FormField.vue'
 import FormPage from '@/components/admin/FormPage.vue'
+import FormSection from '@/components/admin/FormSection.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
 import { flash } from '@/composables/useFlash'
 import { locale, t } from '@/i18n'
@@ -38,6 +40,9 @@ const router = useRouter()
 
 const id = computed(() => (route.params.id === undefined ? null : String(route.params.id)))
 const isNew = computed(() => id.value === null)
+
+/** Adding a place from inside the picker is a registry write like any other. */
+const canWrite = computed(() => can(PERMISSION.registryWrite))
 
 const tree = ref<GeoTree>({ units: [], paths: {} })
 const options = ref<FacilityOptions>({ facility_type: [], level: [], affiliation: [] })
@@ -118,6 +123,20 @@ async function onToggleActive(): Promise<void> {
     }
 }
 
+/**
+ * A place was added from inside the picker.
+ *
+ * The tree is reloaded rather than patched, so the new district arrives with
+ * the path the server builds for it — the picker shows its own guess until
+ * this lands, and the two would drift the first time a name is normalised on
+ * the way in.
+ */
+async function onPlaceAdded(): Promise<void> {
+    await act(async () => {
+        tree.value = await listGeoUnits()
+    })
+}
+
 let mergeTimer: ReturnType<typeof setTimeout> | undefined
 
 function onMergeSearch(): void {
@@ -192,24 +211,69 @@ const inputClass = 'field'
         :error="error"
         @save="onSave"
     >
+        <FormSection :title="t('facilityForm.sectionNames')" />
+
         <FormField :label="t('facilityForm.name')">
-            <input v-model="form.name" type="text" :class="inputClass" />
+            <input v-model="form.name" type="text" :placeholder="t('eg.facilityName')" :class="inputClass" />
         </FormField>
 
         <FormField :label="t('facilityForm.code')" :hint="t('facilityForm.codeHint')">
-            <input v-model="form.code" type="text" spellcheck="false" :class="inputClass" />
+            <input
+                v-model="form.code"
+                type="text"
+                spellcheck="false"
+                :placeholder="t('eg.facilityCode')"
+                :class="inputClass"
+            />
         </FormField>
 
-        <FormField :label="t('facilityForm.place')" wide>
+        <FormSection :title="t('facilityForm.sectionWhere')" />
+
+        <!-- Labelled "Place" rather than "Where it is": the band above it
+             already says that, and a field whose label repeats its own
+             section heading reads as a mistake. -->
+        <FormField :label="t('registry.place')" :hint="t('facilityForm.placeHint')" wide>
             <!-- The picker's model is strictly number | null; the form type has
                  every field optional, so the undefined case is normalised here
                  rather than loosening the picker for one caller. -->
             <PlacePicker
                 :model-value="form.geo_unit_id ?? null"
                 :tree="tree"
+                :can-create="canWrite"
                 @update:model-value="form.geo_unit_id = $event"
+                @created="onPlaceAdded"
             />
         </FormField>
+
+        <FormField :label="t('facilityForm.address')" wide>
+            <textarea
+                v-model="form.address"
+                rows="2"
+                :placeholder="t('eg.address')"
+                :class="inputClass"
+            ></textarea>
+        </FormField>
+
+        <FormField :label="t('facilityForm.coordinates')" :hint="t('facilityForm.coordinatesHint')">
+            <div class="flex gap-2">
+                <input
+                    v-model.number="form.latitude"
+                    type="number"
+                    step="0.0000001"
+                    :placeholder="t('facilityForm.latitude')"
+                    :class="inputClass"
+                />
+                <input
+                    v-model.number="form.longitude"
+                    type="number"
+                    step="0.0000001"
+                    :placeholder="t('facilityForm.longitude')"
+                    :class="inputClass"
+                />
+            </div>
+        </FormField>
+
+        <FormSection :title="t('facilityForm.sectionKind')" />
 
         <FormField :label="t('facilityForm.type')">
             <select v-model="form.facility_type" :class="inputClass">
@@ -238,16 +302,24 @@ const inputClass = 'field'
             </select>
         </FormField>
 
-        <FormField :label="t('facilityForm.address')" wide>
-            <textarea v-model="form.address" rows="2" :class="inputClass"></textarea>
-        </FormField>
+        <FormSection :title="t('facilityForm.sectionContact')" />
 
         <FormField :label="t('facilityForm.contactName')" :hint="t('facilityForm.contactHint')">
-            <input v-model="form.contact_name" type="text" :class="inputClass" />
+            <input
+                v-model="form.contact_name"
+                type="text"
+                :placeholder="t('eg.personName')"
+                :class="inputClass"
+            />
         </FormField>
 
         <FormField :label="t('facilityForm.contactPhone')">
-            <input v-model="form.contact_phone" type="tel" :class="inputClass" />
+            <input
+                v-model="form.contact_phone"
+                type="tel"
+                :placeholder="t('eg.phone')"
+                :class="inputClass"
+            />
         </FormField>
 
         <FormField :label="t('facilityForm.contactEmail')">
@@ -256,27 +328,9 @@ const inputClass = 'field'
                 type="email"
                 autocapitalize="off"
                 spellcheck="false"
+                :placeholder="t('eg.email')"
                 :class="inputClass"
             />
-        </FormField>
-
-        <FormField :label="t('facilityForm.coordinates')" :hint="t('facilityForm.coordinatesHint')">
-            <div class="flex gap-2">
-                <input
-                    v-model.number="form.latitude"
-                    type="number"
-                    step="0.0000001"
-                    :placeholder="t('facilityForm.latitude')"
-                    :class="inputClass"
-                />
-                <input
-                    v-model.number="form.longitude"
-                    type="number"
-                    step="0.0000001"
-                    :placeholder="t('facilityForm.longitude')"
-                    :class="inputClass"
-                />
-            </div>
         </FormField>
 
         <template #actions>

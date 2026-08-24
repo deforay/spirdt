@@ -113,6 +113,15 @@ final class ReportService
                 'assessments.audit_round',
                 'assessments.submitted_at',
                 'assessments.campaign_id',
+                // Where the assessor was standing, when the device would say.
+                // Carried on the row rather than fetched per visit because the
+                // screens that map a site's audits are reading this list
+                // already, and a second request per pin is a second request
+                // per pin.
+                'assessments.latitude',
+                'assessments.longitude',
+                'assessments.accuracy_m',
+                'assessments.location_source',
                 'campaigns.name as campaign_name',
                 'testing_sites.name as site_name',
                 'facilities.name as facility_name',
@@ -145,6 +154,14 @@ final class ReportService
                 'submitted_at'   => $this->asDateTime($row->submitted_at),
                 'campaign_id'    => $row->campaign_id === null ? null : (int) $row->campaign_id,
                 'campaign'       => $row->campaign_name,
+                'latitude'       => $row->latitude === null ? null : (float) $row->latitude,
+                'longitude'      => $row->longitude === null ? null : (float) $row->longitude,
+                'accuracy_m'     => $row->accuracy_m === null ? null : (int) $row->accuracy_m,
+                // 'device' is where somebody stood. 'facility' is what the
+                // registry claims. A reader who cannot tell them apart is one
+                // guess away from settling a dispute about a visit with a
+                // coordinate nobody recorded.
+                'location_source' => $row->location_source === null ? null : (string) $row->location_source,
                 'site'           => $row->site_name,
                 'facility'       => $row->facility_name,
                 'facility_code'  => $row->facility_code,

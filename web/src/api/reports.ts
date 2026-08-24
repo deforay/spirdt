@@ -19,6 +19,13 @@ export interface AssessmentRow {
     submitted_at: string | null
     campaign_id: number | null
     campaign: string | null
+    /** Where the assessor was standing. Null whenever no fix was available. */
+    latitude: number | null
+    longitude: number | null
+    /** Metres. Null on a position inherited from the facility, which has none. */
+    accuracy_m: number | null
+    /** 'device' is evidence somebody was there; 'facility' is what the registry claims. */
+    location_source: string | null
     site: string | null
     facility: string | null
     facility_code: string | null
