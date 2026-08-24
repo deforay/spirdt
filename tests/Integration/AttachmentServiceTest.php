@@ -537,6 +537,41 @@ final class AttachmentServiceTest extends TestCase
     }
 
     /**
+     * Deleting is scoped like every other read here, and this pins it.
+     *
+     * The id of an attachment is a UUID somebody could hold from a report, a
+     * log or a shared device, so "knows the id" must never be the same thing
+     * as "may delete it". The model's organisation scope is what stops it, and
+     * an automated review reading remove() on its own could not see that — so
+     * the guarantee is asserted here instead of being inferred from a trait
+     * three files away.
+     *
+     * The answer is the idempotent one rather than a refusal, deliberately: a
+     * caller learns nothing about whether the id exists somewhere they cannot
+     * see.
+     */
+    public function testAnotherOrganisationCannotDeleteAPhotograph(): void
+    {
+        $stored = $this->service->store($this->png(11, 11), [
+            'assessment_id' => $this->assessmentA,
+            'kind'          => 'photo',
+            'section_code'  => '1',
+            'client_key'    => '019fd300-0000-7000-8000-000000000dd1',
+        ]);
+
+        $this->useTenant($this->orgB);
+
+        $this->assertTrue($this->service->remove($stored['id']));
+
+        $this->useTenant($this->orgA);
+
+        $survivor = Attachment::query()->where('id', BinaryUuid::toBytes($stored['id']))->first();
+
+        $this->assertNotNull($survivor);
+        $this->assertFileExists($this->storage . '/' . $survivor->storage_path);
+    }
+
+    /**
      * A report whose countersignature can be deleted is not a countersigned
      * report. Signatures are replaced by signing again.
      */
