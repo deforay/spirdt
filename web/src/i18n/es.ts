@@ -261,6 +261,7 @@ export const messages: Messages = {
     },
     'review.bySection': 'Por sección',
     'review.notApplicable': 'No aplica',
+    'review.saveDraft': 'Guardar el borrador',
     'review.submit': 'Enviar evaluación',
     'review.submitting': 'Enviando',
     'review.stillNeeded': {

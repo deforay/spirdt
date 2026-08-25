@@ -61,6 +61,8 @@ const emit = defineEmits<{
     /** Open Part A, so a wrong facility detail can be corrected from here too. */
     editSetup: []
     jump: [sectionCode: string, pathogen: string | null]
+    /** Leave the visit unfinished, to be picked up later. */
+    saveDraft: []
     submit: []
 }>()
 
@@ -703,6 +705,30 @@ function summaryOf(gap: Gap): string {
             >
                 {{ t('review.notesNeeded', { count: result.missingNotes.length }) }}
             </p>
+
+            <!--
+                A way off this screen for a visit that cannot be submitted yet.
+
+                Only while it cannot: once the audit is complete, the way out
+                is the button above it, and offering to save a draft of
+                something ready to send is offering to not finish.
+
+                The work is already on the device — every answer is written as
+                it is given — so this saves nothing that was not saved. What it
+                does is say so, next to the button that will not move, and put
+                the visit back under Unfinished where it can be found. Without
+                it the only door out of a half-finished audit is one in the top
+                bar, on the screen where the assessor is most likely to be
+                looking at the bottom of the page and wondering what to do.
+            -->
+            <button
+                v-if="!submittable"
+                type="button"
+                class="mt-3 w-full rounded-card border border-hairline bg-surface py-3 text-[16px] font-medium text-label-2 transition-colors hover:bg-accent-soft hover:text-accent lg:mx-auto lg:block lg:w-auto lg:px-10"
+                @click="emit('saveDraft')"
+            >
+                {{ t('review.saveDraft') }}
+            </button>
         </footer>
     </div>
 </template>

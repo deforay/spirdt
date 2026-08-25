@@ -276,6 +276,7 @@ export const messages = {
     },
     'review.bySection': 'By section',
     'review.notApplicable': 'Not applicable',
+    'review.saveDraft': 'Save draft',
     'review.submit': 'Submit assessment',
     'review.submitting': 'Submitting',
     'review.stillNeeded': {

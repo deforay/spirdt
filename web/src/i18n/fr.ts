@@ -264,6 +264,7 @@ export const messages: Messages = {
     },
     'review.bySection': 'Par section',
     'review.notApplicable': 'Sans objet',
+    'review.saveDraft': 'Enregistrer le brouillon',
     'review.submit': "Soumettre l'évaluation",
     'review.submitting': 'Soumission',
     'review.stillNeeded': {

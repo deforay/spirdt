@@ -1321,6 +1321,7 @@ async function onSubmit() {
         @back="stage = 'checklist'"
         @edit-setup="editSetup"
         @jump="jumpTo"
+        @save-draft="leaveVisit"
         @submit="onSubmit"
     />
 

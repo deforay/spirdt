@@ -262,6 +262,7 @@ export const messages: Messages = {
     },
     'review.bySection': 'Por secção',
     'review.notApplicable': 'Não aplicável',
+    'review.saveDraft': 'Guardar rascunho',
     'review.submit': 'Submeter avaliação',
     'review.submitting': 'A submeter',
     'review.stillNeeded': {
