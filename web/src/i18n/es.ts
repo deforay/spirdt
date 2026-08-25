@@ -106,6 +106,7 @@ export const messages: Messages = {
     'photos.count': '{taken} de {total}',
     'photos.add': 'Tomar una foto',
     'photos.addFromLibrary': 'Añadir de la galería',
+    'photos.addAny': 'Añadir fotografías',
     'photos.working': 'Guardando…',
     'photos.none': 'Aún no hay fotografías de esta parte de la auditoría.',
     'photos.captionPlaceholder': 'Qué se ve en la foto',

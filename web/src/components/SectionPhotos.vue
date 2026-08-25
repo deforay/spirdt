@@ -41,6 +41,22 @@ const props = defineProps<{
     sectionCode: string
 }>()
 
+/**
+ * Whether a camera button can do what it says on this device.
+ *
+ * `capture` is an instruction to the operating system to open the camera, and
+ * a desktop browser is entitled to ignore it — which it does, falling back to
+ * the file picker. The result on a laptop is a control reading "Take a photo"
+ * that opens a browse dialog, sitting next to a second control that opens the
+ * same dialog. One of them is lying and both of them are the same button.
+ *
+ * There is no honest feature test for it: a desktop browser reports the
+ * attribute and then disregards it. So this asks the question that actually
+ * separates the two cases — a coarse pointer is a finger, and a finger comes
+ * attached to a device whose camera is worth opening.
+ */
+const handheld = window.matchMedia('(pointer: coarse)').matches
+
 const rows = ref<StoredAttachment[]>([])
 const busy = ref(false)
 const error = ref('')
@@ -105,6 +121,18 @@ async function onPicked(event: Event): Promise<void> {
         return
     }
 
+    // PINNED BEFORE THE LOOP, and this is not defensive tidying. Resizing
+    // several full-resolution photographs takes seconds, and this component
+    // instance is reused as the assessor moves between sections rather than
+    // rebuilt — so `props.sectionCode` follows them. Read fresh on each pass,
+    // the first pictures of a selection land on the section they were chosen
+    // in and the rest land on whatever section the assessor walked to while
+    // they were being written. Evidence filed against the wrong part of the
+    // audit is worse than evidence not filed: nothing on the report says it
+    // is in the wrong place. The batch belongs where it was chosen.
+    const assessmentId = props.assessmentId
+    const sectionCode = props.sectionCode
+
     error.value = ''
     busy.value = true
 
@@ -122,8 +150,8 @@ async function onPicked(event: Event): Promise<void> {
 
         try {
             const stored = await savePhoto({
-                assessmentId: props.assessmentId,
-                sectionCode: props.sectionCode,
+                assessmentId,
+                sectionCode,
                 caption: '',
                 blob: await resizedForUpload(file),
             })
@@ -149,6 +177,13 @@ async function onPicked(event: Event): Promise<void> {
     }
 
     busy.value = false
+
+    // Said only to somebody still looking at the section it is about. If they
+    // moved on while the batch was being written, a count reported against the
+    // section now on screen describes photographs that are not in it.
+    if (assessmentId !== props.assessmentId || sectionCode !== props.sectionCode) {
+        return
+    }
 
     // One message, and the one that explains the largest gap between what was
     // chosen and what is now on screen.
@@ -252,12 +287,16 @@ onBeforeUnmount(() => {
         <p v-else class="pb-3 text-[15px] text-label-3">{{ t('photos.none') }}</p>
 
         <!--
-            TWO WAYS IN, because one control cannot do both. `capture` is what
-            sends the first straight to the rear camera in a single tap — which
-            is the thing an assessor does standing in the room — and it also
-            removes the library from the sheet and refuses a multiple
-            selection. So the second control drops `capture` to get both back:
+            TWO WAYS IN ON A PHONE, because one control cannot do both.
+            `capture` is what sends the first straight to the rear camera in a
+            single tap — the thing an assessor does standing in the room — and
+            it also takes the library out of the sheet and refuses a selection
+            of more than one. So the second drops `capture` to get both back:
             pictures taken earlier, and several of them at once.
+
+            ONE WAY IN ON A LAPTOP, because there `capture` is ignored and both
+            controls would open the same browse dialog, one of them under a
+            label promising a camera.
 
             Labels wrapping their inputs rather than buttons beside them: the
             input is what opens the camera, and it stays reachable by the
@@ -265,6 +304,7 @@ onBeforeUnmount(() => {
         -->
         <div v-if="rows.length < PHOTOS_PER_SECTION" class="mt-3 flex flex-wrap gap-2">
             <label
+                v-if="handheld"
                 class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-surface-2 px-4 text-[14.5px] font-medium text-label-2 transition-colors hover:text-label"
                 :class="busy ? 'pointer-events-none opacity-40' : ''"
             >
@@ -285,7 +325,8 @@ onBeforeUnmount(() => {
                 :class="busy ? 'pointer-events-none opacity-40' : ''"
             >
                 <PhImages :size="17" aria-hidden="true" />
-                {{ t('photos.addFromLibrary') }}
+                <template v-if="handheld">{{ t('photos.addFromLibrary') }}</template>
+                <template v-else>{{ busy ? t('photos.working') : t('photos.addAny') }}</template>
                 <input
                     type="file"
                     accept="image/*"
