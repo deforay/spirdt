@@ -488,18 +488,17 @@ const setupNextSection = computed(() =>
 )
 
 /**
- * What the way out of the setup screen is called.
+ * What the way back from the setup screen is called.
  *
- * NOT "the checklist", in either direction, and that is the point. Naming this
- * form's exit "Start the checklist" said that the audit begins on the next
- * screen — but Part A is the instrument's own first questions, and an assessor
- * who has just answered twenty of them has been auditing for ten minutes. It
- * also made "Back to the checklist" useless in the other direction: the
- * checklist is five sections and they left one of them mid-question.
+ * NOT "the checklist", and that is the point. Naming this form's exit "Start
+ * the checklist" said that the audit begins on the next screen — but Part A is
+ * the instrument's own first questions, and an assessor who has just answered
+ * twenty of them has been auditing for ten minutes. "Back to the checklist"
+ * was no better: the checklist is five sections and they left one of them
+ * mid-question.
  *
- * So both directions name the SECTION. Continuing goes to a section by name,
- * coming back goes to the section they were in, and nothing on the screen
- * claims the audit has not started yet.
+ * So it names the SECTION they were in. Nothing on the screen claims the audit
+ * has not started yet.
  *
  * On a first visit the label is the site instead, because the top of the
  * screen is a way out of the visit rather than a step through it.
@@ -524,6 +523,9 @@ function sectionFilled(code: string): string {
 
     return `${Math.min(100, Math.round((tally.answered / tally.expected) * 100))}%`
 }
+
+/** The open section by name, for the arrow back to it from the review. */
+const sectionTitle = computed(() => text(section.value.title))
 
 /** Section 4 repeats per pathogen; every other section is answered once. */
 const instance = computed(() => (section.value.scope === 'pathogen' ? activePathogen.value : null))
@@ -770,15 +772,34 @@ async function leaveVisit() {
 }
 
 /**
- * The way out in the top bar, which on a phone is the only one.
+ * The arrow in the top bar goes back one step through the visit.
  *
- * It has to mean the same thing as the button the screen below would have
- * drawn for itself: on setup, an assessor who came here to correct something
- * mid-visit is going back to the checklist rather than out of the visit
- * entirely. Two doors marked with the same site name that led to different
- * places would be worse than one.
+ * It used to go OUT of the visit from the checklist — labelled with the site
+ * name, which read as the way back to the list of sites, and was. That left
+ * the step before the checklist reachable on a phone only as an unlabelled
+ * building icon among the numbered section chips, which is not a door anybody
+ * finds. And from the review screen there was no arrow at all.
+ *
+ * So the arrow is now the visit's own order, run backwards: the review goes to
+ * the section it was reviewing, the checklist goes to the setup screen, and
+ * setup goes to whatever came before it — the section the assessor left, or
+ * the site list when the visit has not started. Leaving the visit entirely is
+ * the door beside the sync badge, which is on every one of these screens and
+ * says what it does.
  */
 async function onShellBack(): Promise<void> {
+    if (stage.value === 'review') {
+        stage.value = 'checklist'
+
+        return
+    }
+
+    if (stage.value === 'checklist') {
+        editSetup()
+
+        return
+    }
+
     if (stage.value === 'setup' && revisitingSetup.value) {
         await startChecklist()
 
@@ -823,10 +844,14 @@ async function onSubmit() {
         stage === 'setup'
             ? setupBackLabel
             : stage === 'checklist'
-              ? (assessment.assessment.value?.siteName ?? t('checklist.loading'))
-              : undefined
+              ? t('checklist.editSetup')
+              : stage === 'review'
+                ? sectionTitle
+                : undefined
     "
+    :exit-label="stage === 'site' ? undefined : t('assess.exit')"
     @back="onShellBack"
+    @exit="leaveVisit"
   >
 
     <SitePicker v-if="stage === 'site'" :drafts="drafts" @chosen="onSiteChosen" @resume="onResume" />
@@ -1028,17 +1053,25 @@ async function onSubmit() {
         </main>
 
         <footer class="border-t border-hairline bg-surface px-4 pb-4 pt-3 md:rounded-t-surface md:border-x md:px-6">
+            <!--
+                The way on, and it says so in both directions.
+
+                It used to borrow the header's label when the assessor had come
+                back to correct something, so the one button past the end of a
+                long form read "Back to Organization and Management" — a
+                retreat, in the place where the screen's forward step goes. It
+                is the same destination either way; what differs is that the
+                door at the top is the one you leave by and this is the one you
+                go on through. The arrow says which.
+            -->
             <button
                 type="button"
-                class="w-full rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 md:mx-auto md:block md:w-auto md:px-12"
+                class="flex w-full items-center justify-center gap-2 rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 md:mx-auto md:w-auto md:px-12"
                 :disabled="!setupReady"
                 @click="startChecklist"
             >
-                {{
-                    revisitingSetup
-                        ? setupBackLabel
-                        : t('setup.continueTo', { section: setupNextSection })
-                }}
+                {{ t('setup.continueTo', { section: setupNextSection }) }}
+                <PhArrowRight :size="17" weight="bold" class="shrink-0" aria-hidden="true" />
             </button>
             <p v-if="draftRound.trim() === ''" class="pt-2 text-center text-[14px] text-label-2">
                 {{ t('setup.needRound') }}

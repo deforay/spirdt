@@ -3,6 +3,7 @@ import {
     PhArrowLeft,
     PhCaretDown,
     PhChartBar,
+    PhDoorOpen,
     PhGauge,
     PhSignOut,
     PhUserCircle,
@@ -64,15 +65,31 @@ import { syncAll } from '@/sync/engine'
  * the screen below gets the row back. From 768px up there is room for both,
  * and the brand comes back with the screen keeping its own way out.
  */
+/**
+ * The way out of a visit, as opposed to the way back a step.
+ *
+ * The back arrow means something different on every stage — out to the site
+ * list from setup, back to the section you left, back to the checklist from
+ * the review — and on two of them it does not lead out of the visit at all.
+ * So an assessor standing in a laboratory who has to leave had to work out
+ * which screen they were on and how many steps back the door was, and from
+ * the review screen there was no door.
+ *
+ * This is that door, in the same place on every screen of a visit. Nothing is
+ * lost by taking it: the work is already written to the device and the visit
+ * stays in the drafts list, which is what the label says.
+ */
 defineProps<{
     storage?: StorageReport | null
     saveState?: SaveState
     saveError?: string
     /** What the phone bar says beside the back arrow. Absent, it shows the brand. */
     backLabel?: string
+    /** Shown while a visit is open. Absent, there is nothing to leave. */
+    exitLabel?: string
 }>()
 
-const emit = defineEmits<{ back: [] }>()
+const emit = defineEmits<{ back: []; exit: [] }>()
 
 const open = ref(false)
 
@@ -151,6 +168,21 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                 >
 
                 <span class="flex-1"></span>
+
+                <!-- Narrow enough to sit beside the sync badge on a phone: the
+                     door alone, with the promise spelled out from 640px up.
+                     It keeps its own label as the accessible name either way,
+                     so the icon is never the whole of what it says. -->
+                <button
+                    v-if="exitLabel !== undefined"
+                    type="button"
+                    class="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2 text-[15px] font-medium text-label-2 transition-colors hover:bg-accent-soft sm:px-3"
+                    :aria-label="exitLabel"
+                    @click="emit('exit')"
+                >
+                    <PhDoorOpen :size="17" class="shrink-0" aria-hidden="true" />
+                    <span class="hidden sm:inline">{{ exitLabel }}</span>
+                </button>
 
                 <SyncBadge @retry="syncAll()" />
                 <LocaleSwitcher />

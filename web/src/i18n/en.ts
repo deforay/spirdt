@@ -215,6 +215,7 @@ export const messages = {
         other: '{count} answers need correcting.',
     },
 
+    'assess.exit': 'Save and exit',
     'checklist.loading': 'Loading',
     'checklist.currentVisit': 'Current audit',
     'checklist.runningScore': 'Running score',

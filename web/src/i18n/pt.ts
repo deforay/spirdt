@@ -200,6 +200,7 @@ export const messages: Messages = {
         other: '{count} respostas a corrigir.',
     },
 
+    'assess.exit': 'Guardar e sair',
     'checklist.loading': 'A carregar',
     'checklist.currentVisit': 'Auditoria atual',
     'checklist.runningScore': 'Pontuação atual',
