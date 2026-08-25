@@ -305,6 +305,13 @@ async function restorePosition(): Promise<boolean> {
         draftContext.value = { ...existing.context }
         draftPathogens.value = [...existing.pathogens]
         draftRound.value = existing.auditRound ?? ''
+
+        // A named pathogen is only written when the setup screen is left, so a
+        // visit that has one has been past here. Arriving from a Back press or
+        // a pasted URL has to know that: it decides whether the way back off
+        // this screen is the section the assessor was in or the site list, and
+        // getting it wrong drops somebody out of a visit they were working.
+        revisitingSetup.value = existing.pathogens.length > 0
         stage.value = 'setup'
 
         return true
@@ -351,6 +358,7 @@ async function onResume(id: string) {
     // Back to setup when the visit never got past it. Sending someone into a
     // checklist whose pathogens were never named shows Section 4 with nothing
     // in it and no way to say why.
+    revisitingSetup.value = false
     stage.value = existing.pathogens.length === 0 ? 'setup' : 'checklist'
 
     if (stage.value === 'setup') {
