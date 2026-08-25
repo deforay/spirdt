@@ -148,6 +148,7 @@ export const messages: Messages = {
     'invalid.above_max': 'No puede ser superior a {max}.',
     'invalid.not_a_date': 'Introduzca una fecha válida.',
     'invalid.in_the_future': 'No puede ser una fecha futura.',
+    'context.choose': 'Elegir una opción',
     'context.specify': 'Especifique',
     'context.add': 'Añadir {label}',
     'date.open': 'Elegir una fecha',

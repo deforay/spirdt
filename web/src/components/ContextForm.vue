@@ -2,6 +2,7 @@
 import { PhCheck, PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { computed, reactive, watch } from 'vue'
 
+import ChoiceField from '@/components/ChoiceField.vue'
 import DateField from '@/components/DateField.vue'
 import TimeField from '@/components/TimeField.vue'
 import { t, text } from '@/i18n'
@@ -91,6 +92,22 @@ function needsSpecify(field: ContextField): boolean {
     const chosen = draft[field.code]
 
     return (field.options ?? []).some((option) => option.key === chosen && option.specify === true)
+}
+
+/**
+ * Whether a choice is short enough to be worth showing whole.
+ *
+ * Two options sit side by side on the narrowest screen the app runs on, so
+ * showing them costs one line and saves a tap. It is also, as it happens, the
+ * length of the one question here that must be readable without opening
+ * anything: `refers_specimens` decides whether Section 5 is part of the visit,
+ * and an answer that removes nine questions should not be behind a list.
+ *
+ * Anything longer becomes a field with the list behind it — see ChoiceField
+ * for why six tiles are the wrong shape for a form.
+ */
+function showsEveryOption(field: ContextField): boolean {
+    return (field.options ?? []).length <= 2
 }
 
 function rows(field: ContextField): Array<Record<string, string>> {
@@ -193,78 +210,86 @@ const inputClass = 'field tnum'
 
             <div>
                 <!--
-                    One choice, shown as rows rather than a dropdown: a select
-                    on a tablet hides its options behind a tap, and these lists
-                    are short.
-
-                    Two abreast wherever there is room for two. A phone gets
-                    one, because half a phone is not a line long enough for
-                    "Non-governmental organisation". Anything wider gets both
-                    columns, and on a desk the difference is most of a screen:
-                    six options in a single column ran the length of the
-                    viewport on their own, and left the four-option field
-                    beside them sitting above an equally tall hole.
+                    One choice. Shown whole while it is short enough to be
+                    worth a line each, and a field with a list behind it once
+                    it is not.
                 -->
-                <div v-if="field.type === 'select_one'" class="grid gap-2 sm:grid-cols-2">
+                <div v-if="field.type === 'select_one'" class="flex flex-col gap-2">
                     <!--
-                        Each option is its own card with a mark on it. The old
-                        row list wrote the word "Selected" in the right margin,
-                        which is not a control: it could not be seen at a
-                        glance, it was the only state in the application
-                        announced in prose, and on a list of six options an
-                        assessor had to read all six to find out which one was
-                        chosen.
+                        Two abreast wherever there is room for two. A phone
+                        gets one, because half a phone is not a line long
+                        enough for "Non-governmental organisation".
                     -->
-                    <button
-                        v-for="option in field.options ?? []"
-                        :key="option.key"
-                        type="button"
-                        :aria-pressed="draft[field.code] === option.key"
-                        :class="[
-                            'flex w-full min-h-12 items-center justify-between gap-3 rounded-card border-2 px-4 py-3 text-left text-[17px] transition-colors',
-                            draft[field.code] === option.key
-                                ? 'border-accent bg-accent-soft font-semibold text-accent'
-                                : 'border-hairline bg-surface hover:border-label-3/40',
-                        ]"
-                        @click="
-                            draft[field.code] = draft[field.code] === option.key ? '' : option.key;
-                            commit()
-                        "
-                    >
-                        <span>{{ text(option.label) }}</span>
-
-                        <!-- The mark, not the word. -->
-                        <span
-                            aria-hidden="true"
+                    <div v-if="showsEveryOption(field)" class="grid gap-2 sm:grid-cols-2">
+                        <!--
+                            Each option is its own card with a mark on it. The
+                            old row list wrote the word "Selected" in the right
+                            margin, which is not a control: it could not be
+                            seen at a glance, and it was the only state in the
+                            application announced in prose.
+                        -->
+                        <button
+                            v-for="option in field.options ?? []"
+                            :key="option.key"
+                            type="button"
+                            :aria-pressed="draft[field.code] === option.key"
                             :class="[
-                                'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+                                'flex w-full min-h-12 items-center justify-between gap-3 rounded-card border-2 px-4 py-3 text-left text-[17px] transition-colors',
                                 draft[field.code] === option.key
-                                    ? 'border-accent bg-accent text-accent-ink'
-                                    : 'border-hairline',
+                                    ? 'border-accent bg-accent-soft font-semibold text-accent'
+                                    : 'border-hairline bg-surface hover:border-label-3/40',
                             ]"
-                        >
-                            <PhCheck
-                                v-if="draft[field.code] === option.key"
-                                :size="12"
-                                weight="bold"
-                            />
-                        </span>
-                    </button>
-
-                    <div v-if="needsSpecify(field)" class="sm:col-span-2">
-                        <input
-                            :value="(draft[`${field.code}_other`] as string) ?? ''"
-                            type="text"
-                            :class="inputClass"
-                            :placeholder="t('context.specify')"
-                            @input="
-                                draft[`${field.code}_other`] = (
-                                    $event.target as HTMLInputElement
-                                ).value;
+                            @click="
+                                draft[field.code] =
+                                    draft[field.code] === option.key ? '' : option.key;
                                 commit()
                             "
-                        />
+                        >
+                            <span>{{ text(option.label) }}</span>
+
+                            <!-- The mark, not the word. -->
+                            <span
+                                aria-hidden="true"
+                                :class="[
+                                    'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+                                    draft[field.code] === option.key
+                                        ? 'border-accent bg-accent text-accent-ink'
+                                        : 'border-hairline',
+                                ]"
+                            >
+                                <PhCheck
+                                    v-if="draft[field.code] === option.key"
+                                    :size="12"
+                                    weight="bold"
+                                />
+                            </span>
+                        </button>
                     </div>
+
+                    <ChoiceField
+                        v-else
+                        :id="field.code"
+                        :model-value="(draft[field.code] as string) ?? ''"
+                        :options="field.options ?? []"
+                        @update:model-value="
+                            draft[field.code] = $event;
+                            commit()
+                        "
+                    />
+
+                    <!-- "Other", and the two options the source form asks to
+                         be qualified. Under the choice that asked for it. -->
+                    <input
+                        v-if="needsSpecify(field)"
+                        :value="(draft[`${field.code}_other`] as string) ?? ''"
+                        type="text"
+                        :class="inputClass"
+                        :placeholder="t('context.specify')"
+                        @input="
+                            draft[`${field.code}_other`] = ($event.target as HTMLInputElement).value;
+                            commit()
+                        "
+                    />
                 </div>
 
                 <!-- A repeating group: the staff who do the testing. -->
