@@ -116,6 +116,20 @@ quietly omits what was skipped is the one way it could mislead.
 Use **Print** for the paper copy. Colour is never the only carrier on this page,
 so a photocopy still reads.
 
+**Download PDF** writes the same visit out as a file, from the list as well as
+from the report itself. It carries everything the screen shows and Part A
+besides — the facility's type, level and staffing, as the assessor recorded
+them.
+
+Choose **With photographs** or **Without photographs** when you download. Five
+pictures a section at a phone camera's resolution makes a file too large to
+email, so a report meant for a mailbox is better sent without them. Signatures
+are in both.
+
+Anything the file leaves out, it says: a picture dropped to keep the download a
+size that can be sent, or a mark this server has no image library to draw. Both
+are still in the system and still on the report screen.
+
 A draft is a visit somebody is part-way through. It is marked as one and its
 figures are not final.
 

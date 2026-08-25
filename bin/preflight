@@ -68,13 +68,13 @@ foreach (['pdo_mysql', 'intl', 'zip', 'mbstring', 'bcmath'] as $ext) {
 }
 
 // A warning rather than a failure: uploads work without it, they are simply
-// stored at the size they arrived at. Nothing else in the application decodes
-// an image.
+// stored at the size they arrived at, and a report PDF leaves out the marks it
+// cannot composite rather than failing to render.
 $hasGd = extension_loaded('gd');
 check(
     'ext-gd',
     $hasGd ? PF_OK : PF_WARN,
-    $hasGd ? '' : 'photographs will be stored unresized — see ImageProcessor',
+    $hasGd ? '' : 'photographs stored unresized, and signatures left off report PDFs',
 );
 
 // ─── 2. Dependencies ───

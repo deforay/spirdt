@@ -278,6 +278,11 @@ final class ReportService
             // report that says where it went.
             'site_photographs' => $photographs['site'] ?? [],
             'signatures'       => $this->signatures($assessmentId),
+            // Part A, read back through the instrument that asked it. Stored
+            // as codes — a facility type is 'health_center', not a phrase —
+            // so anything showing it to a person has to come back through the
+            // template for the wording, in the language being read.
+            'context_fields'   => $this->contextFields($definition, $assessment, $locale),
         ];
     }
 
@@ -896,5 +901,189 @@ final class ReportService
         }
 
         return (string) $value;
+    }
+
+    /**
+     * Part A, as label and answer rather than as code and code.
+     *
+     * The assessment stores what was chosen — `facility_type: health_center` —
+     * and the instrument holds what that means. Reading them back together is
+     * the only way this section can be printed in a language, and the only way
+     * it survives a country customising the form: a field added to the
+     * template appears here without anything downstream being told about it.
+     *
+     * An option that asks to be qualified carries its free text in
+     * `<code>_other`, and the two belong in one line rather than as an answer
+     * and a mystery.
+     *
+     * @param  array<string,mixed>       $definition
+     * @return list<array<string,mixed>>
+     */
+    private function contextFields(array $definition, Assessment $assessment, string $locale): array
+    {
+        $context = $assessment->context ?? [];
+
+        if (!is_array($context)) {
+            $context = [];
+        }
+
+        /** @var list<array<string,mixed>> $fields */
+        $fields = is_array($definition['context_fields'] ?? null) ? $definition['context_fields'] : [];
+
+        $rows = [];
+
+        foreach ($fields as $field) {
+            $code = (string) ($field['code'] ?? '');
+
+            if ($code === '') {
+                continue;
+            }
+
+            $type = (string) ($field['type'] ?? 'text');
+            $value = $context[$code] ?? null;
+
+            $row = [
+                'code'  => $code,
+                'label' => $this->text($field['label'] ?? null, $locale) ?? $code,
+                'type'  => $type,
+                'value' => null,
+                'rows'  => [],
+            ];
+
+            if ($type === 'repeat') {
+                $row['rows'] = $this->contextRepeat($field, is_array($value) ? $value : [], $locale);
+                $rows[] = $row;
+
+                continue;
+            }
+
+            $row['value'] = $type === 'select_one'
+                ? $this->contextChoice($field, $value, $context[$code . '_other'] ?? null, $locale)
+                : $this->contextScalar($value);
+
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The chosen option, in words, with whatever had to be spelled out beside
+     * it.
+     *
+     * An answer no longer in the instrument is shown as the key it was stored
+     * under rather than dropped. The visit recorded something, and a report
+     * that silently prints nothing where an answer exists is worse than one
+     * that prints a code somebody has to ask about.
+     *
+     * @param array<string,mixed> $field
+     */
+    private function contextChoice(array $field, mixed $value, mixed $specify, string $locale): ?string
+    {
+        $key = $this->contextScalar($value);
+
+        if ($key === null) {
+            return null;
+        }
+
+        /** @var list<array<string,mixed>> $options */
+        $options = is_array($field['options'] ?? null) ? $field['options'] : [];
+        $label = $key;
+        $qualified = false;
+
+        foreach ($options as $option) {
+            if ((string) ($option['key'] ?? '') === $key) {
+                $label = $this->text($option['label'] ?? null, $locale) ?? $key;
+                $qualified = ($option['specify'] ?? false) === true;
+
+                break;
+            }
+        }
+
+        // Only when THIS option asked to be spelled out. The form hides the
+        // free-text box when the answer changes but keeps what was typed in
+        // it, so an assessor who picks Laboratory, describes it, and then
+        // corrects the answer to Health Centre leaves a sentence behind. Read
+        // without this check, the report prints it against the new answer and
+        // says something nobody ever said.
+        if (!$qualified) {
+            return $label;
+        }
+
+        $written = $this->contextScalar($specify);
+
+        return $written === null ? $label : $label . ' — ' . $written;
+    }
+
+    /**
+     * A repeating group — the staff who do the testing — as one list per row.
+     *
+     * @param  array<string,mixed>             $field
+     * @param  array<mixed>                    $value
+     * @return list<list<array<string,string>>>
+     */
+    private function contextRepeat(array $field, array $value, string $locale): array
+    {
+        /** @var list<array<string,mixed>> $subFields */
+        $subFields = is_array($field['fields'] ?? null) ? $field['fields'] : [];
+
+        $rows = [];
+
+        foreach ($value as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $cells = [];
+
+            foreach ($subFields as $sub) {
+                $subCode = (string) ($sub['code'] ?? '');
+                $value = $entry[$subCode] ?? null;
+
+                // Through the instrument, like every other answer. The shipped
+                // form asks two names here, but a country's own may ask a role
+                // out of a list — and a report printing `nurse` where the
+                // template says "Nurse" is a report disagreeing with the
+                // document it was collected against.
+                $written = (string) ($sub['type'] ?? '') === 'select_one'
+                    ? $this->contextChoice($sub, $value, $entry[$subCode . '_other'] ?? null, $locale)
+                    : $this->contextScalar($value);
+
+                if ($written === null) {
+                    continue;
+                }
+
+                $cells[] = [
+                    'label' => $this->text($sub['label'] ?? null, $locale) ?? $subCode,
+                    'value' => $written,
+                ];
+            }
+
+            if ($cells !== []) {
+                $rows[] = $cells;
+            }
+        }
+
+        return $rows;
+    }
+
+    /** Anything scalar, as the string it should print as. Blank is no answer. */
+    private function contextScalar(mixed $value): ?string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 }

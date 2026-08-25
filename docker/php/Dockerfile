@@ -26,6 +26,12 @@ FROM php:8.4-fpm-bookworm
 # between; without them it silently falls back to an uncompressed dump.
 #
 # libncurses6 is needed only by the interactive `mysql` client copied below.
+#
+# gd is what resizes an uploaded photograph and what composites a signature
+# into a report PDF. The shell installer has asked for it since it was written
+# and this image did not, so the two supported deployments disagreed: the same
+# signed visit came out of one with the mark on it and out of the other with
+# only the name.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         unzip \
@@ -33,10 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         libonig-dev \
         libncurses6 \
+        libpng-dev \
+        libjpeg-dev \
+        libfreetype6-dev \
         gzip \
         zstd \
         xz-utils \
-    && docker-php-ext-install pdo_mysql intl opcache bcmath zip \
+    && docker-php-ext-configure gd --with-jpeg --with-freetype \
+    && docker-php-ext-install pdo_mysql intl opcache bcmath zip gd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

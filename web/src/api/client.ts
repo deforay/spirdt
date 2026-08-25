@@ -82,6 +82,35 @@ export async function apiBlob(path: string, options: RequestOptions = {}): Promi
     return response.blob()
 }
 
+/**
+ * A file, under the name the server saved it as.
+ *
+ * The name comes back on the response rather than being built here, because
+ * the server is what decides it and two spellings of the same filename is one
+ * spelling that goes stale. Falling back to a given name for a response that
+ * carries no disposition — a proxy that strips headers should cost the file
+ * its name, not the download.
+ */
+export async function apiFile(
+    path: string,
+    fallbackName: string,
+    options: RequestOptions = {},
+): Promise<{ blob: Blob; filename: string }> {
+    const response = await authenticated(path, options)
+
+    if (!response.ok) {
+        await interpret<unknown>(response)
+    }
+
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)
+
+    return {
+        blob: await response.blob(),
+        filename: match === null ? fallbackName : decodeURIComponent(match[1]!),
+    }
+}
+
 /** Send it, and refresh the token once if the server says that is the problem. */
 async function authenticated(path: string, options: RequestOptions): Promise<Response> {
     const { auth = true } = options

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Bootstrap;
+use App\Service\ReportPdfService;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -123,8 +124,19 @@ final class ReportsTest extends TestCase
 
     protected function tearDown(): void
     {
+        // The PDF tests are the only ones that put bytes on the disk, and a
+        // test that leaves files behind is a test that passes once.
+        foreach ($this->writtenFiles as $path) {
+            @unlink($path);
+        }
+
+        $this->writtenFiles = [];
+
         TenantContext::forget();
     }
+
+    /** @var list<string> Files written under var/uploads, removed after each test. */
+    private array $writtenFiles = [];
 
     private int $provinceId = 0;
 
@@ -501,6 +513,240 @@ final class ReportsTest extends TestCase
         }
     }
 
+    /**
+     * The file, and the fact that it is one.
+     *
+     * Asserted on the bytes rather than on a status code: a 200 carrying an
+     * HTML error page would pass every other check here, and what the browser
+     * saves is what matters. %PDF is the whole of the format's signature.
+     */
+    public function testAVisitCanBeDownloadedAsAPdf(): void
+    {
+        $id = $this->sync();
+
+        $response = $this->get(
+            '/api/admin/reports/assessments/' . $id . '/pdf',
+            $this->signIn('boss@example.org'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('application/pdf', $response->getHeaderLine('Content-Type'));
+
+        $body = (string) $response->getBody();
+
+        self::assertStringStartsWith('%PDF-', $body);
+        // A report of fifty-nine questions that fits in a kilobyte is a report
+        // that rendered nothing. What it CONTAINS is asserted below, on the
+        // document rather than on the file: the renderer writes text as glyph
+        // indexes into a subsetted font, so the words are not in the bytes in
+        // any form a test can look for.
+        self::assertGreaterThan(5000, strlen($body));
+    }
+
+    /**
+     * The whole instrument reaches the file, answered or not.
+     *
+     * This is the report's one invariant — a document that quietly omits what
+     * was skipped is the single way it could mislead the laboratory it is
+     * written for — and it is worth asserting on the PDF path separately,
+     * because that path builds its own view rather than reusing the screen's.
+     */
+    public function testThePdfCarriesEveryQuestionAndPartA(): void
+    {
+        $id = $this->sync();
+
+        $html = (new ReportPdfService())->html($id);
+
+        // Against the pinned instrument rather than against a phrase. A test
+        // that samples one question stays green while a whole section stops
+        // rendering, which is the failure this invariant exists to catch.
+        $definition = TenantContext::withoutScope(
+            fn (): mixed => json_decode(
+                (string) Capsule::table('templates')->value('definition'),
+                true,
+                512,
+                JSON_THROW_ON_ERROR,
+            ),
+        );
+
+        $questions = 0;
+
+        foreach ($definition['sections'] as $section) {
+            self::assertStringContainsString($section['title']['en'], $html);
+
+            foreach ($section['questions'] as $question) {
+                self::assertStringContainsString($question['code'], $html, $question['code']);
+                self::assertStringContainsString($question['text']['en'], $html, $question['code']);
+                $questions++;
+            }
+        }
+
+        self::assertGreaterThan(1, $questions);
+
+        // What was skipped says so, rather than being left off.
+        self::assertStringContainsString('Not answered', $html);
+
+        // Part A, which never reached the report screen and is the reason the
+        // file carries more than the page does.
+        self::assertStringContainsString('Type of facility', $html);
+        self::assertStringContainsString('Kitwe TB clinic', $html);
+    }
+
+    /**
+     * A pathogen question skipped for one pathogen says so.
+     *
+     * Section 4 is asked once per pathogen. Answered for one and skipped for
+     * another, the question comes back with a single answer — and a report
+     * that lists what came back shows a complete-looking row while the missing
+     * answer sits in the denominator.
+     */
+    public function testAPathogenLeftUnansweredIsNamedAsUnanswered(): void
+    {
+        $id = '019fd400-0000-7000-8000-000000000778';
+
+        $this->syncRaw([
+            'id'        => $id,
+            'pathogens' => [
+                ['key' => 'hiv', 'name' => 'HIV'],
+                ['key' => 'syphilis', 'name' => 'Syphilis'],
+            ],
+            // 4.1 answered for one of the two. The other is what this is about.
+            'answers'   => [['question_code' => '4.1', 'pathogen' => 'hiv', 'response' => 'Y']],
+        ] + $this->payload());
+
+        $html = (new ReportPdfService())->html($id);
+
+        self::assertMatchesRegularExpression('/HIV.{0,200}Yes/s', $html);
+        self::assertMatchesRegularExpression('/Syphilis.{0,200}Not answered/s', $html);
+    }
+
+    /**
+     * A qualifier belongs to the answer that asked for it.
+     *
+     * The setup form hides the free-text box when the choice changes and keeps
+     * what was typed in it, so a corrected answer can leave a sentence behind.
+     * Printed against the new answer, that sentence says something nobody ever
+     * said.
+     */
+    public function testAQualifierLeftOverFromAnEarlierAnswerIsNotPrinted(): void
+    {
+        $id = $this->sync();
+
+        TenantContext::withoutScope(function () use ($id): void {
+            Capsule::table('assessments')
+                ->where('id', BinaryUuid::toBytes($id))
+                ->update(['context' => json_encode([
+                    // health_center does not ask to be spelled out. laboratory,
+                    // the answer before it, did.
+                    'facility_type'       => 'health_center',
+                    'facility_type_other' => 'The old district laboratory',
+                ], JSON_THROW_ON_ERROR)]);
+        });
+
+        $html = (new ReportPdfService())->html($id);
+
+        self::assertStringContainsString('Health Centre', $html);
+        self::assertStringNotContainsString('The old district laboratory', $html);
+    }
+
+    /**
+     * A signed visit renders, and the signature is in it.
+     *
+     * Signatures are PNGs with their transparency kept, which is the one image
+     * path the renderer composites rather than embedding whole — so a report
+     * that renders with a photograph in it proves nothing about a report with
+     * a signature in it.
+     */
+    public function testASignedVisitRendersWithItsSignature(): void
+    {
+        $id = $this->sync();
+
+        $this->addSignature($id, 'assessor_1', 'Joseph Banda');
+        $this->writeSignatureBytes($id);
+
+        $response = $this->get(
+            '/api/admin/reports/assessments/' . $id . '/pdf',
+            $this->signIn('boss@example.org'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringStartsWith('%PDF-', (string) $response->getBody());
+
+        $html = (new ReportPdfService())->html($id);
+
+        // The name is in the document whether or not the machine can draw the
+        // mark beside it, which is what the report has to promise on a server
+        // without ext-gd.
+        self::assertStringContainsString('Joseph Banda', $html);
+
+        // And the mark itself, which is the part that is the record. Both
+        // supported installations carry the extension; the branch is here
+        // because the application does not require it, and the promise on a
+        // machine that lacks it is that the document SAYS the mark is missing
+        // rather than quietly leaving it out.
+        if (extension_loaded('gd')) {
+            self::assertStringContainsString('data:image/png;base64,', $html);
+        } else {
+            self::assertStringContainsString('cannot draw', $html);
+        }
+    }
+
+    /** Named after the site, so a folder of these can be searched. */
+    public function testTheDownloadIsNamedAfterTheSiteAndTheVisit(): void
+    {
+        $id = $this->sync();
+
+        $disposition = $this->get(
+            '/api/admin/reports/assessments/' . $id . '/pdf',
+            $this->signIn('boss@example.org'),
+        )->getHeaderLine('Content-Disposition');
+
+        self::assertStringContainsString('attachment;', $disposition);
+        self::assertStringContainsString('Kitwe-TB-clinic', $disposition);
+        self::assertStringEndsWith('.pdf"', $disposition);
+    }
+
+    /**
+     * Asking for it without the pictures is asking for a different file.
+     *
+     * The check is that the parameter reaches the renderer at all, which a
+     * smaller document is the only outward evidence of.
+     */
+    public function testThePhotographsCanBeLeftOut(): void
+    {
+        $id = $this->sync();
+        $token = $this->signIn('boss@example.org');
+
+        $this->addPhotograph($id, '2', 'The sharps bin, overflowing', '2026-01-01 09:00:00');
+        $this->writePhotographBytes($id);
+
+        $with = strlen((string) $this->get(
+            '/api/admin/reports/assessments/' . $id . '/pdf',
+            $token,
+        )->getBody());
+
+        $without = strlen((string) $this->get(
+            '/api/admin/reports/assessments/' . $id . '/pdf?photographs=0',
+            $token,
+        )->getBody());
+
+        self::assertLessThan($with, $without);
+    }
+
+    /** The same answer the JSON gives: an id from elsewhere names nothing. */
+    public function testAPartnerCannotDownloadTheVisit(): void
+    {
+        $id = $this->sync();
+
+        self::assertSame(
+            404,
+            $this->get(
+                '/api/admin/reports/assessments/' . $id . '/pdf',
+                $this->signIn('partner@example.org'),
+            )->getStatusCode(),
+        );
+    }
+
     public function testAnIdThatIsNotAUuidIsNotAServerError(): void
     {
         self::assertSame(
@@ -606,6 +852,89 @@ final class ReportsTest extends TestCase
             'role'        => $role,
             'signed_name' => $signedName,
         ]);
+    }
+
+    /**
+     * Put a real image where the row says one is.
+     *
+     * Every other test here inserts the attachment row alone, because nothing
+     * it asserts reads the file. A PDF does: with no bytes on the disk the
+     * renderer draws nothing and a document with photographs is the same size
+     * as one without, so the test would pass while proving the opposite of
+     * what it claims.
+     *
+     * A one-pixel JPEG, spelled out rather than generated, because ext-gd is
+     * optional on this application and a test may not need more of the machine
+     * than the thing it tests.
+     */
+    private function writePhotographBytes(string $assessmentId): void
+    {
+        $pixel = base64_decode(
+            '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof'
+            . 'Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAAB'
+            . 'AAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==',
+            true,
+        );
+
+        self::assertIsString($pixel);
+
+        $paths = TenantContext::withoutScope(fn (): array => Capsule::table('attachments')
+            ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
+            ->where('kind', 'photo')
+            ->pluck('storage_path')
+            ->all());
+
+        foreach ($paths as $relative) {
+            $path = dirname(__DIR__, 2) . '/var/uploads/' . $relative;
+
+            if (!is_dir(dirname($path))) {
+                mkdir(dirname($path), 0o775, true);
+            }
+
+            file_put_contents($path, $pixel);
+            $this->writtenFiles[] = $path;
+        }
+    }
+
+    /**
+     * The same, for a signature — a transparent PNG, as the device saves one.
+     *
+     * Spelled out rather than generated for the reason the JPEG is, and it has
+     * to be a real PNG WITH an alpha channel: that is the path the renderer
+     * composites, and the only one that needs ext-gd.
+     */
+    private function writeSignatureBytes(string $assessmentId): void
+    {
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk'
+            . 'YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+            true,
+        );
+
+        self::assertIsString($png);
+
+        $rows = TenantContext::withoutScope(fn (): array => Capsule::table('attachments')
+            ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
+            ->where('kind', 'signature')
+            ->get(['id', 'storage_path'])
+            ->all());
+
+        foreach ($rows as $row) {
+            TenantContext::withoutScope(function () use ($row): void {
+                Capsule::table('attachments')
+                    ->where('id', $row->id)
+                    ->update(['mime_type' => 'image/png']);
+            });
+
+            $path = dirname(__DIR__, 2) . '/var/uploads/' . $row->storage_path;
+
+            if (!is_dir(dirname($path))) {
+                mkdir(dirname($path), 0o775, true);
+            }
+
+            file_put_contents($path, $png);
+            $this->writtenFiles[] = $path;
+        }
     }
 
     /** @param array<string,mixed> $row */

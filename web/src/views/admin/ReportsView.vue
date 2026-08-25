@@ -6,6 +6,7 @@ import { type AssessmentRow, listAssessments } from '@/api/reports'
 import { type GeoTree, listGeoUnits } from '@/api/registry'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import PagedList from '@/components/admin/PagedList.vue'
+import PdfDownload from '@/components/admin/PdfDownload.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
 import ScoreBadge from '@/components/admin/ScoreBadge.vue'
 import { formatPercent, t } from '@/i18n'
@@ -219,7 +220,7 @@ onMounted(async () => {
         </div>
 
         <div class="data-card data-scroll">
-            <table class="data-table min-w-[840px]">
+            <table class="data-table min-w-[960px]">
                 <thead>
                     <tr>
                         <th>{{ t('registry.siteName') }}</th>
@@ -228,11 +229,15 @@ onMounted(async () => {
                         <th>{{ t('reports.round') }}</th>
                         <th>{{ t('admin.status') }}</th>
                         <th class="text-right">{{ t('report.overall') }}</th>
+                        <!-- Unnamed: the button in the cell says what it is,
+                             and a column heading over one control is a word
+                             the eye has to read on every row to ignore. -->
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="!loading && rows.length === 0">
-                        <td colspan="6" class="text-label-2">{{ t('reports.nothingYet') }}</td>
+                        <td colspan="7" class="text-label-2">{{ t('reports.nothingYet') }}</td>
                     </tr>
 
                     <tr v-for="row in rows" :key="row.id">
@@ -281,6 +286,13 @@ onMounted(async () => {
                             <span v-else class="text-[13px] text-label-3">
                                 {{ t('reports.notScoredYet') }}
                             </span>
+                        </td>
+                        <!-- Every audit, downloadable from the list it is in.
+                             The alternative is opening each one to get at the
+                             file, which for a quarter's worth of visits is the
+                             difference between a task and an afternoon. -->
+                        <td class="text-right">
+                            <PdfDownload :assessment-id="row.id" compact />
                         </td>
                     </tr>
                 </tbody>

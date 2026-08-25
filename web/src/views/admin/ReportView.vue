@@ -12,9 +12,17 @@ import { computed, onBeforeUnmount, onMounted, ref, watch, type Component } from
 import { useRoute } from 'vue-router'
 
 import { apiBlob } from '@/api/client'
-import { fetchReport, type Report, type SectionScore } from '@/api/reports'
+import {
+    fetchReport,
+    type Report,
+    type ReportAnswer,
+    type ReportQuestion,
+    type ReportSection,
+    type SectionScore,
+} from '@/api/reports'
 import ReportPhotographs from '@/components/ReportPhotographs.vue'
 import AdminShell from '@/components/admin/AdminShell.vue'
+import PdfDownload from '@/components/admin/PdfDownload.vue'
 import ScoreBadge from '@/components/admin/ScoreBadge.vue'
 import { formatDate, formatPercent, locale, t, type MessageKey } from '@/i18n'
 
@@ -63,12 +71,59 @@ const later = computed(
     () => report.value?.findings.filter((finding) => finding.urgency !== 'immediate') ?? [],
 )
 
+/**
+ * What a question was answered as, once per instance it applies to.
+ *
+ * Section 4 is asked again for every pathogen the site tests for, so a
+ * question answered for HIV and skipped for malaria comes back with ONE
+ * answer. Listed as it arrives, that question reads as answered — while the
+ * missing one sits in the denominator costing the site points nobody reading
+ * this page can account for. Every question appears whether or not it was
+ * answered, and for Section 4 "every question" means every pathogen.
+ */
+function instancesOf(
+    section: ReportSection,
+    question: ReportQuestion,
+): { pathogen: string | null; answer: ReportAnswer | null }[] {
+    if (section.scope !== 'pathogen') {
+        return [{ pathogen: null, answer: question.answers[0] ?? null }]
+    }
+
+    const named = report.value?.assessment.pathogens.map((entry) => entry.name) ?? []
+
+    // A visit that named no pathogens has nothing to lay the answers against,
+    // and what was recorded is still what happened.
+    if (named.length === 0) {
+        return question.answers.length === 0
+            ? [{ pathogen: null, answer: null }]
+            : question.answers.map((answer) => ({ pathogen: answer.pathogen, answer }))
+    }
+
+    return named.map((name) => ({
+        pathogen: name,
+        answer: question.answers.find((answer) => answer.pathogen === name) ?? null,
+    }))
+}
+
 /** Written out rather than shown raw: "draft" in lowercase is a database value. */
 const STATUS_LABELS: Record<string, MessageKey> = {
     draft: 'reports.statusDraft',
     submitted: 'reports.statusSubmitted',
     reviewed: 'reports.statusReviewed',
     finalised: 'reports.statusFinalised',
+}
+
+/** The same, for a signature's slot: `assessor_1` is a column, not a caption. */
+const ROLE_LABELS: Record<string, MessageKey> = {
+    assessor_1: 'signature.assessor',
+    assessor_2: 'signature.secondAssessor',
+    site_representative: 'signature.siteRepresentative',
+}
+
+function roleLabel(role: string | null): string {
+    const key = role === null ? undefined : ROLE_LABELS[role]
+
+    return key === undefined ? (role ?? '') : t(key)
 }
 
 const status = computed(() => report.value?.assessment.status ?? '')
@@ -326,14 +381,20 @@ onMounted(load)
 
                 <span class="flex-1"></span>
 
+                <!-- Printing leaves a copy on the bench; the file is what
+                     gets emailed, filed, and asked for two years later by
+                     somebody who was never given a login. Both, then, and the
+                     quieter treatment on the one that needs a printer. -->
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-[15px] font-semibold text-accent-ink"
+                    class="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-4 py-2 text-[15px] font-semibold text-label-2 transition-colors hover:border-accent hover:text-accent"
                     @click="print"
                 >
                     <PhPrinter :size="16" aria-hidden="true" />
                     {{ t('report.print') }}
                 </button>
+
+                <PdfDownload :assessment-id="route.params.id as string" />
             </div>
 
             <!-- On paper the status has no chip beside it, so it is stated. -->
@@ -702,21 +763,18 @@ onMounted(load)
                         </p>
 
                         <div class="flex shrink-0 flex-col items-end gap-1">
-                            <template v-if="question.answers.length > 0">
-                                <span
-                                    v-for="(answer, index) in question.answers"
-                                    :key="index"
-                                    class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[13px] font-semibold print:border print:border-hairline"
-                                    :class="pill(answer.response)"
-                                >
-                                    <span v-if="answer.pathogen" class="font-normal opacity-70">
-                                        {{ answer.pathogen }}
-                                    </span>
-                                    {{ answer.label }}
+                            <span
+                                v-for="(row, index) in instancesOf(section, question)"
+                                :key="index"
+                                class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[13px] font-semibold print:border print:border-hairline"
+                                :class="
+                                    row.answer === null ? 'bg-na-soft text-na' : pill(row.answer.response)
+                                "
+                            >
+                                <span v-if="row.pathogen" class="font-normal opacity-70">
+                                    {{ row.pathogen }}
                                 </span>
-                            </template>
-                            <span v-else class="text-[13px] text-label-3">
-                                {{ t('report.unanswered') }}
+                                {{ row.answer === null ? t('report.unanswered') : row.answer.label }}
                             </span>
                         </div>
                     </div>
@@ -767,7 +825,7 @@ onMounted(load)
                         <p class="mt-1 border-t border-hairline pt-1.5 text-[15px] font-medium">
                             {{ signature.signed_name }}
                         </p>
-                        <p class="text-[13px] text-label-3">{{ signature.role }}</p>
+                        <p class="text-[13px] text-label-3">{{ roleLabel(signature.role) }}</p>
                     </div>
                 </div>
             </section>

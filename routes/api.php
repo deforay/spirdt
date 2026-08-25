@@ -210,6 +210,12 @@ return static function (App $app): void {
 
         $group->get('/reports/assessments', [ReportsAction::class, 'index']);
         $group->get('/reports/assessments/{id}', [ReportsAction::class, 'show']);
+
+        // The same report as a file. A separate route rather than a format
+        // parameter on the one above, because what comes back is not JSON and
+        // a client asking for one must not be able to get the other by
+        // accident.
+        $group->get('/reports/assessments/{id}/pdf', [ReportsAction::class, 'pdf']);
     })
         ->add(new RequirePermissionMiddleware(Permission::REPORTS_READ))
         ->add(new AuthMiddleware());

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Action\Admin;
 
+use App\Service\ReportPdfService;
 use App\Service\ReportService;
 use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
@@ -20,8 +21,10 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 final class ReportsAction
 {
-    public function __construct(private readonly ReportService $reports = new ReportService())
-    {
+    public function __construct(
+        private readonly ReportService $reports = new ReportService(),
+        private readonly ReportPdfService $pdfs = new ReportPdfService(),
+    ) {
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -68,6 +71,54 @@ final class ReportsAction
         }
 
         return $this->json($response, 200, $report);
+    }
+
+    /**
+     * The same report, as a file to keep.
+     *
+     * Photographs are asked for rather than assumed. Five per section at a
+     * phone camera's resolution is a document too big to email, and the reader
+     * who wants the evidence and the reader who wants the numbers are not
+     * always the same person. Absent the parameter, they are included: the
+     * complete record is the safer default for something that leaves the
+     * system.
+     *
+     * Rendered on the way out rather than stored. A report is a view of rows
+     * that can still change — a finding closed, a signature added — and a file
+     * cached at submission would be the wrong document the moment either
+     * happened.
+     *
+     * @param array<string,string> $args
+     */
+    public function pdf(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $query = $request->getQueryParams();
+
+        try {
+            $file = $this->pdfs->render(
+                (string) ($args['id'] ?? ''),
+                $this->optionalString($query, 'locale') ?? 'en',
+                ($query['photographs'] ?? '1') !== '0',
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->json($response, 404, ['error' => ['message' => $e->getMessage()]]);
+        }
+
+        $response->getBody()->write($file['bytes']);
+
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            // Attachment rather than inline: this is asked for from a list of
+            // audits, and a PDF that replaces the page somebody was reading
+            // costs them their place in it.
+            ->withHeader(
+                'Content-Disposition',
+                'attachment; filename="' . $file['filename'] . '"',
+            )
+            ->withHeader('X-Content-Type-Options', 'nosniff');
     }
 
     /** @param array<string,mixed> $query */
