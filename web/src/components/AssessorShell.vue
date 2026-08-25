@@ -159,13 +159,54 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                 >
                     <PhChartBar :size="17" weight="bold" aria-hidden="true" />
                 </span>
+                <!--
+                    The wordmark is the first thing to go, not the last.
+                    Where an account has a dashboard to get back to, a phone
+                    has room for the mark and the link but not for the name of
+                    the product as well — and of the two, the one nobody needs
+                    while they are working is the one that says who made it.
+                -->
                 <span
                     :class="[
-                        'text-[17px] font-bold tracking-[-0.02em]',
-                        backLabel === undefined ? '' : 'hidden md:inline',
+                        'whitespace-nowrap text-[17px] font-bold tracking-[-0.02em]',
+                        backLabel !== undefined
+                            ? 'hidden md:inline'
+                            : canManage()
+                              ? 'hidden sm:inline'
+                              : '',
                     ]"
                     >SPI-RDT</span
                 >
+
+                <!--
+                    The way to the dashboard, for an account that holds both
+                    sides.
+
+                    It has been in the menu under the name for a while, and
+                    that was not enough: an administrator who opened the
+                    assessor app — or landed on it from a bookmark — reported
+                    no way out of it at all, with the link sitting two taps
+                    away behind their own initials. A capability nobody can
+                    find is one nobody has, and a menu is where a capability
+                    goes to not be found.
+
+                    It keeps the brand company, so it appears exactly where
+                    there is room for it: always on a screen with nothing else
+                    on the left, and from 768px up during a visit, where the
+                    phone bar is already carrying the way back. It stays in the
+                    menu too, for the widths where it is not here.
+                -->
+                <RouterLink
+                    v-if="canManage()"
+                    :to="{ name: landing() }"
+                    :class="[
+                        'min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[15px] font-medium text-accent transition-opacity hover:opacity-80',
+                        backLabel === undefined ? 'flex' : 'hidden md:flex',
+                    ]"
+                >
+                    <PhGauge :size="17" weight="bold" class="shrink-0" aria-hidden="true" />
+                    <span class="truncate">{{ t('dash.title') }}</span>
+                </RouterLink>
 
                 <span class="flex-1"></span>
 
@@ -174,6 +215,13 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                     door alone, with the promise spelled out from 640px up. It
                     keeps its own label as the accessible name either way, so
                     the icon is never the whole of what it says.
+
+                    Icons accompany words rather than replacing them
+                    (DESIGN.md), and this is the exception that rule allows: a
+                    single action whose name never changes, drawn as the thing
+                    it does. The sync badge beside it keeps its word at every
+                    width for the opposite reason — what it says varies, and in
+                    one state it is a count.
 
                     Filled and in the accent, because grey text was not a
                     control. It sat in a row of grey chrome — a badge saying
@@ -216,16 +264,30 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                              unless the bar is already carrying where you are,
                              in which case the circle stands for it and the
                              menu underneath spells it out. -->
+                        <!--
+                            The name gives way sooner than it used to. The left
+                            of this bar now carries a link as well as a mark, and
+                            at 390px the two of them plus a full name pushed the
+                            wordmark onto a second line. The circle stands for
+                            the name at that width and the menu underneath spells
+                            it out, which is the same trade the bar already made
+                            during a visit.
+                        -->
                         <span
                             :class="[
                                 'max-w-[9rem] truncate',
-                                backLabel === undefined ? '' : 'hidden md:inline',
+                                backLabel === undefined
+                                    ? 'hidden sm:inline'
+                                    : 'hidden md:inline',
                             ]"
                             >{{ user?.fullName }}</span
                         >
                         <PhCaretDown
                             :size="13"
-                            :class="['shrink-0', backLabel === undefined ? '' : 'hidden md:block']"
+                            :class="[
+                                'shrink-0',
+                                backLabel === undefined ? 'hidden sm:block' : 'hidden md:block',
+                            ]"
                             aria-hidden="true"
                         />
                     </button>
@@ -245,7 +307,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 
                         <!--
-                            The way back to the console, for an account that
+                            The way back to the dashboard, for an account that
                             holds both sides.
 
                             The console has linked into the assessor app since
@@ -271,7 +333,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                             @click="open = false"
                         >
                             <PhGauge :size="16" class="shrink-0 text-label-3" aria-hidden="true" />
-                            {{ t('admin.console') }}
+                            {{ t('dash.title') }}
                         </RouterLink>
 
                         <RouterLink

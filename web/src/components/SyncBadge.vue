@@ -37,12 +37,14 @@ import { syncStatus } from '@/sync/engine'
  * be pressed in; resting synced stays grey, because a state that needs nothing
  * should not be the brightest thing on the bar.
  *
- * Each state also carries its own mark, and on a phone the mark is the whole
- * badge. Five states told apart by a word alone is five words to read at a
- * glance in a corridor, and the row they sit in has no width to spare — the
- * screen behind them is a fifty-nine question form. The word comes back at
- * 640px, and the accessible name is the word either way, so nothing is said in
- * shape alone.
+ * Each state also carries its own mark, so five states are told apart by shape
+ * as well as by a word — a glance in a corridor rather than a line to read.
+ *
+ * The word STAYS at every width, though, and that is not the same call the door
+ * beside it made. What this badge says varies, and in one state it carries a
+ * count: an icon alone would drop "12 waiting" to a cloud, and the number is
+ * the whole of the information. Icons accompany words here (DESIGN.md), and
+ * that rule bites hardest where the word is the part that changes.
  */
 
 const emit = defineEmits<{ retry: [] }>()
@@ -108,6 +110,6 @@ const state = computed(() => {
         @click="emit('retry')"
     >
         <component :is="state.icon" :size="15" weight="bold" class="shrink-0" aria-hidden="true" />
-        <span class="hidden whitespace-nowrap sm:inline">{{ state.label }}</span>
+        <span class="whitespace-nowrap">{{ state.label }}</span>
     </button>
 </template>

@@ -313,7 +313,6 @@ export const messages: Messages = {
     'admin.users': 'Pessoas',
     'admin.usersSubtitle': 'Quem pode iniciar sessão, e como.',
     'admin.signOut': 'Terminar sessão',
-    'admin.console': 'Consola de gestão',
     'nav.registry': 'Registo',
     'nav.access': 'Acesso',
     'nav.menu': 'Menu',

@@ -326,7 +326,6 @@ export const messages = {
     'admin.users': 'People',
     'admin.usersSubtitle': 'Who can sign in, and as what.',
     'admin.signOut': 'Sign out',
-    'admin.console': 'Management console',
     'nav.registry': 'Registry',
     'nav.access': 'Access',
     'nav.menu': 'Menu',
