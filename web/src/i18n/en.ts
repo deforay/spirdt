@@ -132,6 +132,8 @@ export const messages = {
     'photos.previous': 'Previous photograph',
     'photos.next': 'Next photograph',
     'photos.close': 'Close',
+    'photos.actualSize': 'Actual size',
+    'photos.fitToScreen': 'Fit to screen',
     'photos.remove': 'Delete this photograph',
     'photos.full': 'That is {count} photographs, which is as many as this part of the audit takes.',
     'photos.someFull': 'Added {added}. This part of the audit takes {count} photographs, so the rest were not.',

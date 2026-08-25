@@ -117,6 +117,8 @@ export const messages: Messages = {
     'photos.previous': 'Fotografía anterior',
     'photos.next': 'Fotografía siguiente',
     'photos.close': 'Cerrar',
+    'photos.actualSize': 'Tamaño real',
+    'photos.fitToScreen': 'Ajustar a la pantalla',
     'photos.remove': 'Eliminar esta fotografía',
     'photos.full': 'Son {count} fotografías, el máximo para esta parte de la auditoría.',
     'photos.someFull': 'Se añadieron {added}. Esta parte de la auditoría admite {count} fotografías, así que el resto no.',

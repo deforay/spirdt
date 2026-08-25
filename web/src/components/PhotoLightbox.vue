@@ -25,7 +25,13 @@ export interface LightboxPhoto {
 </script>
 
 <script setup lang="ts">
-import { PhArrowLeft, PhArrowRight, PhX } from '@phosphor-icons/vue'
+import {
+    PhArrowLeft,
+    PhArrowRight,
+    PhMagnifyingGlassMinus,
+    PhMagnifyingGlassPlus,
+    PhX,
+} from '@phosphor-icons/vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { t } from '@/i18n'
@@ -66,10 +72,51 @@ function step(by: number): void {
 function onKey(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
         close()
-    } else if (event.key === 'ArrowLeft') {
+
+        return
+    }
+
+    if (event.key === 'ArrowLeft') {
         step(-1)
-    } else if (event.key === 'ArrowRight') {
+
+        return
+    }
+
+    if (event.key === 'ArrowRight') {
         step(1)
+
+        return
+    }
+
+    if (event.key !== 'Tab') {
+        return
+    }
+
+    // HELD INSIDE, because `aria-modal` is a promise to assistive technology
+    // and not a rule the browser enforces. Without this, tabbing past the last
+    // control walks into the page underneath — where, on the screen this opens
+    // from, the very next things are the caption fields and the delete buttons
+    // of the photographs it is covering. Somebody looking at a picture could
+    // delete a different one without ever seeing what they were on.
+    const stops = Array.from(panel.value?.querySelectorAll<HTMLElement>('button') ?? [])
+
+    const first = stops.at(0)
+    const last = stops.at(-1)
+
+    // Nothing to hold focus on. Refusing the Tab is still better than letting
+    // it out of a dialog that is covering the screen.
+    if (first === undefined || last === undefined) {
+        event.preventDefault()
+
+        return
+    }
+
+    const active = document.activeElement
+    const inside = panel.value?.contains(active) ?? false
+
+    if (event.shiftKey ? active === first || !inside : active === last || !inside) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
     }
 }
 
@@ -144,6 +191,19 @@ onBeforeUnmount(() => {
                 </span>
 
                 <span class="flex-1"></span>
+
+                <!-- Tapping the picture does this too, but nothing on screen
+                     says so, and a tap is not available to somebody on a
+                     keyboard. -->
+                <button
+                    type="button"
+                    class="rounded-full p-2 transition-colors hover:bg-white/10 hover:text-white"
+                    :aria-label="zoomed ? t('photos.fitToScreen') : t('photos.actualSize')"
+                    @click="zoomed = !zoomed"
+                >
+                    <PhMagnifyingGlassMinus v-if="zoomed" :size="20" aria-hidden="true" />
+                    <PhMagnifyingGlassPlus v-else :size="20" aria-hidden="true" />
+                </button>
 
                 <button
                     v-if="photographs.length > 1"
