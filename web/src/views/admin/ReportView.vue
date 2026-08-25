@@ -8,10 +8,12 @@ import {
     PhSignature,
     PhWarningCircle,
 } from '@phosphor-icons/vue'
-import { computed, onMounted, ref, watch, type Component } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 
+import { apiBlob } from '@/api/client'
 import { fetchReport, type Report, type SectionScore } from '@/api/reports'
+import ReportPhotographs from '@/components/ReportPhotographs.vue'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import ScoreBadge from '@/components/admin/ScoreBadge.vue'
 import { formatDate, formatPercent, locale, t, type MessageKey } from '@/i18n'
@@ -221,12 +223,73 @@ function clock(value: string | null): string {
         : parsed.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * The visit's images, fetched with the session's token and held as object URLs.
+ *
+ * NOT `<img src="/api/attachments/…">`, however much the payload's `url` looks
+ * like an invitation to. These files sit outside the document root and are
+ * served by the application precisely so the organisation scope is what stands
+ * between one tenant's evidence and another's — and a browser asked to load
+ * that URL from an `img` tag sends no Authorization header, gets a 401, and
+ * draws a broken icon where a signature should be.
+ *
+ * Keyed by attachment id. Absent means still on its way; null means it was
+ * asked for and did not arrive, which the page says out loud rather than
+ * leaving a box that looks like it is still loading.
+ */
+const images = ref(new Map<string, string | null>())
+
+async function loadImages(value: Report): Promise<void> {
+    const ids = [
+        ...value.site_photographs.map((photo) => photo.id),
+        ...value.sections.flatMap((section) => section.photographs.map((photo) => photo.id)),
+        ...value.signatures.map((signature) => signature.id),
+    ]
+
+    // All at once. These are a few dozen resized images on a desktop screen,
+    // and fetching them in series would draw the report top to bottom over
+    // several seconds while somebody waits to print it.
+    await Promise.all(
+        ids.map(async (id) => {
+            if (images.value.has(id)) {
+                return
+            }
+
+            try {
+                const blob = await apiBlob(`/attachments/${encodeURIComponent(id)}`, {
+                    method: 'GET',
+                })
+
+                images.value.set(id, URL.createObjectURL(blob))
+            } catch {
+                // One picture that will not load is not a reason to fail the
+                // report around it. The page draws the gap and carries on.
+                images.value.set(id, null)
+            }
+        }),
+    )
+}
+
+/** Object URLs are references the document keeps alive until they are let go. */
+onBeforeUnmount(() => {
+    for (const url of images.value.values()) {
+        if (url !== null) {
+            URL.revokeObjectURL(url)
+        }
+    }
+
+    images.value.clear()
+})
+
 async function load(): Promise<void> {
     loading.value = true
     error.value = ''
 
     try {
         report.value = await fetchReport(String(route.params.id ?? ''), locale.value)
+        // The ids do not change with the locale, so a language switch redraws
+        // the words around images that are already here.
+        await loadImages(report.value)
     } catch (caught) {
         error.value = caught instanceof Error ? caught.message : t('admin.actionFailed')
         report.value = null
@@ -587,6 +650,17 @@ onMounted(load)
                 </div>
             </section>
 
+            <!-- The site itself, photographed on the setup screen before the
+                 first section — so it sits here, ahead of them, in the order
+                 the assessor worked. -->
+            <section
+                v-if="report.site_photographs.length > 0"
+                class="mb-4 rounded-surface bg-surface p-5 shadow-surface print:shadow-none"
+            >
+                <h3 class="pb-4 text-[18px] font-semibold">{{ t('report.sitePhotographs') }}</h3>
+                <ReportPhotographs :photographs="report.site_photographs" :images="images" />
+            </section>
+
             <!-- Every question, answered or not -->
             <section
                 v-for="section in report.sections"
@@ -658,6 +732,18 @@ onMounted(load)
                         {{ answer.comment }}
                     </p>
                 </div>
+
+                <!-- What the assessor was standing in front of, under the
+                     questions it is evidence for. A 0 says a thing was
+                     missing; the photograph of the empty shelf is what
+                     somebody argues from a year later. -->
+                <div
+                    v-if="section.photographs.length > 0"
+                    class="mt-4 border-t border-hairline pt-4"
+                >
+                    <h4 class="eyebrow pb-3 text-label-3">{{ t('report.photographs') }}</h4>
+                    <ReportPhotographs :photographs="section.photographs" :images="images" />
+                </div>
             </section>
 
             <!-- Who signed -->
@@ -669,7 +755,15 @@ onMounted(load)
 
                 <div class="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     <div v-for="signature in report.signatures" :key="signature.id">
-                        <img :src="signature.url" alt="" class="h-16 w-auto" />
+                        <img
+                            v-if="images.get(signature.id)"
+                            :src="images.get(signature.id)!"
+                            alt=""
+                            class="h-16 w-auto"
+                        />
+                        <p v-else class="flex h-16 items-center text-[14px] text-label-3">
+                            {{ images.has(signature.id) ? t('report.imageUnavailable') : '' }}
+                        </p>
                         <p class="mt-1 border-t border-hairline pt-1.5 text-[15px] font-medium">
                             {{ signature.signed_name }}
                         </p>

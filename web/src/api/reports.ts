@@ -92,12 +92,29 @@ export interface ReportQuestion {
     findings: number
 }
 
+/**
+ * One photograph taken during the visit.
+ *
+ * The bytes are not in the report: `url` is served by the app, because these
+ * files sit outside the document root and the organisation scope is the only
+ * thing keeping one tenant's evidence away from another's.
+ */
+export interface ReportPhotograph {
+    id: string
+    /** The assessor's own words about what is in it. Null when they wrote none. */
+    caption: string | null
+    uploaded_at: string | null
+    url: string
+}
+
 export interface ReportSection {
     number: number
     code: string
     title: string | null
     scope: string
     questions: ReportQuestion[]
+    /** What was photographed here, in the order it was taken. */
+    photographs: ReportPhotograph[]
 }
 
 export interface ReportFinding {
@@ -168,6 +185,8 @@ export interface Report {
           }
     sections: ReportSection[]
     findings: ReportFinding[]
+    /** Of the site itself, taken on the setup screen and belonging to no section. */
+    site_photographs: ReportPhotograph[]
     signatures: ReportSignature[]
 }
 

@@ -265,13 +265,19 @@ final class ReportService
 
         $definition = $this->definitionFor((int) $assessment->template_id);
         $score = $this->scoreFor($assessmentId);
+        $photographs = $this->photographs($assessmentId);
 
         return [
             'assessment' => $this->header($assessment, $locale),
             'score'      => $this->scoreSection($score, $definition, $locale),
-            'sections'   => $this->answerSections($assessmentId, $definition, $locale),
+            'sections'   => $this->answerSections($assessmentId, $definition, $locale, $photographs),
             'findings'   => $this->findings($assessmentId, $definition, $locale),
-            'signatures' => $this->signatures($assessmentId),
+            // Taken on the setup screen, and of the site itself rather than of
+            // anything the template asks about — the building, the gate, the
+            // bench. They belong beside the header, which is the part of the
+            // report that says where it went.
+            'site_photographs' => $photographs['site'] ?? [],
+            'signatures'       => $this->signatures($assessmentId),
         ];
     }
 
@@ -441,11 +447,16 @@ final class ReportService
      * answered appears as unanswered instead of not appearing. A report that
      * quietly omits what was skipped is the one way this screen could mislead.
      *
-     * @param  array<string,mixed>       $definition
+     * @param  array<string,mixed>                             $definition
+     * @param  array<string,list<array<string,mixed>>>          $photographs section code => its pictures
      * @return list<array<string,mixed>>
      */
-    private function answerSections(string $assessmentId, array $definition, string $locale): array
-    {
+    private function answerSections(
+        string $assessmentId,
+        array $definition,
+        string $locale,
+        array $photographs,
+    ): array {
         /** @var array<string,list<array<string,mixed>>> $byQuestion */
         $byQuestion = [];
 
@@ -502,12 +513,15 @@ final class ReportService
                 ];
             }
 
+            $sectionCode = (string) ($section['code'] ?? '');
+
             $sections[] = [
-                'number'    => (int) ($section['number'] ?? 0),
-                'code'      => (string) ($section['code'] ?? ''),
-                'title'     => $this->text($section['title'] ?? null, $locale),
-                'scope'     => (string) ($section['scope'] ?? 'assessment'),
-                'questions' => $questions,
+                'number'      => (int) ($section['number'] ?? 0),
+                'code'        => $sectionCode,
+                'title'       => $this->text($section['title'] ?? null, $locale),
+                'scope'       => (string) ($section['scope'] ?? 'assessment'),
+                'questions'   => $questions,
+                'photographs' => $photographs[$sectionCode] ?? [],
             ];
         }
 
@@ -581,6 +595,60 @@ final class ReportService
         });
 
         return $rows;
+    }
+
+    /**
+     * What the assessor photographed, grouped by the part of the visit it
+     * belongs to.
+     *
+     * The pictures are the half of the evidence the numbers cannot carry. A
+     * question scored 0 says a thing was missing; the photograph of the empty
+     * shelf is what somebody argues from a year later, and until now it existed
+     * on the device and in the database and appeared on no screen.
+     *
+     * KEYED BY SECTION CODE, with `site` for the ones taken on the setup screen
+     * — the assessor's own "Site details", which they treat as the section
+     * before the first one. One read for the whole visit, matched up in memory,
+     * because a report with a query per section is a report that gets slower
+     * every time the template grows.
+     *
+     * The bytes are not inlined here either, for the reason given below: these
+     * are photographs rather than signatures, so there are more of them and
+     * they are larger, and base64 in the JSON would be the whole response.
+     *
+     * @return array<string,list<array<string,mixed>>>
+     */
+    private function photographs(string $assessmentId): array
+    {
+        $bySection = [];
+
+        foreach (
+            Attachment::query()
+                ->where('assessment_id', BinaryUuid::toBytes($assessmentId))
+                ->where('kind', 'photo')
+                // Section first, then taken-order — which is both the order
+                // they are shown in and the whole of
+                // idx_attachments_section, so this sorts in the index rather
+                // than in a filesort.
+                ->orderBy('section_code')
+                ->orderBy('uploaded_at')
+                ->get() as $attachment
+        ) {
+            $section = (string) ($attachment->section_code ?? '');
+
+            if ($section === '') {
+                continue;
+            }
+
+            $bySection[$section][] = [
+                'id'          => (string) $attachment->id,
+                'caption'     => $attachment->caption,
+                'uploaded_at' => $this->asDateTime($attachment->uploaded_at),
+                'url'         => '/api/attachments/' . (string) $attachment->id,
+            ];
+        }
+
+        return $bySection;
     }
 
     /**

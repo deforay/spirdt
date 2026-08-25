@@ -396,6 +396,111 @@ final class ReportsTest extends TestCase
         );
     }
 
+    /**
+     * The photographs come back on the section they were taken in.
+     *
+     * They have been in the database since the device synced them and appeared
+     * on no management screen: the evidence existed and only the assessor who
+     * took it could ever see it. A 0 on a question says a thing was missing;
+     * the photograph of the empty shelf is what somebody argues from a year
+     * later, and it belongs beside the questions it is evidence for.
+     */
+    public function testASectionCarriesThePhotographsTakenInIt(): void
+    {
+        $id = $this->sync();
+
+        $this->addPhotograph($id, '3', 'The empty shelf', '2026-08-05 09:30:00');
+        $this->addPhotograph($id, '3', null, '2026-08-05 09:31:00');
+        $this->addPhotograph($id, '2', 'No organogram on the wall', '2026-08-05 09:10:00');
+
+        $report = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('boss@example.org')),
+        );
+
+        $bySection = [];
+
+        foreach ($report['sections'] as $section) {
+            $bySection[$section['code']] = $section['photographs'];
+        }
+
+        self::assertCount(2, $bySection['3']);
+        self::assertCount(1, $bySection['2']);
+
+        // Taken in order, shown in order. The sequence is part of what the
+        // assessor was recording as they worked the room.
+        self::assertSame('The empty shelf', $bySection['3'][0]['caption']);
+
+        // A photograph nobody captioned is still a photograph, and the report
+        // says so rather than dropping it.
+        self::assertNull($bySection['3'][1]['caption']);
+
+        // The bytes are not in the report: these files sit outside the
+        // document root and are served by the application, which is the only
+        // thing keeping one tenant's evidence away from another's.
+        self::assertSame(
+            '/api/attachments/' . $bySection['2'][0]['id'],
+            $bySection['2'][0]['url'],
+        );
+
+        // A section nobody photographed says so with an empty list rather than
+        // by leaving the key off.
+        self::assertSame([], $bySection['1']);
+    }
+
+    /**
+     * The setup screen's pictures are of the SITE, not of a section.
+     *
+     * The assessor treats "Site details" as the section before the first one,
+     * and the building, the gate and the bench answer no question in the
+     * template. Filed under a section code they would be evidence for
+     * questions they are not about.
+     */
+    public function testThePicturesOfTheSiteItselfStandApartFromTheSections(): void
+    {
+        $id = $this->sync();
+
+        $this->addPhotograph($id, 'site', 'The main entrance', '2026-08-05 08:55:00');
+        $this->addPhotograph($id, '2', 'No organogram on the wall', '2026-08-05 09:10:00');
+
+        $report = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('boss@example.org')),
+        );
+
+        self::assertCount(1, $report['site_photographs']);
+        self::assertSame('The main entrance', $report['site_photographs'][0]['caption']);
+
+        foreach ($report['sections'] as $section) {
+            foreach ($section['photographs'] as $photograph) {
+                self::assertNotSame('The main entrance', $photograph['caption']);
+            }
+        }
+    }
+
+    /**
+     * A signature is not a photograph.
+     *
+     * Both live in `attachments`, and a report that read the table by
+     * assessment alone would print somebody's signature into the middle of
+     * Section 3 as evidence of what was found there.
+     */
+    public function testASignatureDoesNotTurnUpAmongThePhotographs(): void
+    {
+        $id = $this->sync();
+
+        $this->addSignature($id, 'assessor_1', 'Joseph Banda');
+
+        $report = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('boss@example.org')),
+        );
+
+        self::assertCount(1, $report['signatures']);
+        self::assertSame([], $report['site_photographs']);
+
+        foreach ($report['sections'] as $section) {
+            self::assertSame([], $section['photographs']);
+        }
+    }
+
     public function testAnIdThatIsNotAUuidIsNotAServerError(): void
     {
         self::assertSame(
@@ -467,6 +572,59 @@ final class ReportsTest extends TestCase
                 'responsibility_level' => 'site',
                 'urgency'              => $urgency,
                 'status'               => 'open',
+            ]);
+        });
+    }
+
+    /**
+     * One photograph, written straight in.
+     *
+     * The report never opens the file, so there is no point putting bytes on
+     * disk to read a row back. `uploaded_at` is given explicitly because the
+     * order photographs are shown in is the order they were taken, and rows
+     * inserted in the same second would not test that.
+     */
+    private function addPhotograph(
+        string $assessmentId,
+        ?string $sectionCode,
+        ?string $caption,
+        string $uploadedAt,
+    ): void {
+        $this->addAttachment($assessmentId, [
+            'kind'         => 'photo',
+            'section_code' => $sectionCode,
+            'caption'      => $caption,
+            'client_key'   => BinaryUuid::v7(),
+            'uploaded_at'  => $uploadedAt,
+        ]);
+    }
+
+    private function addSignature(string $assessmentId, string $role, string $signedName): void
+    {
+        $this->addAttachment($assessmentId, [
+            'kind'        => 'signature',
+            'role'        => $role,
+            'signed_name' => $signedName,
+        ]);
+    }
+
+    /** @param array<string,mixed> $row */
+    private function addAttachment(string $assessmentId, array $row): void
+    {
+        TenantContext::withoutScope(function () use ($assessmentId, $row): void {
+            $id = BinaryUuid::v7();
+
+            Capsule::table('attachments')->insert($row + [
+                'id'              => BinaryUuid::toBytes($id),
+                'organization_id' => $this->orgId,
+                'assessment_id'   => BinaryUuid::toBytes($assessmentId),
+                'storage_path'    => 'attachments/' . $this->orgId . '/' . $assessmentId . '/' . $id . '.jpg',
+                'mime_type'       => 'image/jpeg',
+                'byte_size'       => 1024,
+                // Left off on purpose. Two photographs of the same shelf a
+                // minute apart are plausibly byte-identical, and identity here
+                // is the key the device minted rather than the bytes.
+                'checksum'        => null,
             ]);
         });
     }

@@ -655,6 +655,9 @@ export const messages: Messages = {
     'report.immediate': 'Inmediato',
     'report.followUp': 'Seguimiento',
     'report.unanswered': 'Sin responder',
+    'report.photographs': 'Fotografías',
+    'report.imageUnavailable': 'No se pudo cargar esta imagen.',
+    'report.sitePhotographs': 'Fotografías del sitio',
     'report.signatures': 'Firmas',
     'form.edit': 'Editar',
 
