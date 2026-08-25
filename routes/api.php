@@ -8,6 +8,7 @@ use App\Http\Action\Admin\DashboardAction;
 use App\Http\Action\Admin\OrganizationsAction;
 use App\Http\Action\Admin\RegistryAction;
 use App\Http\Action\Admin\ReportsAction;
+use App\Http\Action\Admin\RequestLogAction;
 use App\Http\Action\Admin\RolesAction;
 use App\Http\Action\Admin\SettingsAction;
 use App\Http\Action\Admin\SitePhotoAction;
@@ -104,10 +105,19 @@ return static function (App $app): void {
         ->add(new RequirePermissionMiddleware(Permission::USERS_MANAGE))
         ->add(new AuthMiddleware());
 
-    // Who did what. Read-only: rows are written by the services that perform
-    // the actions, from an actor taken off a verified token.
+    // Who did what, and what the server was asked. Read-only, both of them:
+    // the audit rows are written by the services that perform the actions from
+    // an actor taken off a verified token, and the request rows by the
+    // middleware from what actually arrived.
+    //
+    // One permission for the pair. They are the evidence and the diagnostic of
+    // the same activity, read by the same person for the same reason, and
+    // splitting them would mean an installation could grant the record of what
+    // was done while withholding the record of what was asked — which is the
+    // half that says why.
     $app->group('/admin', function (RouteCollectorProxy $group): void {
         $group->get('/audit', [AuditAction::class, 'index']);
+        $group->get('/requests', [RequestLogAction::class, 'index']);
     })
         ->add(new RequirePermissionMiddleware(Permission::AUDIT_READ))
         ->add(new AuthMiddleware());

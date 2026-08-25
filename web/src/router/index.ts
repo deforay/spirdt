@@ -141,6 +141,16 @@ const routes: RouteRecordRaw[] = [
         meta: { permission: PERMISSION.auditRead },
     },
     {
+        // Beside the audit trail and sharing its permission: the evidence and
+        // the diagnostic of the same activity. /admin/requests rather than
+        // /admin/logs, because the file log is a different thing and will want
+        // that name if it ever gets a screen.
+        path: '/admin/requests',
+        name: 'admin-requests',
+        component: () => import('@/views/admin/RequestLogView.vue'),
+        meta: { permission: PERMISSION.auditRead },
+    },
+    {
         path: '/admin/roles',
         name: 'admin-roles',
         component: () => import('@/views/admin/RolesView.vue'),

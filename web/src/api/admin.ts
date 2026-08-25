@@ -185,6 +185,68 @@ export async function listAudit(filters: AuditFilters = {}): Promise<AuditPage> 
     })
 }
 
+export interface RequestRow {
+    id: number
+    method: string
+    path: string
+    status: number
+    duration_ms: number | null
+    user_id: number | null
+    user_name: string | null
+    user_email: string | null
+    /** First eight characters, for comparing rows by eye. */
+    session: string | null
+    session_hash: string | null
+    /** Joins this row to the lines in var/log written while it was handled. */
+    request_uid: string | null
+    /** JSON as stored, with the secret-bearing keys already replaced server-side. */
+    body: string | null
+    ip_address: string | null
+    user_agent: string | null
+    platform: string | null
+    browser: string | null
+    device_id: string | null
+    app_version: string | null
+    created_at: string
+}
+
+export interface RequestPage {
+    rows: RequestRow[]
+    total: number
+    per_page: number
+    /** Every method the API can be called with, so the filter is not built from history. */
+    methods: string[]
+}
+
+export interface RequestFilters {
+    method?: string
+    /** 'failed' | '4xx' | '5xx' | an exact code. */
+    status?: string
+    /** Matched as a substring, so a route is findable without knowing its endpoints. */
+    path?: string
+    session_hash?: string
+    from?: string
+    to?: string
+    /** Walk back from this row. Omit for the newest page. */
+    before_id?: number
+}
+
+export async function listRequests(filters: RequestFilters = {}): Promise<RequestPage> {
+    const query = new URLSearchParams()
+
+    for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== '' && value !== null) {
+            query.set(key, String(value))
+        }
+    }
+
+    const suffix = query.toString()
+
+    return apiRequest<RequestPage>(`/admin/requests${suffix === '' ? '' : `?${suffix}`}`, {
+        method: 'GET',
+    })
+}
+
 export interface NewUser {
     email: string
     full_name: string
