@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { PhCheck, PhPlus, PhTrash } from '@phosphor-icons/vue'
+import { PhPlus, PhTrash } from '@phosphor-icons/vue'
 import { computed, reactive, watch } from 'vue'
 
 import ChoiceField from '@/components/ChoiceField.vue'
+import ChoiceSwitch from '@/components/ChoiceSwitch.vue'
 import DateField from '@/components/DateField.vue'
 import TimeField from '@/components/TimeField.vue'
 import { t, text } from '@/i18n'
@@ -97,14 +98,14 @@ function needsSpecify(field: ContextField): boolean {
 /**
  * Whether a choice is short enough to be worth showing whole.
  *
- * Two options sit side by side on the narrowest screen the app runs on, so
- * showing them costs one line and saves a tap. It is also, as it happens, the
- * length of the one question here that must be readable without opening
- * anything: `refers_specimens` decides whether Section 5 is part of the visit,
- * and an answer that removes nine questions should not be behind a list.
+ * Two options are a switch — both words on screen, one tap between them. It is
+ * also, as it happens, the length of the one question here that must be
+ * readable without opening anything: `refers_specimens` decides whether
+ * Section 5 is part of the visit, and an answer that removes nine questions
+ * should not be behind a list.
  *
- * Anything longer becomes a field with the list behind it — see ChoiceField
- * for why six tiles are the wrong shape for a form.
+ * Anything longer becomes a field with the list behind it. See ChoiceSwitch
+ * and ChoiceField for why each is the shape it is.
  */
 function showsEveryOption(field: ContextField): boolean {
     return (field.options ?? []).length <= 2
@@ -191,7 +192,14 @@ const inputClass = 'field tnum'
         >
             <div class="flex flex-col justify-end gap-1.5">
                 <div class="flex items-baseline justify-between gap-3 px-1">
-                    <label :for="field.code" class="text-[16px] font-medium">
+                    <!-- Named as well as pointed at: a control that is a group
+                         rather than a box cannot be reached by `for`, and reads
+                         the label by id instead. -->
+                    <label
+                        :id="`${field.code}-label`"
+                        :for="field.code"
+                        class="text-[16px] font-medium"
+                    >
                         {{ text(field.label) }}
                         <span v-if="field.required" class="text-no">*</span>
                     </label>
@@ -215,56 +223,16 @@ const inputClass = 'field tnum'
                     it is not.
                 -->
                 <div v-if="field.type === 'select_one'" class="flex flex-col gap-2">
-                    <!--
-                        Two abreast wherever there is room for two. A phone
-                        gets one, because half a phone is not a line long
-                        enough for "Non-governmental organisation".
-                    -->
-                    <div v-if="showsEveryOption(field)" class="grid gap-2 sm:grid-cols-2">
-                        <!--
-                            Each option is its own card with a mark on it. The
-                            old row list wrote the word "Selected" in the right
-                            margin, which is not a control: it could not be
-                            seen at a glance, and it was the only state in the
-                            application announced in prose.
-                        -->
-                        <button
-                            v-for="option in field.options ?? []"
-                            :key="option.key"
-                            type="button"
-                            :aria-pressed="draft[field.code] === option.key"
-                            :class="[
-                                'flex w-full min-h-12 items-center justify-between gap-3 rounded-card border-2 px-4 py-3 text-left text-[17px] transition-colors',
-                                draft[field.code] === option.key
-                                    ? 'border-accent bg-accent-soft font-semibold text-accent'
-                                    : 'border-hairline bg-surface hover:border-label-3/40',
-                            ]"
-                            @click="
-                                draft[field.code] =
-                                    draft[field.code] === option.key ? '' : option.key;
-                                commit()
-                            "
-                        >
-                            <span>{{ text(option.label) }}</span>
-
-                            <!-- The mark, not the word. -->
-                            <span
-                                aria-hidden="true"
-                                :class="[
-                                    'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
-                                    draft[field.code] === option.key
-                                        ? 'border-accent bg-accent text-accent-ink'
-                                        : 'border-hairline',
-                                ]"
-                            >
-                                <PhCheck
-                                    v-if="draft[field.code] === option.key"
-                                    :size="12"
-                                    weight="bold"
-                                />
-                            </span>
-                        </button>
-                    </div>
+                    <ChoiceSwitch
+                        v-if="showsEveryOption(field)"
+                        :labelled-by="`${field.code}-label`"
+                        :model-value="(draft[field.code] as string) ?? ''"
+                        :options="field.options ?? []"
+                        @update:model-value="
+                            draft[field.code] = $event;
+                            commit()
+                        "
+                    />
 
                     <ChoiceField
                         v-else
