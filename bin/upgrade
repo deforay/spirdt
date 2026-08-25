@@ -166,7 +166,12 @@ function apply_new_code(bool $dryRun, bool $skip): void
     // loud precisely because every target that WAS tried succeeded: without
     // this, the one arrangement this step cannot service is also the one it
     // reports no problem with.
-    if (con_run('pgrep -x php-fpm >/dev/null 2>&1 || pgrep -f "php-fpm: master" >/dev/null 2>&1')[1] === 0
+    // MATCHED ON THE PROCESS NAME, NEVER ON THE COMMAND LINE. `pgrep -f` searches
+    // full command lines, which includes the shell this very check is running
+    // in — so the pattern finds itself, and the first run of this warning fired
+    // on a host with no FPM anywhere on it. The bracket allows the version
+    // suffix Debian puts on the master's name; -x anchors the whole of it.
+    if (con_run('pgrep -x "php-fpm[0-9.]*" >/dev/null 2>&1')[1] === 0
         && !array_filter($targets, static fn (array $t): bool => str_contains($t[2], 'fpm'))
     ) {
         con_print('warn', 'PHP-FPM is running but no way to reload it was found.');
