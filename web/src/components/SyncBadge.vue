@@ -45,6 +45,12 @@ import { syncStatus } from '@/sync/engine'
  * count: an icon alone would drop "12 waiting" to a cloud, and the number is
  * the whole of the information. Icons accompany words here (DESIGN.md), and
  * that rule bites hardest where the word is the part that changes.
+ *
+ * It gives way rather than pushing, all the same. On a 320px screen a long
+ * translation — "Non synchronisé" — against a bar of things that all refused
+ * to shrink took the account control off the side of the page. Truncating is
+ * a worse badge than a whole one and a much better bar than one you cannot
+ * reach the end of, and the accessible name is the whole label either way.
  */
 
 const emit = defineEmits<{ retry: [] }>()
@@ -101,7 +107,7 @@ const state = computed(() => {
     <button
         type="button"
         :class="[
-            'flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-semibold sm:px-2.5',
+            'flex min-w-0 items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-semibold sm:px-2.5',
             state.tone,
         ]"
         :disabled="!state.clickable"
@@ -110,6 +116,6 @@ const state = computed(() => {
         @click="emit('retry')"
     >
         <component :is="state.icon" :size="15" weight="bold" class="shrink-0" aria-hidden="true" />
-        <span class="whitespace-nowrap">{{ state.label }}</span>
+        <span class="truncate">{{ state.label }}</span>
     </button>
 </template>

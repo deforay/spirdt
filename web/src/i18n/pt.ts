@@ -188,7 +188,6 @@ export const messages: Messages = {
     'reports.round': 'Ronda',
     'setup.contextHeading': 'Sobre o local',
     'setup.continueTo': 'Continuar para {section}',
-    'setup.backToSection': 'Voltar a {section}',
     'setup.needRound': 'Indique a que ronda pertence esta auditoria.',
     'setup.needPathogen': 'Adicione pelo menos um teste realizado neste local.',
     'setup.missingFields': {

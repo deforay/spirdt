@@ -191,7 +191,6 @@ export const messages: Messages = {
     'reports.round': 'Cycle',
     'setup.contextHeading': 'À propos du site',
     'setup.continueTo': 'Continuer vers {section}',
-    'setup.backToSection': 'Retour à {section}',
     'setup.needRound': 'Indiquez à quelle série appartient cet audit.',
     'setup.needPathogen': 'Ajoutez au moins un test réalisé sur ce site.',
     'setup.missingFields': {

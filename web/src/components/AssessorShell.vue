@@ -12,7 +12,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { signOut } from '@/auth/login'
-import { canManage, landing } from '@/auth/permissions'
+import { canManage, landing, landingLabel } from '@/auth/permissions'
 import { session } from '@/auth/session'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import StorageNotice from '@/components/StorageNotice.vue'
@@ -154,17 +154,27 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                 <span
                     :class="[
                         'size-8 shrink-0 items-center justify-center rounded-card bg-accent text-accent-ink',
-                        backLabel === undefined ? 'flex' : 'hidden md:flex',
+                        backLabel !== undefined
+                            ? 'hidden md:flex'
+                            : canManage()
+                              ? 'hidden sm:flex'
+                              : 'flex',
                     ]"
                 >
                     <PhChartBar :size="17" weight="bold" aria-hidden="true" />
                 </span>
                 <!--
-                    The wordmark is the first thing to go, not the last.
-                    Where an account has a dashboard to get back to, a phone
-                    has room for the mark and the link but not for the name of
-                    the product as well — and of the two, the one nobody needs
-                    while they are working is the one that says who made it.
+                    The brand is the first thing to go, not the last.
+
+                    A phone showing the mark, the wordmark, a link, a sync
+                    state, a language and a name has 358px for about 450px of
+                    them, and every one of those truncates to an ellipsis
+                    rather than one of them standing down — "Dash…" beside
+                    "Not s…", which is two controls neither of which says what
+                    it is. So where an account has a management screen to get
+                    back to, the brand stands down on a phone and comes back at
+                    640px. It is the only thing in the row that nobody needs
+                    while they are working.
                 -->
                 <span
                     :class="[
@@ -199,13 +209,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                 <RouterLink
                     v-if="canManage()"
                     :to="{ name: landing() }"
+                    :title="t(landingLabel())"
                     :class="[
-                        'min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[15px] font-medium text-accent transition-opacity hover:opacity-80',
+                        'min-h-11 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-[15px] font-medium text-accent transition-opacity hover:opacity-80',
                         backLabel === undefined ? 'flex' : 'hidden md:flex',
                     ]"
                 >
                     <PhGauge :size="17" weight="bold" class="shrink-0" aria-hidden="true" />
-                    <span class="truncate">{{ t('dash.title') }}</span>
+                    <span class="truncate">{{ t(landingLabel()) }}</span>
                 </RouterLink>
 
                 <span class="flex-1"></span>
@@ -333,7 +344,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
                             @click="open = false"
                         >
                             <PhGauge :size="16" class="shrink-0 text-label-3" aria-hidden="true" />
-                            {{ t('dash.title') }}
+                            {{ t(landingLabel()) }}
                         </RouterLink>
 
                         <RouterLink

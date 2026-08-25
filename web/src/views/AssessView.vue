@@ -501,7 +501,7 @@ const setupNextSection = computed(() =>
 )
 
 /**
- * What the way back from the setup screen is called.
+ * What the arrow out of the setup screen is called.
  *
  * NOT "the checklist", and that is the point. Naming this form's exit "Start
  * the checklist" said that the audit begins on the next screen — but Part A is
@@ -510,15 +510,19 @@ const setupNextSection = computed(() =>
  * was no better: the checklist is five sections and they left one of them
  * mid-question.
  *
- * So it names the SECTION they were in. Nothing on the screen claims the audit
- * has not started yet.
+ * NOR IS IT "Back to" anything. This screen is step one of the audit and says
+ * so in its own eyebrow, and a word meaning retreat put in front of the
+ * section name made Site details read as a detour off to one side of the
+ * visit — somewhere you go and come back from, rather than the place the visit
+ * starts. The bar draws the arrow; the label is only the destination, as it is
+ * on every other screen of a visit.
  *
- * On a first visit the label is the site instead, because the top of the
- * screen is a way out of the visit rather than a step through it.
+ * On a first visit the label is the site instead, because there the arrow
+ * leads out of a visit that has not begun rather than on through one.
  */
 const setupBackLabel = computed(() =>
     revisitingSetup.value
-        ? t('setup.backToSection', { section: setupNextSection.value })
+        ? setupNextSection.value
         : (assessment.assessment.value?.siteName ?? ''),
 )
 
@@ -896,29 +900,6 @@ async function onSubmit() {
             of the audit, and the top of the page now says so.
         -->
         <header class="flex flex-col gap-0.5 px-4 pb-3 pt-4 md:px-0 md:pt-6">
-            <!--
-                A way out at the top, because this form is long and the only
-                other one was the button past the end of it. Where it goes
-                depends on how the assessor got here: back to the checklist
-                when they came to correct something, back to the site list when
-                the visit has not started.
-
-                At a desk only. On a phone the same door is in the top bar,
-                where the brand would otherwise sit — the checklist made that
-                trade a while ago and this screen was still spending a row on
-                its own copy.
-            -->
-            <div class="hidden items-center justify-between gap-3 md:flex">
-                <button
-                    type="button"
-                    class="-ml-1 flex min-h-11 flex-1 items-center gap-1 truncate pr-1 text-left text-[14px] text-accent"
-                    @click="revisitingSetup ? startChecklist() : leaveVisit()"
-                >
-                    <PhArrowLeft :size="14" class="shrink-0" aria-hidden="true" />
-                    <span class="truncate">{{ setupBackLabel }}</span>
-                </button>
-            </div>
-
             <span class="eyebrow text-brass">{{ t('setup.eyebrow') }}</span>
 
             <!--

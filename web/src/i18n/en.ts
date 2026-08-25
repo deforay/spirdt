@@ -203,7 +203,6 @@ export const messages = {
     'reports.round': 'Round',
     'setup.contextHeading': 'About the site',
     'setup.continueTo': 'Continue to {section}',
-    'setup.backToSection': 'Back to {section}',
     'setup.needRound': 'Say which round this audit belongs to.',
     'setup.needPathogen': 'Add at least one test performed at this site.',
     'setup.missingFields': {

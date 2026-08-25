@@ -1,5 +1,7 @@
 import { computed } from 'vue'
 
+import type { MessageKey } from '@/i18n'
+
 import { session } from './session'
 
 /**
@@ -137,6 +139,42 @@ export function landing(): string {
     }
 
     return 'no-access'
+}
+
+/**
+ * What to call the screen landing() picked.
+ *
+ * Beside landing() rather than anywhere else, for the reason that function
+ * gives about the guard: two places deciding the same thing separately is two
+ * places that can disagree, and here the disagreement is a link that says one
+ * screen and opens another. A link into the management side used to be called
+ * "Management console" — a name no screen wears — and calling it Dashboard
+ * instead was right for the account that lands on the dashboard and a lie for
+ * the one that lands on Geography.
+ *
+ * The keys are the ones the management navigation already uses for the same
+ * routes, so a link into that side is called what it is called once you are
+ * there.
+ */
+export function landingLabel(): MessageKey {
+    switch (landing()) {
+        case 'admin-dashboard':
+            return 'dash.title'
+        case 'admin-places':
+            return 'places.title'
+        case 'admin-users':
+            return 'admin.users'
+        case 'admin-roles':
+            return 'roles.title'
+        case 'admin-audit':
+            return 'audit.title'
+        case 'admin-organizations':
+            return 'organizations.title'
+        case 'admin-settings':
+            return 'settings.title'
+        default:
+            return 'dash.title'
+    }
 }
 
 /** The same, for templates, so a change of account re-renders the navigation. */
