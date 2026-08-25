@@ -201,7 +201,6 @@ export const messages = {
     'review.auditRound': 'Audit round',
     'report.auditRound': 'Audit round',
     'reports.round': 'Round',
-    'setup.visitHeading': 'This visit',
     'setup.contextHeading': 'About the site',
     'setup.peopleHeading': 'Who was spoken to',
     'setup.continueTo': 'Continue to {section}',

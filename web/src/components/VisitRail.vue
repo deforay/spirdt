@@ -35,18 +35,6 @@ const props = defineProps<{
     sections: Section[]
     /** A section code, or 'site' for the setup screen itself. */
     activeCode: string
-    /**
-     * Whether a section can be opened from here yet.
-     *
-     * False on the setup screen until it is filled in. Section 4 repeats once
-     * per pathogen and the pathogens are named on that screen, so a rail that
-     * let somebody leap into the checklist before then would land them in a
-     * section with nothing in it and no way to say why. The rows stay legible
-     * rather than vanishing: the shape of the visit is worth seeing before it
-     * is worth walking, and the footer of that screen already says what is
-     * stopping it.
-     */
-    sectionsOpen?: boolean
     tallies: Map<string, RailTally>
     answered: number
     total: number
@@ -121,12 +109,10 @@ function filled(code: string): string {
                 v-for="item in sections"
                 :key="item.code"
                 type="button"
-                :disabled="sectionsOpen === false"
                 :aria-current="item.code === activeCode ? 'true' : undefined"
                 :class="[
                     'relative flex w-full items-baseline gap-2.5 rounded-card px-3 py-2.5 text-left',
                     'text-[15px] transition-colors',
-                    sectionsOpen === false ? 'opacity-45' : '',
                     item.code === activeCode
                         ? 'bg-surface font-semibold text-accent shadow-pick'
                         : 'text-label-2 hover:bg-surface/70 hover:text-label',

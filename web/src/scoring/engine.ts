@@ -53,8 +53,14 @@ export function questionKey(code: string, pathogen: string | null | undefined): 
  * values by option key — refers_specimens arrives as the string 'yes' or 'no',
  * not a boolean. So this accepts the several shapes the same fact arrives in:
  * an option key from the form, a boolean from the API, a number from a column.
+ *
+ * Exported for the same reason expectedQuestions is: the setup screen has to
+ * ask this question of an answer nobody has saved yet. Its rail and the button
+ * past the end of its form both name a section, and both were naming one the
+ * assessor had just switched off — the saved context still said Section 5
+ * applied, because saving is what pressing the button does.
  */
-function sectionApplies(section: Section, context: Context): boolean {
+export function sectionApplies(section: Section, context: Context): boolean {
     if (section.optional !== true) {
         return true
     }

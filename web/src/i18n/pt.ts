@@ -186,7 +186,6 @@ export const messages: Messages = {
     'review.auditRound': 'Ronda de auditoria',
     'report.auditRound': 'Ronda de auditoria',
     'reports.round': 'Ronda',
-    'setup.visitHeading': 'Esta visita',
     'setup.contextHeading': 'Sobre o local',
     'setup.peopleHeading': 'Com quem se falou',
     'setup.continueTo': 'Continuar para {section}',

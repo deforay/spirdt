@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhArrowLeft, PhArrowRight, PhBuildings } from '@phosphor-icons/vue'
+import { PhArrowLeft, PhArrowRight, PhBuildings, PhCrosshair, PhMapPin } from '@phosphor-icons/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
@@ -20,7 +20,7 @@ import { COARSE_ACCURACY_M } from '@/db/location'
 import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
 import { formatPercent, formatTime, locale, type MessageKey, t, text } from '@/i18n'
-import { expectedQuestions } from '@/scoring/engine'
+import { expectedQuestions, sectionApplies } from '@/scoring/engine'
 import { validateContext } from '@/validation/context'
 import type { Context, ContextField, ResponseCode, Template } from '@/scoring/types'
 import { startSync } from '@/sync/engine'
@@ -419,7 +419,10 @@ async function onSiteChosen(site: Site) {
  */
 const CONTEXT_GROUPS: Array<{ heading: MessageKey; codes: string[] }> = [
     {
-        heading: 'setup.visitHeading',
+        // The round is not one of these — no instrument asks it — but it
+        // belongs under this heading with them, and a card holding one field
+        // whose label repeats its own heading is not a card worth drawing.
+        heading: 'setup.roundHeading',
         codes: ['assessment_date', 'assessment_time', 'previous_assessment_date'],
     },
     {
@@ -438,6 +441,30 @@ const CONTEXT_GROUPS: Array<{ heading: MessageKey; codes: string[] }> = [
         codes: ['testing_staff', 'interviewee_name', 'interviewee_title', 'interviewee_phone'],
     },
 ]
+
+/**
+ * The cards of this screen, top to bottom.
+ *
+ * Three of them are Part A groups and two are this application's own — where
+ * the device is, and which tests the site runs — and the order they are asked
+ * in does not follow that split. Naming the order in one list is what lets the
+ * bespoke two sit between the others without the loop that draws the rest
+ * being torn in half, and without reaching for CSS `order`, which would leave
+ * the tab sequence and a screen reader walking the form in a different order
+ * from everybody else.
+ */
+const CARD_ORDER: MessageKey[] = [
+    'setup.roundHeading',
+    'setup.locationHeading',
+    'setup.pathogensHeading',
+    'setup.contextHeading',
+    'setup.peopleHeading',
+]
+
+/** The Part A fields belonging to one card, empty for the bespoke two. */
+function fieldsFor(heading: MessageKey): ContextField[] {
+    return contextGroups.value.find((group) => group.heading === heading)?.fields ?? []
+}
 
 const contextGroups = computed(() => {
     const all = template.context_fields ?? []
@@ -573,19 +600,37 @@ const sectionNumber = computed(
 )
 
 /**
+ * Which sections the visit has, according to what is on the setup screen now.
+ *
+ * `visibleSections` answers the same question from the SAVED context, which is
+ * right on every screen except this one — this is the screen where the answer
+ * is being changed, and nothing is saved until it is left. An assessor who
+ * switches the question governing Section 5 to "no" was still offered Section
+ * 5 by the rail and promised it by the button, and then landed somewhere else,
+ * because the guard that catches this runs after the saving and the labels
+ * were drawn before it.
+ */
+const draftSections = computed(() =>
+    template.sections.filter((entry) => sectionApplies(entry, draftContext.value)),
+)
+
+/**
  * Which section the setup screen leads to, by name.
  *
  * Returning to one that was left mid-question, or the first one on a visit
- * that has not started. Either way the button says where it lands.
+ * that has not started. Either way the button says where it lands — including
+ * when the section it was going to return to has just been switched off.
  */
-const setupNextSection = computed(() =>
-    text(
-        (revisitingSetup.value
-            ? section.value
-            : (visibleSections.value[0] ?? template.sections[0]!)
-        ).title,
-    ),
-)
+const setupNextSection = computed(() => {
+    const wanted = revisitingSetup.value ? section.value : draftSections.value[0]
+
+    const landing =
+        wanted !== undefined && draftSections.value.some((entry) => entry.code === wanted.code)
+            ? wanted
+            : (draftSections.value[0] ?? template.sections[0]!)
+
+    return text(landing.title)
+})
 
 /**
  * What the arrow out of the setup screen is called.
@@ -946,6 +991,10 @@ async function railPick(code: string): Promise<void> {
     // round the saving. The section goes in as a request rather than being
     // assigned here, because writing Part A down can take the section asked
     // for out of the visit.
+    //
+    // It does nothing at all until the form will save, the same as the button.
+    // The rows are not dimmed for it: the rail is one object across a visit and
+    // an assessor should not have to work out why it looks different here.
     if (stage.value === 'setup') {
         await startChecklist(code)
 
@@ -1070,9 +1119,8 @@ async function onSubmit() {
             -->
             <VisitRail
                 :site-name="assessment.assessment.value?.siteName ?? ''"
-                :sections="visibleSections"
+                :sections="draftSections"
                 active-code="site"
-                :sections-open="setupReady"
                 :tallies="sectionProgress"
                 :answered="progress.answered"
                 :total="progress.total"
@@ -1087,24 +1135,26 @@ async function onSubmit() {
             />
 
             <div class="flex flex-col gap-5">
-            <section class="rounded-surface border border-hairline bg-surface p-5 md:p-6">
+            <section
+                v-for="heading in CARD_ORDER"
+                :key="heading"
+                class="rounded-surface border border-hairline bg-surface p-5 md:p-6"
+            >
+                <h2 class="eyebrow pb-4 text-label-3">
+                    {{ t(heading) }}
+                </h2>
+
                 <!--
                     Which round this audit belongs to, asked before what it
                     covers, because it is the thing that files the audit rather
-                    than a fact about the laboratory. It sits in this card and
-                    not in Part A: Part A is what the instrument asks, and no
-                    instrument asks this.
+                    than a fact about the laboratory.
 
                     Free text on purpose. The first round of a programme is
                     usually the baseline and is called that, so a number field
                     would push the word into a comment somewhere.
                 -->
-                <h2 class="eyebrow pb-3 text-label-3">
-                    {{ t('setup.roundHeading') }}
-                </h2>
-
-                <label class="flex flex-col gap-1.5">
-                    <span class="text-[14px] font-medium text-label-2">
+                <label v-if="heading === 'setup.roundHeading'" class="mb-5 flex flex-col gap-1.5">
+                    <span class="px-1 text-[16px] font-medium">
                         {{ t('setup.auditRound') }}
                         <span class="text-no">*</span>
                     </span>
@@ -1116,7 +1166,7 @@ async function onSubmit() {
                         class="field"
                         :placeholder="t('setup.auditRoundPlaceholder')"
                     />
-                    <span class="text-[13px] leading-snug text-label-3">
+                    <span class="px-1 text-[13px] leading-snug text-label-3">
                         {{ t('setup.auditRoundHint') }}
                     </span>
                 </label>
@@ -1132,59 +1182,73 @@ async function onSubmit() {
                     it is a two-kilometre fix knows the pin will say the
                     district rather than the building. Neither is possible if
                     the screen never mentions it.
+
+                    It is dressed as a field because it is one. Standing among
+                    twenty bordered boxes it was a line of grey text over a
+                    grey pill — nothing about it said it was part of the form,
+                    or that anything could be done about it, and the one thing
+                    this block exists to prompt is somebody walking to a
+                    window. A recessed box says an answer belongs here, the pin
+                    says what kind, and the button is in the accent because it
+                    is the one control in this column that does something
+                    rather than receives something.
                 -->
-                <h2 class="eyebrow pb-3 pt-5 text-label-3">
-                    {{ t('setup.locationHeading') }}
-                </h2>
+                <template v-else-if="heading === 'setup.locationHeading'">
+                    <div class="field flex items-center gap-2.5">
+                        <PhMapPin
+                            :size="16"
+                            class="shrink-0"
+                            :class="fix === null ? 'text-label-3' : 'text-accent'"
+                            aria-hidden="true"
+                        />
+                        <span v-if="fix === null" class="truncate text-label-3">
+                            {{ t('setup.locationNone') }}
+                        </span>
+                        <span v-else class="tnum truncate">
+                            {{ fix.latitude.toFixed(5) }}, {{ fix.longitude.toFixed(5) }}
+                        </span>
+                    </div>
 
-                <p v-if="fix !== null" class="text-[15px]">
-                    <span class="tnum">{{ fix.latitude.toFixed(5) }}, {{ fix.longitude.toFixed(5) }}</span>
-                    <span v-if="fix.accuracyM !== null" class="text-label-2">
-                        · {{ t('setup.locationAccuracy', { metres: fix.accuracyM }) }}
-                    </span>
-                    <span v-if="fix.coarse" class="mt-1 block text-[13px] text-label-2">
-                        {{ t('setup.locationCoarse') }}
-                    </span>
-                </p>
+                    <p
+                        v-if="fix !== null && fix.accuracyM !== null"
+                        class="mt-1.5 px-1 text-[13px] leading-snug text-label-3"
+                    >
+                        {{ t('setup.locationAccuracy', { metres: fix.accuracyM }) }}
+                        <span v-if="fix.coarse" class="mt-1 block text-label-2">
+                            {{ t('setup.locationCoarse') }}
+                        </span>
+                    </p>
 
-                <p v-else class="text-[15px] text-label-3">{{ t('setup.locationNone') }}</p>
+                    <button
+                        type="button"
+                        class="mt-3 flex min-h-11 items-center gap-2 rounded-full bg-accent-soft px-4 text-[14px] font-semibold text-accent transition-opacity hover:opacity-80 disabled:opacity-40"
+                        :disabled="locating"
+                        @click="onLocate"
+                    >
+                        <PhCrosshair :size="16" weight="bold" class="shrink-0" aria-hidden="true" />
+                        {{
+                            locating
+                                ? t('setup.locationWorking')
+                                : fix === null
+                                  ? t('setup.locationCapture')
+                                  : t('setup.locationRetry')
+                        }}
+                    </button>
+                </template>
 
-                <button
-                    type="button"
-                    class="mt-2 min-h-11 rounded-full bg-surface-2 px-3.5 text-[14px] font-medium text-label-2 transition-colors hover:text-label disabled:opacity-40"
-                    :disabled="locating"
-                    @click="onLocate"
-                >
-                    {{
-                        locating
-                            ? t('setup.locationWorking')
-                            : fix === null
-                              ? t('setup.locationCapture')
-                              : t('setup.locationRetry')
-                    }}
-                </button>
-
-                <h2 class="eyebrow pb-3 pt-5 text-label-3">
-                    {{ t('setup.pathogensHeading') }}
-                </h2>
+                <!-- The tests performed here, which decide how many times
+                     Section 4 is answered. -->
                 <PathogenSetup
+                    v-else-if="heading === 'setup.pathogensHeading'"
                     v-model="draftPathogens"
                     :repeating-section="repeating.number"
                     :questions-per-pathogen="repeating.questions"
                 />
-            </section>
 
-            <section
-                v-for="group in contextGroups"
-                :key="group.heading"
-                class="rounded-surface border border-hairline bg-surface p-5 md:p-6"
-            >
-                <h2 class="eyebrow pb-4 text-label-3">
-                    {{ t(group.heading) }}
-                </h2>
                 <ContextForm
+                    v-if="fieldsFor(heading).length > 0"
                     v-model="draftContext"
-                    :fields="group.fields"
+                    :fields="fieldsFor(heading)"
                     :applicability-fields="applicabilityFields"
                     :problems="contextProblems"
                 />

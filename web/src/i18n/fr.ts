@@ -189,7 +189,6 @@ export const messages: Messages = {
     'review.auditRound': 'Cycle d’audit',
     'report.auditRound': 'Cycle d’audit',
     'reports.round': 'Cycle',
-    'setup.visitHeading': 'Cette visite',
     'setup.contextHeading': 'À propos du site',
     'setup.peopleHeading': 'Personnes interrogées',
     'setup.continueTo': 'Continuer vers {section}',
