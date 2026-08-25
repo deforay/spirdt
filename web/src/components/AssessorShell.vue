@@ -169,18 +169,28 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
                 <span class="flex-1"></span>
 
-                <!-- Narrow enough to sit beside the sync badge on a phone: the
-                     door alone, with the promise spelled out from 640px up.
-                     It keeps its own label as the accessible name either way,
-                     so the icon is never the whole of what it says. -->
+                <!--
+                    Narrow enough to sit beside the sync badge on a phone: the
+                    door alone, with the promise spelled out from 640px up. It
+                    keeps its own label as the accessible name either way, so
+                    the icon is never the whole of what it says.
+
+                    Filled and in the accent, because grey text was not a
+                    control. It sat in a row of grey chrome — a badge saying
+                    Synced, a language, a name — and read as one more label
+                    about the state of things rather than the way out. Every
+                    other thing on this bar reports; this is the only one that
+                    does something, and it is the thing an assessor needs to
+                    find while standing up in a laboratory holding a tablet.
+                -->
                 <button
                     v-if="exitLabel !== undefined"
                     type="button"
-                    class="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2 text-[15px] font-medium text-label-2 transition-colors hover:bg-accent-soft sm:px-3"
+                    class="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2.5 text-[15px] font-semibold text-accent transition-opacity hover:opacity-80 sm:px-3.5"
                     :aria-label="exitLabel"
                     @click="emit('exit')"
                 >
-                    <PhDoorOpen :size="17" class="shrink-0" aria-hidden="true" />
+                    <PhDoorOpen :size="18" weight="bold" class="shrink-0" aria-hidden="true" />
                     <span class="hidden sm:inline">{{ exitLabel }}</span>
                 </button>
 
