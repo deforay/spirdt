@@ -774,6 +774,17 @@ function editSetup() {
 }
 
 async function leaveVisit() {
+    // Part A, the round and the pathogens are held in memory until the setup
+    // screen is left FORWARDS, because that is the only way it could be left
+    // when they were written. Leaving sideways has to write them too, or a
+    // door labelled Save and exit throws away the twenty answers somebody just
+    // gave — the one thing this application promises never to do.
+    if (stage.value === 'setup') {
+        await assessment.updateContext(draftContext.value)
+        await assessment.updatePathogens(draftPathogens.value)
+        await assessment.updateAuditRound(draftRound.value)
+    }
+
     await assessment.flush()
     await loadDrafts()
     stage.value = 'site'
