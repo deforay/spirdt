@@ -63,6 +63,24 @@ Options -Indexes
     # and Apache gives up after ten passes with "Request exceeded the limit of
     # 10 internal redirects", naming no rule and no file. With this line the
     # same mistake is a plain 404 that says what is missing.
+    # A MISSING ASSET MUST 404 RATHER THAN ANSWER 200 WITH THE APP, and that
+    # exception is the whole reason this line exists. The file test below asks
+    # only whether something is there; a fingerprinted chunk that is not there
+    # is missing for one specific reason, and it is not a typed URL. It is a
+    # tab that was loaded before the last build, whose import map names files
+    # the build has since replaced.
+    #
+    # Serving index.html to that request hands the browser HTML where it asked
+    # for a module. The dynamic import rejects, the navigation that triggered
+    # it dies, and because the status was 200 nothing anywhere reports a
+    # failure — the symptom is a button that does nothing at all. Signing in
+    # was where it was noticed, and it was never about signing in: every
+    # management screen is loaded this way.
+    #
+    # A 404 is the same failure said out loud. It is also what the router's
+    # onError handler needs in order to recognise the case and reload.
+    RewriteCond %{REQUEST_URI} !^/assets/
+
     RewriteCond %{REQUEST_URI} !^/index\.html$
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d

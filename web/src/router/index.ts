@@ -318,4 +318,94 @@ router.beforeEach((to) => {
  */
 router.afterEach(() => {
     settleFlash()
+
+    // Arriving anywhere at all means the bundle is current, so whatever the
+    // reload below was guarding against is over.
+    forgetReload()
 })
+
+/**
+ * A tab that was open across a deploy.
+ *
+ * EVERY SCREEN BUT THE SIGN-IN FORM IS A DYNAMIC IMPORT, and the names of
+ * those files are fingerprints of their contents — so a build replaces all of
+ * them. The import map naming the old ones is baked into the bundle this tab
+ * is already running, which means that from the moment a build lands, every
+ * navigation this tab has not already made asks for a file that is gone.
+ *
+ * vue-router reports that by rejecting the navigation and nothing else. The
+ * caller is usually in no position to show it and mostly does not try — the
+ * sign-in view discards it with a `void` — so the screen simply stays where it
+ * was. The symptom is a control that does nothing whatsoever: no error, no
+ * spinner, no address change. It was found on the sign-in button and it was
+ * never about signing in; every management link on a tab left open since the
+ * morning fails the same silent way.
+ *
+ * Reloading is the repair, and it works because index.html is the one file
+ * whose name never changes. It is also what somebody does by hand when a click
+ * does nothing — the difference is that they land back where they started and
+ * this lands them where they were going.
+ *
+ * ONCE PER DESTINATION. A chunk can be missing for reasons a reload cannot
+ * mend, and a repair that retries itself is a tab that reloads for ever.
+ */
+const RELOAD_KEY = 'spirdt.reload-for'
+
+router.onError((error, to) => {
+    if (!isMissingChunk(error)) {
+        return
+    }
+
+    try {
+        if (sessionStorage.getItem(RELOAD_KEY) === to.fullPath) {
+            return
+        }
+
+        sessionStorage.setItem(RELOAD_KEY, to.fullPath)
+    } catch {
+        // No sessionStorage to mark it in. Reloading once is still the right
+        // move and still what a person would do unaided; what is lost is the
+        // protection against a loop, which needs a chunk to be permanently
+        // missing before it can happen at all.
+    }
+
+    window.location.assign(to.fullPath)
+})
+
+function forgetReload(): void {
+    try {
+        sessionStorage.removeItem(RELOAD_KEY)
+    } catch {
+        // Nothing was written, so there is nothing to clear.
+    }
+}
+
+/**
+ * Whether this is a chunk that will not load, as opposed to a real fault in a
+ * screen that loaded perfectly well.
+ *
+ * Matched on the message because that is all there is: no browser gives this a
+ * code, and each words it differently. Chrome and Firefox both say
+ * "dynamically imported module"; Safari says the module script failed to
+ * import; Vite raises its own line when a stylesheet cannot be preloaded.
+ *
+ * The MIME line is the one worth explaining. A server that answers the SPA
+ * fallback for a missing asset hands back index.html with a 200, and the
+ * browser rejects the HTML rather than the request — this app's own .htaccess
+ * did exactly that until it was told to leave /assets alone. It is kept
+ * because not every deployment is behind that file.
+ */
+function isMissingChunk(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+        return false
+    }
+
+    const message = error.message.toLowerCase()
+
+    return (
+        message.includes('dynamically imported module') ||
+        message.includes('importing a module script failed') ||
+        message.includes('expected a javascript module script') ||
+        message.includes('unable to preload')
+    )
+}
