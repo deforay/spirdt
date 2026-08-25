@@ -20,7 +20,8 @@ declare(strict_types=1);
  *   2. Back up the database (amitdugar/db-tools)
  *   3. Sync code and dependencies (bin/refresh)
  *   4. Migrate, unconditionally
- *   5. Verify (bin/preflight) and summarise
+ *   5. Verify (bin/preflight)
+ *   6. Restart the web server, so the new PHP is the PHP that runs
  *
  * Usage:
  *   bin/upgrade                  full upgrade
@@ -29,6 +30,10 @@ declare(strict_types=1);
  *                                taken by other means — this is the one step
  *                                that makes the rest reversible.
  *   bin/upgrade --skip-pull      migrate and verify only; code already updated
+ *   bin/upgrade --skip-reload    do not restart the web server. Only where
+ *                                something else does it — see step 5, which
+ *                                explains why skipping it usually means the
+ *                                upgrade has not taken effect.
  *   bin/upgrade --keep=30        backups to retain (db-tools retention)
  *   bin/upgrade --help           print this docblock
  *
@@ -42,9 +47,241 @@ require __DIR__ . '/lib/console.php';
 $root = dirname(__DIR__);
 chdir($root);
 
+/**
+ * Make the code that was just pulled the code that actually runs.
+ *
+ * THE STEP THAT WAS MISSING, and its absence is invisible in the worst way: a
+ * PHP opcode cache configured with `opcache.validate_timestamps=0` never looks
+ * at a file's mtime again. The pull succeeds, migrations run, preflight passes,
+ * this script prints the new commit — and the web server goes on executing the
+ * previous version of every .php file it had already cached, for as long as its
+ * workers live.
+ *
+ * Found on 2026-08-25 on the demo host, which is configured exactly that way. A
+ * newly added admin route answered 404 while the route beside it answered 401,
+ * with the correct source sitting on disk and the upgrade reporting success. The
+ * front end had shipped, because assets are files the browser fetches by name
+ * and no cache stood between them — so everything visible said the deploy had
+ * worked.
+ *
+ * Timestamp validation being ON does not make this pointless. It makes it
+ * unnecessary within `revalidate_freq` seconds, which is a race this step
+ * removes rather than shortens.
+ *
+ * UNCONDITIONAL, and deliberately not clever about it. Comparing HEAD before
+ * and after looks like an obvious way to avoid a pointless reload, and it is
+ * wrong twice: under --skip-pull the code was updated before this script
+ * started, so the two always match; and an upgrade that pulled and then failed
+ * during migration leaves the workers stale for ever, because every later run
+ * finds HEAD unchanged and skips the reload that would have fixed it. What the
+ * check saved was one graceful reload. What it cost was the guarantee this step
+ * exists to provide.
+ *
+ * EVERY HANDLER HAS TO SUCCEED, not one of them. With PHP-FPM behind Apache,
+ * both hold a cache and only one of them holds the one that answers the API —
+ * so an Apache reload that works while the FPM reload fails is precisely the
+ * silent half-deploy this exists to end, and it must not be reported as
+ * anything else.
+ *
+ * NEVER FATAL. An upgrade that reached this point has already changed the
+ * database and passed its verify, and refusing to finish because a reload could
+ * not be issued would turn a stale cache into an aborted deploy. It warns
+ * instead — loudly, and saying exactly what is left to do, because a warning
+ * nobody can act on is the same as no warning.
+ */
+function apply_new_code(bool $dryRun, bool $skip): void
+{
+    if ($dryRun) {
+        con_print('info', 'would restart the web server');
+
+        return;
+    }
+
+    if ($skip) {
+        con_print('warn', 'Skipped (--skip-reload). The new code is on disk but may not be running.');
+
+        return;
+    }
+
+    $targets = reload_targets();
+
+    if ($targets === []) {
+        con_print('warn', 'No way to restart the web server was found.');
+        con_print('info', 'PHP changes may not take effect until it is restarted by hand.');
+
+        return;
+    }
+
+    // Only root can reload a system service, and asking through sudo is worse
+    // than not asking: on a host without a password-less rule it blocks a deploy
+    // on a prompt nobody is watching. Shared hosting lands here too, and there
+    // the operator's panel is the only way.
+    //
+    // The instruction names WHAT THIS HOST ACTUALLY RUNS. A fixed line about
+    // apache2 is wrong on a RHEL box and useless on an nginx one, and an
+    // instruction that does not work leaves the operator believing they have
+    // finished the job.
+    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+        con_print('warn', 'Not root — cannot restart the web server.');
+        con_print('info', 'PHP changes may not take effect until it is restarted.');
+
+        foreach ($targets as [$unit, $test, $reload]) {
+            con_print('info', 'Ask an administrator for: ' . $reload);
+        }
+
+        return;
+    }
+
+    $failed = [];
+
+    foreach ($targets as [$unit, $test, $reload]) {
+        // Tested before reloading, where a test exists to run. A reload into a
+        // configuration that does not parse is the one outcome worse than a
+        // stale cache.
+        if ($test !== null) {
+            [$testOut, $testCode] = con_run($test);
+
+            if ($testCode !== 0) {
+                con_print('warn', ($unit ?? 'the web server') . ' configuration does not parse — NOT restarting it.');
+                con_print('info', trim($testOut));
+                $failed[] = $reload;
+
+                continue;
+            }
+        }
+
+        [$out, $code] = con_run($reload);
+
+        if ($code === 0) {
+            con_print('success', 'Restarted: ' . $reload);
+
+            continue;
+        }
+
+        con_print('warn', $reload . ' failed: ' . trim($out));
+        $failed[] = $reload;
+    }
+
+    // FPM is running and nothing above knew how to reload it. Worth saying out
+    // loud precisely because every target that WAS tried succeeded: without
+    // this, the one arrangement this step cannot service is also the one it
+    // reports no problem with.
+    if (con_run('pgrep -x php-fpm >/dev/null 2>&1 || pgrep -f "php-fpm: master" >/dev/null 2>&1')[1] === 0
+        && !array_filter($targets, static fn (array $t): bool => str_contains($t[2], 'fpm'))
+    ) {
+        con_print('warn', 'PHP-FPM is running but no way to reload it was found.');
+        con_print('info', 'It holds its own opcode cache — reload it by hand, or old PHP keeps serving.');
+    }
+
+    if ($failed === []) {
+        return;
+    }
+
+    con_print('warn', 'Some handlers were not restarted, so old PHP may still be running:');
+
+    foreach ($failed as $reload) {
+        con_print('info', '  ' . $reload);
+    }
+}
+
+/**
+ * The handlers on THIS host that hold a cache, and how to reload each.
+ *
+ * Filtered rather than merely listed, so that both callers — the one that
+ * reloads and the one that can only tell somebody else to — are talking about
+ * the same real services. A candidate survives if systemd says its unit is
+ * active, or, where there is no unit to ask about, if the command exists.
+ *
+ * RELOAD RATHER THAN RESTART throughout. It is graceful — requests in flight
+ * finish — and on a shared box the neighbouring applications get fresh workers
+ * instead of a gap.
+ *
+ * @return list<array{0:?string,1:?string,2:string}>
+ */
+function reload_targets(): array
+{
+    $targets = [];
+
+    foreach (reload_candidates() as [$unit, $test, $reload]) {
+        if ($unit !== null) {
+            if (con_run('systemctl is-active --quiet ' . escapeshellarg($unit))[1] !== 0) {
+                continue;
+            }
+        } elseif (con_run('command -v ' . escapeshellarg(explode(' ', $reload)[0]))[1] !== 0) {
+            continue;
+        }
+
+        // A MISSING TEST BINARY IS NOT A FAILED TEST, and the two read alike
+        // through an exit code. Dropping the test here rather than failing on it
+        // is what stops "apache2ctl is not installed on this RHEL host" being
+        // reported as a broken configuration.
+        if ($test !== null && con_run('command -v ' . escapeshellarg(explode(' ', $test)[0]))[1] !== 0) {
+            $test = null;
+        }
+
+        $targets[] = [$unit, $test, $reload];
+    }
+
+    return $targets;
+}
+
+/**
+ * Everything worth asking about, before the host is consulted about any of it.
+ *
+ * @return list<array{0:?string,1:?string,2:string}>
+ */
+function reload_candidates(): array
+{
+    $candidates = [];
+
+    // The same server, named differently by Debian and by RHEL — and tested
+    // differently too, which is the part that is easy to get wrong: apache2ctl
+    // does not exist on the host that calls it httpd.
+    $candidates[] = ['apache2', 'apache2ctl configtest', 'systemctl reload apache2'];
+    $candidates[] = ['httpd', 'httpd -t', 'systemctl reload httpd'];
+
+    // Whichever PHP-FPM units this host has, from either place systemd keeps
+    // them. Globbed rather than guessed: the version is in the unit name, and
+    // hard-coding one is how this quietly stops working at the next PHP
+    // upgrade. Which of them is real is decided by reload_targets().
+    foreach (['/lib/systemd/system', '/usr/lib/systemd/system', '/etc/systemd/system'] as $dir) {
+        foreach (glob($dir . '/php*-fpm.service') ?: [] as $unit) {
+            $name = basename($unit, '.service');
+            $candidates[] = [$name, null, 'systemctl reload ' . $name];
+        }
+    }
+
+    // No systemd at all. apachectl tests its own configuration before acting, so
+    // the separate test is belt and braces rather than the only guard. The null
+    // unit means there is nothing to ask systemd about first.
+    //
+    // NOT ON MACOS, and that is not squeamishness about an unlikely host. A
+    // developer machine runs Apache under its own user through brew services;
+    // apachectl there starts a second one as _www, which cannot read the files
+    // the first one serves, and the site breaks in a way that looks nothing like
+    // a deploy. A Mac is never the production host this step exists for.
+    if (PHP_OS_FAMILY !== 'Darwin' && con_run('command -v systemctl')[1] !== 0) {
+        $candidates[] = [null, 'apache2ctl configtest', 'apache2ctl -k graceful'];
+        $candidates[] = [null, 'apachectl configtest', 'apachectl -k graceful'];
+
+        // And FPM again, the way a host without systemd offers it. Reloading
+        // Apache does not empty a cache held in another process, so leaving
+        // these out would mean the fallback path reports success having
+        // restarted the one handler that was not the problem.
+        foreach (glob('/etc/init.d/php*-fpm') ?: [] as $script) {
+            $candidates[] = [null, null, $script . ' reload'];
+        }
+    }
+
+    return $candidates;
+}
+
+
+
 $dryRun     = in_array('--dry-run', $argv, true);
 $skipBackup = in_array('--skip-backup', $argv, true);
 $skipPull   = in_array('--skip-pull', $argv, true);
+$skipReload = in_array('--skip-reload', $argv, true);
 
 $keep = '';
 foreach ($argv as $arg) {
@@ -66,7 +303,7 @@ con_print('header', 'SPI-RDT upgrade' . ($dryRun ? '  (dry run)' : ''));
 
 // ─── 1. Current state ───
 
-con_print('step', '[1/5] Current state');
+con_print('step', '[1/6] Current state');
 
 $codeVersionBefore = is_file($root . '/VERSION')
     ? trim((string) file_get_contents($root . '/VERSION'))
@@ -106,7 +343,7 @@ con_print('info', 'Commit:         ' . trim($commitBefore));
 
 // ─── 2. Backup ───
 
-con_print('step', '[2/5] Database backup');
+con_print('step', '[2/6] Database backup');
 
 if ($skipBackup) {
     con_print('warn', 'Skipped (--skip-backup). Nothing here is reversible without one.');
@@ -139,7 +376,7 @@ if ($skipBackup) {
 
 // ─── 3. Code and dependencies ───
 
-con_print('step', '[3/5] Code and dependencies');
+con_print('step', '[3/6] Code and dependencies');
 
 if ($skipPull) {
     con_print('info', 'Skipped (--skip-pull)');
@@ -161,7 +398,7 @@ if ($skipPull) {
 
 // ─── 4. Migrate ───
 
-con_print('step', '[4/5] Schema');
+con_print('step', '[4/6] Schema');
 
 // Unconditional, unlike refresh. A partially-applied earlier run leaves
 // pending work that this pull's diff knows nothing about.
@@ -187,7 +424,7 @@ if (preg_match('/Failed:\s+([1-9]\d*)/', $migrateOut) === 1) {
 
 // ─── 5. Verify ───
 
-con_print('step', '[5/5] Verify');
+con_print('step', '[5/6] Verify');
 
 [$preflightOut, $preflightCode] = con_run(
     $prefix . 'php bin/preflight --quiet',
@@ -202,6 +439,18 @@ foreach (explode("\n", trim($preflightOut)) as $line) {
 if ($preflightCode !== 0 && !$dryRun) {
     con_fail('Preflight reported failures after upgrade — see above.');
 }
+
+// ─── 6. Make the new code the running code ───
+
+// LAST, AND AFTER THE VERIFY ON PURPOSE. Preflight runs through the CLI, which
+// has its own opcode cache and reads the new files whatever the web server is
+// still holding — so verifying first checks the code about to be activated
+// rather than the code being replaced. Reloading before it would mean a failed
+// preflight aborts this script with production already serving what it just
+// rejected, and no step left to put it back.
+con_print('step', '[6/6] Restart');
+
+apply_new_code($dryRun, $skipReload);
 
 // ─── Summary ───
 

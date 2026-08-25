@@ -147,6 +147,28 @@ apache2ctl configtest >/dev/null 2>&1 || die "Apache configuration is invalid �
 systemctl reload apache2
 say success "Apache reloaded"
 
+# PHP-FPM keeps its OWN opcode cache, in its own workers, and reloading Apache
+# does not touch it. On a host running mod_php there is nothing here to find and
+# this loop does nothing; on one running FPM it is the only thing that makes the
+# code that was just pulled the code that answers the next request, because
+# opcache.validate_timestamps is off on a tuned production box and the workers
+# never look at a file's mtime again.
+#
+# bin/upgrade tries this too, and cannot get there from here: this wrapper runs
+# it through as_owner, and reloading a system service needs root. That is the
+# right split — the PHP script is the application and this is the machine around
+# it — but it does mean the privileged half has to do the privileged part.
+#
+# Units are listed rather than guessed, because the PHP version is in the name
+# and hard-coding one is how this stops working at the next upgrade.
+for unit in $(systemctl list-units --type=service --state=active --no-legend 'php*-fpm.service' 2>/dev/null | awk '{print $1}'); do
+    if systemctl reload "$unit" 2>/dev/null; then
+        say success "${unit} reloaded"
+    else
+        say warn "${unit} did not reload — PHP changes may not have taken effect."
+    fi
+done
+
 # The cron entry names an absolute path, so it survives a move only if this
 # runs. Re-asserting it costs nothing and catches the installation that was
 # copied to a new host.
