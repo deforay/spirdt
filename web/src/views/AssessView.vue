@@ -193,10 +193,15 @@ function queryFor(): Record<string, string> {
         return {}
     }
 
+    // The section is carried on every screen of a visit, not only the one that
+    // shows it. Setup and the review both have a way back INTO a named
+    // section now, and a URL that dropped the name sent a reloaded screen home
+    // to Section 1 — so an assessor who opened Site details from Section 3 and
+    // reloaded lost their place, silently and without leaving the visit.
     return {
         visit: current.id,
         stage: stage.value,
-        ...(stage.value === 'checklist' ? { section: activeSection.value } : {}),
+        section: activeSection.value,
         ...(activePathogen.value === null ? {} : { pathogen: activePathogen.value }),
     }
 }
