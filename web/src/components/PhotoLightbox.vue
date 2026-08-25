@@ -114,7 +114,16 @@ function onKey(event: KeyboardEvent): void {
     const active = document.activeElement
     const inside = panel.value?.contains(active) ?? false
 
-    if (event.shiftKey ? active === first || !inside : active === last || !inside) {
+    // The panel itself counts as the START of the ring, not merely as "inside".
+    // Focus lands on it when the viewer opens — it holds `tabindex="-1"` so
+    // there is something to move focus TO before any control has been reached —
+    // and a Shift+Tab from there is a step backwards out of the dialog. Going
+    // forwards needs no help: the browser's next stop from the panel is already
+    // the first button.
+    const atStart = !inside || active === first || active === panel.value
+    const atEnd = !inside || active === last
+
+    if (event.shiftKey ? atStart : atEnd) {
         event.preventDefault()
         ;(event.shiftKey ? last : first).focus()
     }
