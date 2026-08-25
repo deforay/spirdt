@@ -7,6 +7,8 @@ import type { StoredAttachment, StoredFinding } from '@/db/database'
 import { formatNumber, formatPercent, t, text } from '@/i18n'
 import type { ScoreResult, Template } from '@/scoring/types'
 
+import PhotoLightbox, { type LightboxPhoto } from './PhotoLightbox.vue'
+
 /**
  * Review, record the gaps, submit.
  *
@@ -91,6 +93,16 @@ const questionText = computed(() => {
  * left to accumulate they are the whole visit's images held in memory at once.
  */
 const photos = ref<StoredAttachment[]>([])
+
+/**
+ * Which photograph is open full size, and which group it belongs to.
+ *
+ * The group is carried alongside the index because the object URLs only exist
+ * while a group is open — so the viewer's list is that one group's rows, not
+ * the whole visit's, and an index on its own would not say into what.
+ */
+const viewingGroup = ref<string | null>(null)
+const viewing = ref<number | null>(null)
 const openSections = ref(new Set<string>())
 const previews = ref(new Map<string, string>())
 
@@ -136,6 +148,21 @@ const photoGroups = computed<PhotoGroup[]>(() => {
 
     return groups
 })
+
+const lightbox = computed<LightboxPhoto[]>(() => {
+    const group = photoGroups.value.find((one) => one.code === viewingGroup.value)
+
+    return (group?.rows ?? []).map((row) => ({
+        key: row.key,
+        src: previews.value.get(row.key) ?? '',
+        caption: row.caption,
+    }))
+})
+
+function view(group: PhotoGroup, index: number): void {
+    viewingGroup.value = group.code
+    viewing.value = index
+}
 
 function togglePhotos(group: PhotoGroup): void {
     if (openSections.value.has(group.code)) {
@@ -607,15 +634,22 @@ function summaryOf(gap: Gap): string {
                             class="grid gap-3 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3"
                         >
                             <figure
-                                v-for="row in group.rows"
+                                v-for="(row, index) in group.rows"
                                 :key="row.key"
                                 class="overflow-hidden rounded-card border border-hairline bg-surface-2"
                             >
-                                <img
-                                    :src="previews.get(row.key)"
-                                    :alt="row.caption ?? t('photos.untitled')"
-                                    class="block h-40 w-full bg-white object-cover"
-                                />
+                                <button
+                                    type="button"
+                                    class="block h-40 w-full cursor-zoom-in bg-white"
+                                    :aria-label="t('photos.view')"
+                                    @click="view(group, index)"
+                                >
+                                    <img
+                                        :src="previews.get(row.key)"
+                                        :alt="row.caption ?? t('photos.untitled')"
+                                        class="block h-full w-full object-cover"
+                                    />
+                                </button>
                                 <figcaption class="px-2.5 py-2 text-[14px] leading-snug">
                                     <span v-if="row.caption">{{ row.caption }}</span>
                                     <span v-else class="text-label-3">{{ t('photos.untitled') }}</span>
@@ -626,6 +660,8 @@ function summaryOf(gap: Gap): string {
                 </div>
 
                 <p v-else class="px-1 text-[16px] text-label-2">{{ t('photos.reviewEmpty') }}</p>
+
+                <PhotoLightbox v-model:index="viewing" :photographs="lightbox" />
             </section>
           </div>
 

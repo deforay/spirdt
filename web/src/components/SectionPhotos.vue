@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PhCamera, PhImages, PhTrash } from '@phosphor-icons/vue'
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import {
     deletePhoto,
@@ -12,6 +12,8 @@ import {
 import type { StoredAttachment } from '@/db/database'
 import { t } from '@/i18n'
 import { resizedForUpload } from '@/media/image'
+
+import PhotoLightbox, { type LightboxPhoto } from './PhotoLightbox.vue'
 
 /**
  * Photographs of what the assessor is standing in front of.
@@ -58,6 +60,9 @@ const props = defineProps<{
 const handheld = window.matchMedia('(pointer: coarse)').matches
 
 const rows = ref<StoredAttachment[]>([])
+
+/** Which photograph is open full size. Null is closed. */
+const viewing = ref<number | null>(null)
 const busy = ref(false)
 const error = ref('')
 
@@ -86,6 +91,21 @@ function refreshPreviews(next: StoredAttachment[]): void {
         }
     }
 }
+
+/**
+ * The same rows the grid draws, in the same order, as the viewer wants them.
+ *
+ * Built here rather than in the template so the array is not a new object on
+ * every render — the viewer watches its index against this list, and a list
+ * that changes identity every keystroke in a caption field would reset it.
+ */
+const lightbox = computed<LightboxPhoto[]>(() =>
+    rows.value.map((row) => ({
+        key: row.key,
+        src: previews.value.get(row.key) ?? '',
+        caption: row.caption,
+    })),
+)
 
 async function load(): Promise<void> {
     if (props.assessmentId === '') {
@@ -246,15 +266,25 @@ onBeforeUnmount(() => {
 
         <div v-if="rows.length > 0" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <figure
-                v-for="row in rows"
+                v-for="(row, index) in rows"
                 :key="row.key"
                 class="overflow-hidden rounded-card border border-hairline bg-surface-2"
             >
-                <img
-                    :src="previews.get(row.key)"
-                    :alt="row.caption ?? t('photos.untitled')"
-                    class="block h-40 w-full bg-white object-cover"
-                />
+                <!-- A button, not an image with a click handler. It is a
+                     control now, and it has to be reachable by the keyboard
+                     and announced as one. -->
+                <button
+                    type="button"
+                    class="block h-40 w-full cursor-zoom-in bg-white"
+                    :aria-label="t('photos.view')"
+                    @click="viewing = index"
+                >
+                    <img
+                        :src="previews.get(row.key)"
+                        :alt="row.caption ?? t('photos.untitled')"
+                        class="block h-full w-full object-cover"
+                    />
+                </button>
 
                 <figcaption class="flex items-center gap-2 px-2.5 py-2">
                     <!-- The words go under the picture, where somebody reading
@@ -337,5 +367,7 @@ onBeforeUnmount(() => {
                 />
             </label>
         </div>
+
+        <PhotoLightbox v-model:index="viewing" :photographs="lightbox" />
     </section>
 </template>
