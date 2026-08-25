@@ -18,10 +18,10 @@ import { useAssessment } from '@/composables/useAssessment'
 import { COARSE_ACCURACY_M } from '@/db/location'
 import { getAssessment, listAssessments, loadAnswers } from '@/db/assessments'
 import type { StoredPathogen, StoredResponse } from '@/db/database'
-import { formatPercent, formatTime, locale, t, text } from '@/i18n'
+import { formatPercent, formatTime, locale, type MessageKey, t, text } from '@/i18n'
 import { expectedQuestions } from '@/scoring/engine'
 import { validateContext } from '@/validation/context'
-import type { Context, ResponseCode, Template } from '@/scoring/types'
+import type { Context, ContextField, ResponseCode, Template } from '@/scoring/types'
 import { startSync } from '@/sync/engine'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -397,6 +397,68 @@ async function onSiteChosen(site: Site) {
  * `refers_specimens` is not a blank on a form — it is nine questions that never
  * appeared, and finding that out at the end means going back through the site.
  */
+/**
+ * Part A, as cards rather than as one slab.
+ *
+ * Every other screen of a visit is a rhythm of surfaces with the page showing
+ * between them — one question to a card on the checklist, one panel to a
+ * concern on the review. This screen put thirteen fields inside a single card
+ * a thousand pixels wide, which is why it looked like a form belonging to some
+ * other application rather than the first step of the audit it says it is.
+ *
+ * The grouping is presentation and lives here rather than in the instrument.
+ * The template is the document being applied and says what is asked; how many
+ * white rectangles it is asked across is this application's business, and
+ * putting it in the JSON would mean a new version of the instrument to move a
+ * heading.
+ *
+ * Anything a later instrument adds that is not named here still renders — it
+ * joins the card about the site rather than disappearing, because a field
+ * nobody can see is a field nobody answers.
+ */
+const CONTEXT_GROUPS: Array<{ heading: MessageKey; codes: string[] }> = [
+    {
+        heading: 'setup.visitHeading',
+        codes: ['assessment_date', 'assessment_time', 'previous_assessment_date'],
+    },
+    {
+        heading: 'setup.contextHeading',
+        codes: [
+            'facility_type',
+            'level',
+            'affiliation',
+            'poc_site_count',
+            'refers_specimens',
+            'poc_tests_list',
+        ],
+    },
+    {
+        heading: 'setup.peopleHeading',
+        codes: ['testing_staff', 'interviewee_name', 'interviewee_title', 'interviewee_phone'],
+    },
+]
+
+const contextGroups = computed(() => {
+    const all = template.context_fields ?? []
+    const named = new Set(CONTEXT_GROUPS.flatMap((group) => group.codes))
+
+    const groups = CONTEXT_GROUPS.map((group) => ({
+        heading: group.heading,
+        fields: group.codes
+            .map((code) => all.find((field) => field.code === code))
+            .filter((field): field is ContextField => field !== undefined),
+    }))
+
+    const unnamed = all.filter((field) => !named.has(field.code))
+    const site = groups.find((group) => group.heading === 'setup.contextHeading')
+
+    if (unnamed.length > 0 && site !== undefined) {
+        site.fields = [...site.fields, ...unnamed]
+    }
+
+    return groups.filter((group) => group.fields.length > 0)
+})
+
 const missingContext = computed(() =>
     (template.context_fields ?? []).filter((field) => {
         if (field.required !== true) {
@@ -1031,14 +1093,21 @@ async function onSubmit() {
                 />
             </section>
 
-            <div class="md:mt-0">
-            <section class="mt-5 rounded-surface border border-hairline bg-surface p-5 md:mt-0 md:p-6">
+            <div class="flex flex-col gap-5 md:mt-0">
+            <section
+                v-for="(group, index) in contextGroups"
+                :key="group.heading"
+                :class="[
+                    'rounded-surface border border-hairline bg-surface p-5 md:p-6',
+                    index === 0 ? 'mt-5 md:mt-0' : '',
+                ]"
+            >
                 <h2 class="eyebrow pb-4 text-label-3">
-                    {{ t('setup.contextHeading') }}
+                    {{ t(group.heading) }}
                 </h2>
                 <ContextForm
                     v-model="draftContext"
-                    :fields="template.context_fields ?? []"
+                    :fields="group.fields"
                     :applicability-fields="applicabilityFields"
                     :problems="contextProblems"
                 />
@@ -1050,7 +1119,6 @@ async function onSubmit() {
                  same five, same offline queue as every section. -->
             <SectionPhotos
                 v-if="assessment.assessment.value !== null"
-                class="mt-5"
                 :assessment-id="assessment.assessment.value.id"
                 section-code="site"
             />

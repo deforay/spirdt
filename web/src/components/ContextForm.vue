@@ -48,8 +48,31 @@ watch(
     (next) => Object.assign(draft, next),
 )
 
+/**
+ * Only this form's OWN fields go back up.
+ *
+ * Part A is drawn as several cards, each of them one of these driven off a
+ * slice of the same context object — so every instance holds a copy of the
+ * whole answer and knows the truth about only part of it. Emitting the whole
+ * copy meant the card an assessor was not typing in could overwrite the card
+ * they were, with whatever it last saw there.
+ */
 function commit() {
-    emit('update:modelValue', { ...draft })
+    const mine: Record<string, unknown> = {}
+
+    for (const field of props.fields) {
+        mine[field.code] = draft[field.code]
+
+        // "Other" carries a free-text companion, and it belongs to the same
+        // card as the choice that asked for it.
+        const specify = `${field.code}_other`
+
+        if (specify in draft) {
+            mine[specify] = draft[specify]
+        }
+    }
+
+    emit('update:modelValue', { ...props.modelValue, ...mine })
 }
 
 /** The wording lives here; the validator only names a reason and a limit. */
