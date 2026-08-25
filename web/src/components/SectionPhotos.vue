@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhCamera, PhTrash } from '@phosphor-icons/vue'
+import { PhCamera, PhImages, PhTrash } from '@phosphor-icons/vue'
 import { onBeforeUnmount, ref, watch } from 'vue'
 
 import {
@@ -84,44 +84,83 @@ async function load(): Promise<void> {
     rows.value = found
 }
 
+/**
+ * Whatever was chosen, one at a time.
+ *
+ * The camera hands over a single shot; the library hands over as many as the
+ * assessor selected, which is why this takes a list rather than a file. They
+ * are resized and written in order and the count is checked on every one — a
+ * selection of eight against three free slots has to stop at three and SAY so,
+ * because a picture that silently did not save is worse than one refused.
+ */
 async function onPicked(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement
-    const file = input.files?.[0] ?? null
+    const picked = Array.from(input.files ?? [])
 
     // Cleared straight away, so choosing the same file again — after a failed
     // attempt, or two shots of the same thing — still fires a change event.
     input.value = ''
 
-    if (file === null || props.assessmentId === '') {
-        return
-    }
-
-    if (!file.type.startsWith('image/')) {
-        error.value = t('photos.notAnImage')
-
+    if (picked.length === 0 || props.assessmentId === '') {
         return
     }
 
     error.value = ''
     busy.value = true
 
-    try {
-        const stored = await savePhoto({
-            assessmentId: props.assessmentId,
-            sectionCode: props.sectionCode,
-            caption: '',
-            blob: await resizedForUpload(file),
-        })
+    let added = 0
+    let full = false
+    let notImages = 0
+    let failures = 0
 
-        if (stored === null) {
-            error.value = t('photos.full', { count: PHOTOS_PER_SECTION })
+    for (const file of picked) {
+        if (!file.type.startsWith('image/')) {
+            notImages += 1
+
+            continue
         }
 
+        try {
+            const stored = await savePhoto({
+                assessmentId: props.assessmentId,
+                sectionCode: props.sectionCode,
+                caption: '',
+                blob: await resizedForUpload(file),
+            })
+
+            // Full. Nothing after this one can fit either, so the rest of the
+            // selection is not worth resizing.
+            if (stored === null) {
+                full = true
+
+                break
+            }
+
+            added += 1
+        } catch {
+            failures += 1
+        }
+    }
+
+    try {
         await load()
     } catch {
+        failures += 1
+    }
+
+    busy.value = false
+
+    // One message, and the one that explains the largest gap between what was
+    // chosen and what is now on screen.
+    if (full) {
+        error.value =
+            added === 0
+                ? t('photos.full', { count: PHOTOS_PER_SECTION })
+                : t('photos.someFull', { added, count: PHOTOS_PER_SECTION })
+    } else if (failures > 0) {
         error.value = t('photos.failed')
-    } finally {
-        busy.value = false
+    } else if (notImages > 0) {
+        error.value = t('photos.notAnImage')
     }
 }
 
@@ -212,24 +251,50 @@ onBeforeUnmount(() => {
 
         <p v-else class="pb-3 text-[15px] text-label-3">{{ t('photos.none') }}</p>
 
-        <!-- A label wrapping the input rather than a button beside it: the
-             input is what opens the camera, and it stays reachable by the
-             keyboard instead of being hidden from the tree. -->
-        <label
-            v-if="rows.length < PHOTOS_PER_SECTION"
-            class="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-surface-2 px-4 text-[14.5px] font-medium text-label-2 transition-colors hover:text-label"
-            :class="busy ? 'pointer-events-none opacity-40' : ''"
-        >
-            <PhCamera :size="17" aria-hidden="true" />
-            {{ busy ? t('photos.working') : t('photos.add') }}
-            <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                class="sr-only"
-                :disabled="busy"
-                @change="onPicked"
-            />
-        </label>
+        <!--
+            TWO WAYS IN, because one control cannot do both. `capture` is what
+            sends the first straight to the rear camera in a single tap — which
+            is the thing an assessor does standing in the room — and it also
+            removes the library from the sheet and refuses a multiple
+            selection. So the second control drops `capture` to get both back:
+            pictures taken earlier, and several of them at once.
+
+            Labels wrapping their inputs rather than buttons beside them: the
+            input is what opens the camera, and it stays reachable by the
+            keyboard instead of being hidden from the tree.
+        -->
+        <div v-if="rows.length < PHOTOS_PER_SECTION" class="mt-3 flex flex-wrap gap-2">
+            <label
+                class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-surface-2 px-4 text-[14.5px] font-medium text-label-2 transition-colors hover:text-label"
+                :class="busy ? 'pointer-events-none opacity-40' : ''"
+            >
+                <PhCamera :size="17" aria-hidden="true" />
+                {{ busy ? t('photos.working') : t('photos.add') }}
+                <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    class="sr-only"
+                    :disabled="busy"
+                    @change="onPicked"
+                />
+            </label>
+
+            <label
+                class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-surface-2 px-4 text-[14.5px] font-medium text-label-2 transition-colors hover:text-label"
+                :class="busy ? 'pointer-events-none opacity-40' : ''"
+            >
+                <PhImages :size="17" aria-hidden="true" />
+                {{ t('photos.addFromLibrary') }}
+                <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    class="sr-only"
+                    :disabled="busy"
+                    @change="onPicked"
+                />
+            </label>
+        </div>
     </section>
 </template>
