@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhArrowLeft, PhArrowRight, PhBuildings, PhCheck } from '@phosphor-icons/vue'
+import { PhArrowLeft, PhArrowRight, PhBuildings } from '@phosphor-icons/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import rawTemplate from '@resources/templates/spi-rdt-1.0.0.json'
@@ -12,6 +12,7 @@ import PathogenSetup from '@/components/PathogenSetup.vue'
 import QuestionRow from '@/components/QuestionRow.vue'
 import SectionActions from '@/components/SectionActions.vue'
 import SectionPhotos from '@/components/SectionPhotos.vue'
+import VisitRail from '@/components/VisitRail.vue'
 import ReviewScreen from '@/components/ReviewScreen.vue'
 import SitePicker, { type DraftSummary } from '@/components/SitePicker.vue'
 import { useAssessment } from '@/composables/useAssessment'
@@ -899,6 +900,41 @@ async function onShellBack(): Promise<void> {
     await leaveVisit()
 }
 
+/**
+ * A row of the rail, from either screen it hangs on.
+ *
+ * Site details is a row like any other, so choosing it is not a special case
+ * of navigation — it is the same move as choosing Section 3, made to the step
+ * that comes before Section 1. From the setup screen it also has to carry the
+ * form back with it, which is what editSetup and startChecklist are for.
+ */
+async function railPick(code: string): Promise<void> {
+    if (code === 'site') {
+        if (stage.value !== 'setup') {
+            editSetup()
+        }
+
+        return
+    }
+
+    // Leaving the setup screen by the rail writes it down, exactly as leaving
+    // by the button past the end of it does. The rail is a way on, not a way
+    // round the saving — and the section is chosen AFTER, because starting a
+    // visit for the first time sends it to the first section by design.
+    if (stage.value === 'setup') {
+        if (!setupReady.value) {
+            return
+        }
+
+        await startChecklist()
+        activeSection.value = code
+
+        return
+    }
+
+    activeSection.value = code
+}
+
 function jumpTo(sectionCode: string) {
     activeSection.value = sectionCode
     stage.value = 'checklist'
@@ -997,16 +1033,41 @@ async function onSubmit() {
             being filled in, rather than a scroll away.
         -->
         <main
-            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:grid md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start md:gap-7 md:px-0"
+            class="scroll-thin flex-1 overflow-y-auto px-4 pb-6 md:grid md:grid-cols-[17rem_minmax(0,1fr)] md:items-start md:gap-7 md:px-0"
         >
             <!--
-                The tests are four chips and a box; Part A is twenty fields. An
-                even split gave the short half a column of its own and left two
-                thirds of it empty down the length of the long one, so the panel
-                is now sized to its content and sticks while the form scrolls
-                past it — it is the thing the form's last section depends on.
+                The same rail the checklist wears, at the same width, with this
+                screen lit as the row it is. Two screens of one visit used to
+                put different objects in the same third of the page, which is
+                most of why walking between them felt like leaving one
+                application for another.
+
+                The panel that used to live here — the round, the position, the
+                tests — moved into the column on the right and became cards
+                among the rest of Part A. It is all one form; the only reason
+                it sat apart was that this screen had a column spare and the
+                checklist did not.
             -->
-            <section class="rounded-surface border border-hairline bg-surface p-5 md:sticky md:top-4">
+            <VisitRail
+                :site-name="assessment.assessment.value?.siteName ?? ''"
+                :sections="visibleSections"
+                active-code="site"
+                :sections-open="setupReady"
+                :tallies="sectionProgress"
+                :answered="progress.answered"
+                :total="progress.total"
+                :is-complete="progress.isComplete"
+                :percentage="assessment.result.value.percentage"
+                :round-dp="assessment.result.value.roundDp"
+                :level="assessment.result.value.level"
+                :level-tone="levelTone"
+                :visit-filled="visitFilled"
+                :saved-label="savedLabel"
+                @pick="railPick"
+            />
+
+            <div class="flex flex-col gap-5">
+            <section class="rounded-surface border border-hairline bg-surface p-5 md:p-6">
                 <!--
                     Which round this audit belongs to, asked before what it
                     covers, because it is the thing that files the audit rather
@@ -1093,14 +1154,10 @@ async function onSubmit() {
                 />
             </section>
 
-            <div class="flex flex-col gap-5 md:mt-0">
             <section
-                v-for="(group, index) in contextGroups"
+                v-for="group in contextGroups"
                 :key="group.heading"
-                :class="[
-                    'rounded-surface border border-hairline bg-surface p-5 md:p-6',
-                    index === 0 ? 'mt-5 md:mt-0' : '',
-                ]"
+                class="rounded-surface border border-hairline bg-surface p-5 md:p-6"
             >
                 <h2 class="eyebrow pb-4 text-label-3">
                     {{ t(group.heading) }}
@@ -1398,144 +1455,22 @@ async function onSubmit() {
                 as far from the list of sections as the layout allowed and
                 spent a row of the working area on it.
             -->
-            <div class="hidden min-h-0 md:flex md:flex-col md:pb-6">
-                <div class="mb-3 rounded-surface bg-accent-soft px-3.5 py-3">
-                    <span class="eyebrow text-accent">{{ t('checklist.currentVisit') }}</span>
-                    <p class="mt-1 text-[15px] font-semibold leading-snug">
-                        {{ assessment.assessment.value?.siteName ?? t('checklist.loading') }}
-                    </p>
-                </div>
-
-                <span class="eyebrow px-3 pb-1.5 text-label-3">
-                    {{ t('checklist.sections') }}
-                </span>
-
-            <nav
-                class="scroll-thin min-h-0 flex-1 md:overflow-y-auto"
-                :aria-label="t('checklist.sections')"
-            >
-                <!-- Before the sections, because that is where it comes in the
-                     visit. It was a chip in the top corner, which on a wide
-                     screen is the furthest point from this list — and this list
-                     is where somebody looks for where a visit can be. -->
-                <button
-                    type="button"
-                    class="mb-1 flex w-full items-center gap-2.5 rounded-card px-3 py-2.5 text-left text-[15px] text-label-2 transition-colors hover:bg-surface hover:text-label"
-                    @click="editSetup"
-                >
-                    <PhBuildings :size="16" class="shrink-0" aria-hidden="true" />
-                    <span class="min-w-0 flex-1">{{ t('checklist.editSetup') }}</span>
-                </button>
-
-                <button
-                    v-for="item in visibleSections"
-                    :key="item.code"
-                    type="button"
-                    :aria-current="item.code === activeSection ? 'true' : undefined"
-                    :class="[
-                        'relative flex w-full items-baseline gap-2.5 rounded-card px-3 py-2.5 text-left',
-                        'text-[15px] transition-colors',
-                        item.code === activeSection
-                            ? 'bg-surface font-semibold text-accent shadow-pick'
-                            : 'text-label-2 hover:bg-surface/70 hover:text-label',
-                    ]"
-                    @click="activeSection = item.code"
-                >
-                    <span class="tnum shrink-0 font-bold">{{ item.number }}</span>
-
-                    <span class="min-w-0 flex-1">
-                        {{ text(item.title) }}
-
-                        <!--
-                            How far through this section is, drawn rather than
-                            counted. The count is still there and still exact;
-                            the bar is what makes a rail of five sections
-                            answerable at a glance, which a column of fractions
-                            never was. Hidden from assistive technology because
-                            the fraction beside it says the same thing in words.
-                        -->
-                        <span
-                            aria-hidden="true"
-                            class="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-track"
-                        >
-                            <span
-                                class="block h-full rounded-full bg-accent transition-[width] duration-200"
-                                :style="{ width: sectionFilled(item.code) }"
-                            ></span>
-                        </span>
-                    </span>
-
-                    <!-- A tick when there is nothing left, the count when there
-                         is. Both in the faintest label colour: this is the
-                         answer to a question the assessor asked, not something
-                         demanding to be read. -->
-                    <PhCheck
-                        v-if="sectionProgress.get(item.code)?.done"
-                        :size="14"
-                        class="mt-0.5 shrink-0 self-start text-accent"
-                        :aria-label="t('checklist.sectionDone')"
-                    />
-                    <span v-else class="tnum shrink-0 self-start text-[13px] text-label-3">
-                        {{ sectionProgress.get(item.code)?.answered ?? 0 }}/{{
-                            sectionProgress.get(item.code)?.expected ?? 0
-                        }}
-                    </span>
-                </button>
-            </nav>
-
-                <!--
-                    Where the visit stands, at the foot of the rail. Dark on a
-                    light page because it is the one figure somebody looks up
-                    rather than reads past, and a tile that dark is found
-                    without being hunted for.
-                -->
-                <div class="mt-3 rounded-surface bg-chrome px-4 py-3.5 text-chrome-ink">
-                    <span class="eyebrow text-chrome-ink/55">
-                        {{ progress.isComplete ? t('checklist.runningScore') : t('checklist.progress2') }}
-                    </span>
-
-                    <div class="mt-1.5 flex items-baseline gap-2.5">
-                        <span class="tnum text-[30px] font-extrabold leading-none">
-                            <template v-if="progress.isComplete">
-                                {{
-                                    assessment.result.value.percentage === null
-                                        ? '—'
-                                        : formatPercent(
-                                              assessment.result.value.percentage,
-                                              assessment.result.value.roundDp,
-                                          )
-                                }}
-                            </template>
-                            <template v-else>{{ progress.answered }}/{{ progress.total }}</template>
-                        </span>
-
-                        <span
-                            v-if="progress.isComplete"
-                            :class="['tnum rounded-full px-2 py-0.5 text-[12px] font-semibold', levelTone]"
-                        >
-                            {{
-                                assessment.result.value.level === null
-                                    ? t('score.notScorable')
-                                    : t('score.level', { level: assessment.result.value.level })
-                            }}
-                        </span>
-                    </div>
-
-                    <span
-                        aria-hidden="true"
-                        class="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-white/15"
-                    >
-                        <span
-                            class="block h-full rounded-full bg-brass-fill transition-[width] duration-200"
-                            :style="{ width: visitFilled }"
-                        ></span>
-                    </span>
-
-                    <p class="tnum mt-2.5 truncate text-[12.5px] text-chrome-ink/60">
-                        {{ savedLabel }}
-                    </p>
-                </div>
-            </div>
+            <VisitRail
+                :site-name="assessment.assessment.value?.siteName ?? ''"
+                :sections="visibleSections"
+                :active-code="activeSection"
+                :tallies="sectionProgress"
+                :answered="progress.answered"
+                :total="progress.total"
+                :is-complete="progress.isComplete"
+                :percentage="assessment.result.value.percentage"
+                :round-dp="assessment.result.value.roundDp"
+                :level="assessment.result.value.level"
+                :level-tone="levelTone"
+                :visit-filled="visitFilled"
+                :saved-label="savedLabel"
+                @pick="railPick"
+            />
 
             <div class="flex min-h-0 flex-1 flex-col">
                 <!-- Section 4 is answered once per pathogen, so it gets its own
