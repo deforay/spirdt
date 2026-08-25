@@ -500,7 +500,14 @@ const setupReady = computed(
         draftPathogens.value.length > 0,
 )
 
-async function startChecklist() {
+/**
+ * Leave the setup screen forwards, into a named section or the first one.
+ *
+ * `wanted` is the rail asking for a particular section. It is a request rather
+ * than an instruction: this function writes Part A down, and writing it down
+ * can change which sections the visit has.
+ */
+async function startChecklist(wanted?: string) {
     if (!setupReady.value) {
         return
     }
@@ -511,12 +518,29 @@ async function startChecklist() {
 
     // Returning from a correction keeps the assessor where they were. Only a
     // visit being set up for the first time starts at the beginning.
+    if (wanted !== undefined) {
+        activeSection.value = wanted
+    } else if (!revisitingSetup.value) {
+        activeSection.value = template.sections[0]?.code ?? '1'
+    }
+
     if (!revisitingSetup.value) {
         activePathogen.value = draftPathogens.value[0]?.name ?? null
-        activeSection.value = template.sections[0]?.code ?? '1'
     } else if (!draftPathogens.value.some((entry) => entry.name === activePathogen.value)) {
         // Unless the pathogen they were on has just been removed.
         activePathogen.value = draftPathogens.value[0]?.name ?? null
+    }
+
+    // AND UNLESS THE SECTION HAS. Answering "no" to the question that governs
+    // Section 5 takes it out of the visit, and the three lines above have just
+    // written that answer down — so the rail an assessor clicked, and the
+    // section they were standing in before they came here to correct
+    // something, were both drawn against a visit that no longer exists.
+    // Landing there anyway shows questions the scoring has stopped counting
+    // and files the answers as unexpected.
+    if (!visibleSections.value.some((entry) => entry.code === activeSection.value)) {
+        activeSection.value =
+            visibleSections.value[0]?.code ?? template.sections[0]?.code ?? '1'
     }
 
     revisitingSetup.value = false
@@ -918,16 +942,12 @@ async function railPick(code: string): Promise<void> {
     }
 
     // Leaving the setup screen by the rail writes it down, exactly as leaving
-    // by the button past the end of it does. The rail is a way on, not a way
-    // round the saving — and the section is chosen AFTER, because starting a
-    // visit for the first time sends it to the first section by design.
+    // by the button past the end of it does — the rail is a way on, not a way
+    // round the saving. The section goes in as a request rather than being
+    // assigned here, because writing Part A down can take the section asked
+    // for out of the visit.
     if (stage.value === 'setup') {
-        if (!setupReady.value) {
-            return
-        }
-
-        await startChecklist()
-        activeSection.value = code
+        await startChecklist(code)
 
         return
     }
@@ -1198,7 +1218,7 @@ async function onSubmit() {
                 type="button"
                 class="flex w-full items-center justify-center gap-2 rounded-card bg-accent py-3.5 text-[17px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-40 md:mx-auto md:w-auto md:px-12"
                 :disabled="!setupReady"
-                @click="startChecklist"
+                @click="startChecklist()"
             >
                 {{ t('setup.continueTo', { section: setupNextSection }) }}
                 <PhArrowRight :size="17" weight="bold" class="shrink-0" aria-hidden="true" />
