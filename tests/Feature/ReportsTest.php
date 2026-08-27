@@ -750,12 +750,26 @@ final class ReportsTest extends TestCase
             self::assertStringContainsString('data:image/png;base64,', $actions);
         }
 
-        // Not the record: no questions, no section table, no score, and no
-        // photograph — which is a promise about the WORK as much as the page,
-        // because the bytes are never read off the disk to begin with.
+        // The score, because the first thing anybody acting on an audit asks is
+        // how far off they were — and the FIGURES, not the word above them. A
+        // heading survives the numbers being dropped.
+        $score = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('boss@example.org')),
+        )['score'];
+
+        self::assertStringContainsString('Overall', $actions);
+        self::assertStringContainsString(number_format((float) $score['percentage'], 2) . '%', $actions);
+        self::assertStringContainsString('Level ' . $score['level'], $actions);
+        self::assertStringContainsString(
+            $score['total_score'] . ' of ' . $score['total_possible'] . ' points',
+            $actions,
+        );
+
+        // Not the record: no questions, no section table, and no photograph —
+        // which is a promise about the WORK as much as the page, because the
+        // bytes are never read off the disk to begin with.
         self::assertStringNotContainsString('Is there a designated area', $actions);
         self::assertStringNotContainsString('Not answered', $actions);
-        self::assertStringNotContainsString('Overall', $actions);
         self::assertStringNotContainsString('Percentage', $actions);
         self::assertStringNotContainsString('data:image/jpeg', $actions);
 

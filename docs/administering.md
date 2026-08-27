@@ -124,8 +124,10 @@ them.
 The menu offers three documents. **Full report with photographs** is the
 record. **Full report without photographs** is the same record, light enough
 to email. **Corrective actions only** is two pages rather than seven — who was
-audited, the site's details, and the work it has to do — and it is what to
-hand a laboratory manager who has to act on the visit rather than file it.
+audited, the site's details, the score, and the work it has to do — and it is
+what to hand a laboratory manager who has to act on the visit rather than file
+it. What it leaves out is the question-by-question record and the section
+table.
 
 Five pictures a section at a phone camera's resolution makes a file too large
 to email, so a report meant for a mailbox is better sent without them.

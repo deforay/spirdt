@@ -442,7 +442,13 @@ foreach ([$sitePhotographs, ...array_map(
     <p class="draft"><?= $t('report.draftWarning') ?></p>
 <?php } ?>
 
-<?php if ($scored && $full) { ?>
+<?php if ($scored) { ?>
+    <!-- On BOTH documents. The short one is what a laboratory manager is
+         handed to act on, and the first thing anybody acting on an audit asks
+         is how far off they were — the predecessor's action plan carried the
+         same summation for the same reason. What stays out of it is the
+         section-by-section table below, which is the record's detail rather
+         than the work. -->
     <table class="figures keep">
         <tr>
             <td>
