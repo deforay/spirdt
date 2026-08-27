@@ -250,6 +250,13 @@ export async function fetchReport(id: string, locale: string): Promise<Report> {
 }
 
 /**
+ * Which document. `full` is the record — every question, answered or not.
+ * `actions` is the site's details and the work it has to do, which is the part
+ * anybody has to act on and two pages rather than seven.
+ */
+export type PdfVariant = 'full' | 'actions'
+
+/**
  * The same report as a file, saved where the browser saves things.
  *
  * Fetched rather than linked. Every call carries the token in a header, and a
@@ -265,10 +272,12 @@ export async function downloadAssessmentPdf(
     id: string,
     locale: string,
     photographs: boolean,
+    variant: PdfVariant = 'full',
 ): Promise<void> {
     const query = new URLSearchParams({
         locale,
         photographs: photographs ? '1' : '0',
+        variant,
     })
 
     const file = await apiFile(

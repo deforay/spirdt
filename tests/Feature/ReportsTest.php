@@ -691,6 +691,108 @@ final class ReportsTest extends TestCase
         }
     }
 
+    /**
+     * The short document is the site and the work, and nothing else.
+     *
+     * Asserted on what is ABSENT as much as on what is there. A variant that
+     * quietly rendered the whole record would pass every check that only looks
+     * for the action plan, and the point of it is the seven pages it leaves
+     * out.
+     */
+    public function testTheShortDocumentCarriesTheSiteAndTheActionsOnly(): void
+    {
+        $id = $this->sync();
+
+        $this->addFinding($id, '3.1', 'immediate', 'Expired kits on the bench.');
+        $this->addFinding($id, '3.2', 'follow_up', 'Write the SOP.');
+
+        // Both kinds of attachment, with real bytes: the short document keeps
+        // the signature and must never read a photograph.
+        $this->addSignature($id, 'assessor_1', 'Joseph Banda');
+        $this->writeSignatureBytes($id);
+        $this->addPhotograph($id, '3', 'The bench', '2026-01-01 09:00:00');
+        $this->writePhotographBytes($id);
+
+        $pdfs = new ReportPdfService();
+        $actions = $pdfs->html($id, 'en', true, ReportPdfService::ACTIONS);
+
+        // Who was audited, and Part A.
+        self::assertStringContainsString('Kitwe TB clinic', $actions);
+        self::assertStringContainsString('About the site', $actions);
+        self::assertStringContainsString('Corrective action plan', $actions);
+
+        // The work itself, which is the whole reason this document exists —
+        // and both urgencies, because they are drawn as separate tables.
+        self::assertStringContainsString('Expired kits on the bench.', $actions);
+        self::assertStringContainsString('Write the SOP.', $actions);
+        self::assertStringContainsString('Immediate', $actions);
+        self::assertStringContainsString('Follow-up', $actions);
+
+        // The signature stays. It is what makes the plan agreed rather than
+        // asserted, and it is the one image this document carries.
+        self::assertStringContainsString('Joseph Banda', $actions);
+
+        if (extension_loaded('gd')) {
+            self::assertStringContainsString('data:image/png;base64,', $actions);
+        }
+
+        // Not the record: no questions, no section table, no score, and no
+        // photograph — which is a promise about the WORK as much as the page,
+        // because the bytes are never read off the disk to begin with.
+        self::assertStringNotContainsString('Is there a designated area', $actions);
+        self::assertStringNotContainsString('Not answered', $actions);
+        self::assertStringNotContainsString('Overall', $actions);
+        self::assertStringNotContainsString('Percentage', $actions);
+        self::assertStringNotContainsString('data:image/jpeg', $actions);
+
+        // And the full one still is the record, so the flag is what differs.
+        $full = $pdfs->html($id);
+
+        self::assertStringContainsString('Is there a designated area', $full);
+        self::assertStringContainsString('Overall', $full);
+        self::assertStringContainsString('data:image/jpeg', $full);
+    }
+
+    /**
+     * Work already done does not read as work still to do.
+     *
+     * Nothing closes a finding from the console yet — the column has held four
+     * states since the schema was written and only the default is ever set —
+     * but a plan that lists a finished item as outstanding is the one way this
+     * document could mislead the person acting on it.
+     */
+    public function testAFindingThatIsNoLongerOpenSaysSo(): void
+    {
+        $id = $this->sync();
+
+        $this->addFinding($id, '3.1', 'immediate', 'Expired kits on the bench.', 'closed');
+        $this->addFinding($id, '3.2', 'follow_up', 'Write the SOP.');
+
+        $actions = (new ReportPdfService())->html($id, 'en', true, ReportPdfService::ACTIONS);
+
+        self::assertStringContainsString('Expired kits on the bench.', $actions);
+        self::assertStringContainsString('Closed', $actions);
+
+        // And the one still open carries no state, because 'open' is what a
+        // finding on a plan already means.
+        self::assertSame(1, substr_count($actions, 'Closed'));
+    }
+
+    /** Two documents about one visit, so they cannot share a filename. */
+    public function testTheShortDocumentIsNamedApart(): void
+    {
+        $id = $this->sync();
+        $token = $this->signIn('boss@example.org');
+
+        $full = $this->get('/api/admin/reports/assessments/' . $id . '/pdf', $token)
+            ->getHeaderLine('Content-Disposition');
+        $actions = $this->get('/api/admin/reports/assessments/' . $id . '/pdf?variant=actions', $token)
+            ->getHeaderLine('Content-Disposition');
+
+        self::assertStringEndsWith('-actions.pdf"', $actions);
+        self::assertNotSame($full, $actions);
+    }
+
     /** Named after the site, so a folder of these can be searched. */
     public function testTheDownloadIsNamedAfterTheSiteAndTheVisit(): void
     {
@@ -805,9 +907,14 @@ final class ReportsTest extends TestCase
         ];
     }
 
-    private function addFinding(string $assessmentId, string $questionCode, ?string $urgency, string $gap): void
-    {
-        TenantContext::withoutScope(function () use ($assessmentId, $questionCode, $urgency, $gap): void {
+    private function addFinding(
+        string $assessmentId,
+        string $questionCode,
+        ?string $urgency,
+        string $gap,
+        string $status = 'open',
+    ): void {
+        TenantContext::withoutScope(function () use ($assessmentId, $questionCode, $urgency, $gap, $status): void {
             Capsule::table('findings')->insert([
                 'id'                   => BinaryUuid::toBytes(BinaryUuid::v7()),
                 'organization_id'      => $this->orgId,
@@ -817,7 +924,7 @@ final class ReportsTest extends TestCase
                 'gap'                  => $gap,
                 'responsibility_level' => 'site',
                 'urgency'              => $urgency,
-                'status'               => 'open',
+                'status'               => $status,
             ]);
         });
     }

@@ -121,10 +121,15 @@ from the report itself. It carries everything the screen shows and Part A
 besides — the facility's type, level and staffing, as the assessor recorded
 them.
 
-Choose **With photographs** or **Without photographs** when you download. Five
-pictures a section at a phone camera's resolution makes a file too large to
-email, so a report meant for a mailbox is better sent without them. Signatures
-are in both.
+The menu offers three documents. **Full report with photographs** is the
+record. **Full report without photographs** is the same record, light enough
+to email. **Corrective actions only** is two pages rather than seven — who was
+audited, the site's details, and the work it has to do — and it is what to
+hand a laboratory manager who has to act on the visit rather than file it.
+
+Five pictures a section at a phone camera's resolution makes a file too large
+to email, so a report meant for a mailbox is better sent without them.
+Signatures are in all three.
 
 Anything the file leaves out, it says: a picture dropped to keep the download a
 size that can be sent, or a mark this server has no image library to draw. Both

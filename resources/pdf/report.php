@@ -15,11 +15,18 @@
  * document: how the site did, which sections dragged it down, what has to be
  * fixed, and then the detail behind all three.
  *
+ * TWO DOCUMENTS OUT OF ONE VIEW. `$variant` decides how much: the full record,
+ * or the short one — who was audited and what they have to do about it. The
+ * short one is not a different report, it is the same one with the parts
+ * nobody has to ACT on left out, which is why it is a flag here rather than a
+ * second file to keep in step.
+ *
  * @var array<string,mixed>              $report
  * @var array<string,string>             $strings
  * @var string                           $organisation
  * @var string                           $timezone
  * @var int                              $undrawable
+ * @var string                           $variant
  * @var bool                             $photographs
  * @var array<string,array{0:string,1:string}> $responseTones
  * @var array<int,array{0:string,1:string}>    $levelTones
@@ -190,6 +197,21 @@ $instances = static function (array $question, array $section) use ($assessment)
     return $rows;
 };
 
+/**
+ * A finding that has moved on from open says so.
+ *
+ * Nothing closes one from the console yet, and the column has held four states
+ * since the schema was written. A plan listing finished work as outstanding is
+ * the one way this document could mislead the person it is written for, so the
+ * state is drawn wherever it is not simply 'open' rather than waiting for the
+ * screen that will set it.
+ */
+$findingStates = [
+    'in_progress' => 'finding.in_progress',
+    'closed'      => 'finding.closed',
+    'escalated'   => 'finding.escalated',
+];
+
 /** The signature slots, named the way the screen that collects them names them. */
 $signatureRoles = [
     'assessor_1'          => 'signature.assessor',
@@ -204,6 +226,9 @@ $statusLabels = [
     'reviewed'  => 'reports.statusReviewed',
     'finalised' => 'reports.statusFinalised',
 ];
+
+/** The short document: the site, and the work. Everything else is the record. */
+$full = $variant !== 'actions';
 
 $level = $scored ? ($score['level'] ?? null) : null;
 $levelTone = $levelTones[$level] ?? ['#EFEFF1', '#46536A'];
@@ -417,7 +442,7 @@ foreach ([$sitePhotographs, ...array_map(
     <p class="draft"><?= $t('report.draftWarning') ?></p>
 <?php } ?>
 
-<?php if ($scored) { ?>
+<?php if ($scored && $full) { ?>
     <table class="figures keep">
         <tr>
             <td>
@@ -503,15 +528,17 @@ foreach ([$sitePhotographs, ...array_map(
         <th><?= $t('report.scoredAt') ?></th>
         <td><?= $e($moment($scored ? ($score['scored_at'] ?? null) : null)) ?></td>
     </tr>
-    <tr>
-        <th><?= $t('report.photographs') ?></th>
-        <td colspan="3">
-            <?= $e((string) $photographCount) ?><?= $photographs ? '' : ' · ' . $t('report.photographsOmitted') ?>
-        </td>
-    </tr>
+    <?php if ($full) { ?>
+        <tr>
+            <th><?= $t('report.photographs') ?></th>
+            <td colspan="3">
+                <?= $e((string) $photographCount) ?><?= $photographs ? '' : ' · ' . $t('report.photographsOmitted') ?>
+            </td>
+        </tr>
+    <?php } ?>
 </table>
 
-<?php if ($scored && is_array($score['sections'] ?? null) && $score['sections'] !== []) { ?>
+<?php if ($full && $scored && is_array($score['sections'] ?? null) && $score['sections'] !== []) { ?>
     <h2><?= $t('report.sections') ?></h2>
 
     <table class="panel">
@@ -586,6 +613,11 @@ foreach ([$sitePhotographs, ...array_map(
     </table>
 <?php } ?>
 
+<?php if ($findings === [] && !$full) { ?>
+    <h2><?= $t('report.actionPlan') ?></h2>
+    <p class="muted"><?= $t('report.noFindings') ?></p>
+<?php } ?>
+
 <?php if ($findings !== []) { ?>
     <h2><?= $t('report.actionPlan') ?></h2>
 
@@ -604,7 +636,13 @@ foreach ([$sitePhotographs, ...array_map(
                 <tbody>
                     <?php foreach ($group as $finding) { ?>
                         <tr class="finding">
-                            <td><?= $e($finding['question_code'] ?? '') ?></td>
+                            <td>
+                                <?= $e($finding['question_code'] ?? '') ?>
+                                <?php $state = (string) ($finding['status'] ?? 'open'); ?>
+                                <?php if (isset($findingStates[$state])) { ?>
+                                    <div class="small muted"><?= $t($findingStates[$state]) ?></div>
+                                <?php } ?>
+                            </td>
                             <td>
                                 <div><?= $e($finding['gap'] ?? '') ?></div>
                                 <?php if (($finding['recommendation'] ?? null) !== null && $finding['recommendation'] !== '') { ?>
@@ -625,7 +663,7 @@ foreach ([$sitePhotographs, ...array_map(
     <?php } ?>
 <?php } ?>
 
-<?php foreach ($sections as $section) { ?>
+<?php foreach ($full ? $sections : [] as $section) { ?>
     <div class="section">
         <h2>
             <?= $e((string) ($section['number'] ?? '')) ?>. <?= $e($section['title'] ?? '') ?>
@@ -701,7 +739,7 @@ foreach ([$sitePhotographs, ...array_map(
     </div>
 <?php } ?>
 
-<?php if ($sitePhotographs !== [] && $photographs) { ?>
+<?php if ($full && $sitePhotographs !== [] && $photographs) { ?>
     <h2><?= $t('report.sitePhotographs') ?></h2>
     <table>
         <tr>
@@ -760,7 +798,7 @@ foreach ([$sitePhotographs, ...array_map(
     </table>
 <?php } ?>
 
-<?php if ($scored && is_array($score['anomalies'] ?? null)) { ?>
+<?php if ($full && $scored && is_array($score['anomalies'] ?? null)) { ?>
     <?php
     $anomalies = array_merge(
         is_array($score['anomalies']['unexpected'] ?? null) ? $score['anomalies']['unexpected'] : [],

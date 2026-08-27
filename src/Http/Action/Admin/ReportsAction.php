@@ -83,6 +83,9 @@ final class ReportsAction
      * complete record is the safer default for something that leaves the
      * system.
      *
+     * The variant is the same distinction the download menu offers: the whole
+     * record, or the site's details and the work it has to do.
+     *
      * Rendered on the way out rather than stored. A report is a view of rows
      * that can still change — a finding closed, a signature added — and a file
      * cached at submission would be the wrong document the moment either
@@ -102,6 +105,10 @@ final class ReportsAction
                 (string) ($args['id'] ?? ''),
                 $this->optionalString($query, 'locale') ?? 'en',
                 ($query['photographs'] ?? '1') !== '0',
+                // Anything but the short one is the whole record, so a
+                // mistyped variant errs towards giving somebody more of the
+                // document rather than less.
+                $this->optionalString($query, 'variant') ?? ReportPdfService::FULL,
             );
         } catch (InvalidArgumentException $e) {
             return $this->json($response, 404, ['error' => ['message' => $e->getMessage()]]);

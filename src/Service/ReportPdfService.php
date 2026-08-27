@@ -53,6 +53,10 @@ final class ReportPdfService
      */
     private const STRINGS = [
         'en' => [
+            'finding.in_progress' => 'In progress',
+            'finding.closed' => 'Closed',
+            'finding.escalated' => 'Escalated',
+            'report.noFindings' => 'No corrective actions were recorded during this audit.',
             'report.imagesUndrawable' => 'This server cannot draw {count} of the images recorded during this audit. They are in the system and can be seen on the report screen.',
             'report.photographsTooLarge' => '{count} photographs are not shown here. The file would have been too large to send.',
             'signature.assessor' => 'Assessor',
@@ -102,6 +106,10 @@ final class ReportPdfService
             'report.page' => 'Page {page} of {pages}',
         ],
         'fr' => [
+            'finding.in_progress' => 'En cours',
+            'finding.closed' => 'Clôturée',
+            'finding.escalated' => 'Transmise',
+            'report.noFindings' => "Aucune action corrective n'a été enregistrée lors de cet audit.",
             'report.imagesUndrawable' => "Ce serveur ne peut pas afficher {count} des images enregistrées pendant cet audit. Elles sont conservées et visibles sur l'écran du rapport.",
             'report.photographsTooLarge' => '{count} photographies ne sont pas affichées ici. Le fichier aurait été trop volumineux pour être envoyé.',
             'signature.assessor' => 'Évaluateur',
@@ -151,6 +159,10 @@ final class ReportPdfService
             'report.page' => 'Page {page} sur {pages}',
         ],
         'pt' => [
+            'finding.in_progress' => 'Em curso',
+            'finding.closed' => 'Encerrada',
+            'finding.escalated' => 'Escalada',
+            'report.noFindings' => 'Não foram registadas ações corretivas durante esta auditoria.',
             'report.imagesUndrawable' => 'Este servidor não consegue desenhar {count} das imagens registadas durante esta auditoria. Estão guardadas e podem ser vistas no ecrã do relatório.',
             'report.photographsTooLarge' => '{count} fotografias não são mostradas aqui. O ficheiro teria sido demasiado grande para enviar.',
             'signature.assessor' => 'Avaliador',
@@ -200,6 +212,10 @@ final class ReportPdfService
             'report.page' => 'Página {page} de {pages}',
         ],
         'es' => [
+            'finding.in_progress' => 'En curso',
+            'finding.closed' => 'Cerrada',
+            'finding.escalated' => 'Escalada',
+            'report.noFindings' => 'No se registraron acciones correctivas durante esta auditoría.',
             'report.imagesUndrawable' => 'Este servidor no puede dibujar {count} de las imágenes registradas durante esta auditoría. Están guardadas y pueden verse en la pantalla del informe.',
             'report.photographsTooLarge' => '{count} fotografías no se muestran aquí. El archivo habría sido demasiado grande para enviarlo.',
             'signature.assessor' => 'Evaluador',
@@ -267,6 +283,21 @@ final class ReportPdfService
      */
     private const PHOTOGRAPH_BUDGET_BYTES = 20 * 1024 * 1024;
 
+    /** The whole visit, question by question. */
+    public const FULL = 'full';
+
+    /**
+     * The site's details and what it has to do about them, and nothing else.
+     *
+     * The full report is a record: fifty-nine questions, whether or not each
+     * was answered, because that is what makes it evidence. It is also six
+     * pages, and the person who has to ACT on it needs two — who was audited
+     * and what was found. Handing a laboratory manager the record and asking
+     * them to find the work in it is how a corrective action plan becomes a
+     * document nobody opens.
+     */
+    public const ACTIONS = 'actions';
+
     /** Response code to the two colours it wears — the tint and the ink. */
     private const RESPONSE_TONES = [
         'Y'  => ['#E8F6ED', '#15803D'],
@@ -308,9 +339,14 @@ final class ReportPdfService
      *                                  id gets, on purpose
      * @return array{bytes:string,filename:string}
      */
-    public function render(string $assessmentId, string $locale = 'en', bool $withPhotographs = true): array
-    {
+    public function render(
+        string $assessmentId,
+        string $locale = 'en',
+        bool $withPhotographs = true,
+        string $variant = self::FULL,
+    ): array {
         $locale = isset(self::STRINGS[$locale]) ? $locale : 'en';
+        $variant = $variant === self::ACTIONS ? self::ACTIONS : self::FULL;
 
         // Assembled once. It is a dozen reads across answers, findings and
         // attachments, and the file needs both the document and the name off
@@ -318,8 +354,11 @@ final class ReportPdfService
         $report = $this->reports->report($assessmentId, $locale);
 
         return [
-            'bytes'    => $this->pdf($this->document($report, $locale, $withPhotographs), $locale),
-            'filename' => $this->filename($report),
+            'bytes'    => $this->pdf(
+                $this->document($report, $locale, $withPhotographs, $variant),
+                $locale,
+            ),
+            'filename' => $this->filename($report, $variant),
         ];
     }
 
@@ -332,11 +371,20 @@ final class ReportPdfService
      * asserting on the PDF alone can only measure it, and a document that lost
      * all fifty-nine questions is still comfortably several kilobytes of font.
      */
-    public function html(string $assessmentId, string $locale = 'en', bool $withPhotographs = true): string
-    {
+    public function html(
+        string $assessmentId,
+        string $locale = 'en',
+        bool $withPhotographs = true,
+        string $variant = self::FULL,
+    ): string {
         $locale = isset(self::STRINGS[$locale]) ? $locale : 'en';
 
-        return $this->document($this->reports->report($assessmentId, $locale), $locale, $withPhotographs);
+        return $this->document(
+            $this->reports->report($assessmentId, $locale),
+            $locale,
+            $withPhotographs,
+            $variant,
+        );
     }
 
     /**
@@ -344,8 +392,20 @@ final class ReportPdfService
      *
      * @param array<string,mixed> $report
      */
-    private function document(array $report, string $locale, bool $withPhotographs): string
-    {
+    private function document(
+        array $report,
+        string $locale,
+        bool $withPhotographs,
+        string $variant = self::FULL,
+    ): string {
+        $variant = $variant === self::ACTIONS ? self::ACTIONS : self::FULL;
+
+        // Decided HERE and nowhere else. The short document draws no evidence,
+        // so it must not pay to read any — and a condition spelled once at the
+        // point the document is built cannot fall out of step with itself the
+        // way the same condition spelled at each entrance can.
+        $withPhotographs = $withPhotographs && $variant === self::FULL;
+
         $organisation = $this->organisation();
 
         $this->undrawable = 0;
@@ -354,6 +414,7 @@ final class ReportPdfService
         return $this->view([
             'report'       => $withImages,
             'undrawable'   => $this->undrawable,
+            'variant'      => $variant,
             'organisation' => $organisation['name'],
             // Every stamp in the database is UTC. The organisation is where
             // the audit happened, and "started 08:00" is a claim about that
@@ -437,7 +498,7 @@ final class ReportPdfService
      * filesystem it lands on.
      */
     /** @param array<string,mixed> $report */
-    private function filename(array $report): string
+    private function filename(array $report, string $variant = self::FULL): string
     {
         $assessment = is_array($report['assessment'] ?? null) ? $report['assessment'] : [];
         $site = is_array($assessment['site'] ?? null) ? $assessment['site'] : [];
@@ -448,7 +509,15 @@ final class ReportPdfService
 
         $date = (string) ($assessment['assessed_on'] ?? '');
 
-        $parts = array_filter(['SPI-RDT', $name === '' ? 'report' : $name, $date]);
+        // Named apart. The two documents are about the same visit on the same
+        // day, and a folder holding both under one name is a folder where
+        // somebody opens the wrong one.
+        $parts = array_filter([
+            'SPI-RDT',
+            $name === '' ? 'report' : $name,
+            $date,
+            $variant === self::ACTIONS ? 'actions' : '',
+        ]);
 
         return implode('-', $parts) . '.pdf';
     }

@@ -3,7 +3,7 @@ import { PhCaretDown, PhFilePdf } from '@phosphor-icons/vue'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
 import { ref } from 'vue'
 
-import { downloadAssessmentPdf } from '@/api/reports'
+import { downloadAssessmentPdf, type PdfVariant } from '@/api/reports'
 import { locale, t } from '@/i18n'
 
 /**
@@ -13,10 +13,11 @@ import { locale, t } from '@/i18n'
  * the top of the report itself, and those are the same action — a person who
  * learns it in one screen must not have to learn it again in the other.
  *
- * The choice is photographs. Five per section at a phone camera's resolution
- * is a document too big to email, and the two readers are genuinely different
- * people: the one filing the evidence wants every picture, and the one sending
- * figures to a ministry wants a file that arrives.
+ * THREE DOCUMENTS, because there are three readers. The record with its
+ * evidence, for the file. The record without, for a mailbox — five pictures a
+ * section at a phone camera's resolution is a file that bounces. And the short
+ * one, for the laboratory manager who has to act: who was audited and what
+ * they have to do about it, without seven pages of questions to find it in.
  *
  * The work happens here rather than in a link because every call to the API
  * carries a token in a header. An anchor pointed at the endpoint carries
@@ -35,12 +36,12 @@ const props = withDefaults(
 const working = ref(false)
 const error = ref('')
 
-async function download(photographs: boolean): Promise<void> {
+async function download(photographs: boolean, variant: PdfVariant = 'full'): Promise<void> {
     working.value = true
     error.value = ''
 
     try {
-        await downloadAssessmentPdf(props.assessmentId, locale.value, photographs)
+        await downloadAssessmentPdf(props.assessmentId, locale.value, photographs, variant)
     } catch {
         // The message is ours rather than the server's: what comes back from a
         // failed file request is a status code, and "the report could not be
@@ -73,7 +74,7 @@ async function download(photographs: boolean): Promise<void> {
                 <DropdownMenuContent
                     :side-offset="6"
                     align="end"
-                    class="z-50 min-w-[220px] rounded-card border border-hairline bg-surface p-1.5 shadow-surface"
+                    class="z-50 min-w-[260px] rounded-card border border-hairline bg-surface p-1.5 shadow-surface"
                 >
                     <DropdownMenuItem
                         class="flex min-h-11 cursor-pointer select-none items-center rounded-card px-3 text-[15px] outline-none transition-colors data-[highlighted]:bg-accent-soft data-[highlighted]:text-accent"
@@ -87,6 +88,17 @@ async function download(photographs: boolean): Promise<void> {
                         @select="download(false)"
                     >
                         {{ t('report.pdfWithoutPhotographs') }}
+                    </DropdownMenuItem>
+
+                    <!-- Apart from the two above it, because it is a different
+                         document rather than a lighter copy of the same one. -->
+                    <div class="my-1.5 border-t border-hairline"></div>
+
+                    <DropdownMenuItem
+                        class="flex min-h-11 cursor-pointer select-none items-center rounded-card px-3 text-[15px] outline-none transition-colors data-[highlighted]:bg-accent-soft data-[highlighted]:text-accent"
+                        @select="download(false, 'actions')"
+                    >
+                        {{ t('report.pdfActions') }}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenuPortal>
