@@ -71,6 +71,30 @@ final class AuditAction
     public const ASSESSMENT_SUBMITTED = 'assessment.submitted';
 
     /**
+     * A report was emailed out of the system.
+     *
+     * The one action here that leaves the installation. Who sent it, which
+     * visit, which of the documents, and the address it went to — because a
+     * laboratory's score arriving in the wrong mailbox is a question somebody
+     * asks months later, and "who sent this" is the whole of the answer.
+     *
+     * The address is metadata rather than a secret. It is a business contact,
+     * it is already in the registry, and a trail that records a send without
+     * recording where it went records nothing worth having.
+     */
+    public const REPORT_SENT = 'report.sent';
+
+    /**
+     * A report was not emailed, having been asked for.
+     *
+     * Kept for the same reason the successful one is. An administrator asking
+     * why the laboratory never received their report needs to see the attempt
+     * and the reason the mail server gave, and an audit trail holding only the
+     * sends that worked cannot answer it.
+     */
+    public const REPORT_SEND_FAILED = 'report.send_failed';
+
+    /**
      * Two facility records were folded into one.
      *
      * The only registry action here. Adding and correcting a record is

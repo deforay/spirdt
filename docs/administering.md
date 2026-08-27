@@ -67,7 +67,7 @@ account.
 |---|---|
 | Administrator | Day-to-day administration of the organisation |
 | Assessor | Conducting audits |
-| Viewer | Reading dashboards and reports |
+| Viewer | Reading dashboards and reports, but not emailing them out |
 | Site staff | Viewing and closing the findings raised against their own facility |
 
 The new account's password is shown **once**, on the screen that creates it.
@@ -135,6 +135,31 @@ Anything the file leaves out, it says: a picture dropped to keep the download a
 size that can be sent, or a mark this server has no image library to draw. Both
 are still in the system and still on the report screen.
 
+## Send an audit to the site
+
+The laboratory that was audited has no account here, so **Send to the site**
+emails the report to them with the document attached. It asks for an address:
+if the registry holds a contact for that facility it is filled in already, and
+if it does not, whatever you enter is kept on the facility so the next send
+does not ask again — provided your role may edit the registry, because a
+facility record is shared with every organisation working that programme.
+Correcting the address in the dialog never changes a contact the registry
+already holds: that is edited on the facility's own screen.
+
+Choose which of the three documents goes. **Corrective actions only** is
+usually the one a laboratory manager wants.
+
+Every send is recorded permanently: who sent it, when, to what address, and
+which document — including whether the photographs went with it. So is every attempt that failed, with the reason the mail
+server gave, because "the site says they never got it" is a question the trail
+has to be able to answer. The record is under the dialog, and in the audit
+trail beside every other action. It is shown only to accounts that may send:
+who mailed a laboratory's score where belongs to whoever may send it again.
+
+Sending needs its own permission — an account that may read reports cannot
+necessarily send them — and this installation needs SMTP settings before
+anything can go. Both are below.
+
 A draft is a visit somebody is part-way through. It is marked as one and its
 figures are not final.
 
@@ -174,7 +199,10 @@ Dates are bucketed in the organisation's timezone, which is set under Settings.
 |---|---|
 | This installation | The whole installation. Its name replaces SPI-RDT in the header, and its contact is offered to anybody who signs in with no access yet |
 | Localisation | One organisation. Timezone, starting language and country code |
-| Email delivery | The whole installation. Kept for the messages the platform does not send yet |
+| Email delivery | The whole installation. What **Send to the site** sends through |
+
+Until the host and the sending address are filled in, sending a report answers
+that no mail server is configured and records the attempt like any other.
 
 The mail password is write-only. The server never sends it back, so the box is
 always empty and leaving it empty keeps the stored password. Use **Remove the

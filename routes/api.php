@@ -220,6 +220,18 @@ return static function (App $app): void {
         ->add(new RequirePermissionMiddleware(Permission::REPORTS_READ))
         ->add(new AuthMiddleware());
 
+    // Sending one out of the system, which is MORE than reading one rather
+    // than instead of it. Both permissions: a role holding only the send would
+    // otherwise be a way to read any report by mailing it to yourself, and a
+    // viewer holding only the read may see a laboratory's score without being
+    // able to post it to an address they typed. A message that has left cannot
+    // be called back.
+    $app->group('/admin', function (RouteCollectorProxy $group): void {
+        $group->post('/reports/assessments/{id}/send', [ReportsAction::class, 'send']);
+    })
+        ->add(new RequirePermissionMiddleware(Permission::REPORTS_READ, Permission::REPORTS_SEND))
+        ->add(new AuthMiddleware());
+
     // Reference data the device caches to work offline.
     $app->group('', function (RouteCollectorProxy $group): void {
         $group->get('/sites', SitesAction::class);

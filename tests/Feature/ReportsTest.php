@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Bootstrap;
+use App\Mail\MailFailed;
+use App\Service\ReportDispatchService;
 use App\Service\ReportPdfService;
+use App\Service\ReportService;
 use App\Support\BinaryUuid;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -13,6 +16,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Tests\Support\MakesTenants;
+use Tests\Support\RecordingMailer;
 
 /**
  * Reading a visit back.
@@ -131,6 +135,16 @@ final class ReportsTest extends TestCase
         }
 
         $this->writtenFiles = [];
+
+        // system_config is not in the setUp truncation — it is installation
+        // configuration rather than tenant data — so a test that writes mail
+        // settings has to take them out again, or every test after it in the
+        // process runs against a mail server that was never configured for it.
+        TenantContext::withoutScope(static function (): void {
+            Capsule::table('system_config')
+                ->whereIn('key', ['smtp.host', 'smtp.from_address'])
+                ->delete();
+        });
 
         TenantContext::forget();
     }
@@ -849,6 +863,380 @@ final class ReportsTest extends TestCase
         );
     }
 
+    // ─── sending it to the site ───
+
+    /**
+     * The address is asked for once and kept.
+     *
+     * A contact typed into a dialog and nowhere else is a contact lost the
+     * moment the tab closes, and the second send should not have to ask again.
+     */
+    public function testSendingToATypedAddressRemembersItOnTheFacility(): void
+    {
+        $id = $this->sync();
+        $mailer = new RecordingMailer();
+
+        $sent = $this->dispatcher($mailer)
+            ->send($id, 'en', ReportPdfService::FULL, false, 'lab@kch.example', true);
+
+        self::assertSame('lab@kch.example', $sent['to']);
+        self::assertTrue($sent['remembered']);
+
+        $message = $mailer->last();
+
+        self::assertNotNull($message);
+        self::assertSame('lab@kch.example', $message->to);
+        self::assertStringContainsString('Kitwe TB clinic', $message->subject);
+        self::assertStringStartsWith('%PDF-', (string) $message->attachment);
+        self::assertStringEndsWith('.pdf', $message->filename);
+
+        self::assertSame('lab@kch.example', $this->facilityEmail());
+    }
+
+    /** Once it is on the facility, nobody has to type it again. */
+    public function testTheRecordedAddressIsUsedWhenNoneIsGiven(): void
+    {
+        $id = $this->sync();
+        $this->setFacilityEmail('manager@kch.example');
+
+        $mailer = new RecordingMailer();
+        $sent = $this->dispatcher($mailer)->send($id);
+
+        self::assertSame('manager@kch.example', $sent['to']);
+        self::assertFalse($sent['remembered']);
+    }
+
+    /**
+     * A typo in a dialog does not rewrite the registry.
+     *
+     * Sending one report elsewhere is a thing somebody does deliberately. The
+     * facility's contact is a national record, and it is edited on the screen
+     * that edits the registry.
+     */
+    public function testAGivenAddressDoesNotOverwriteTheRecordedOne(): void
+    {
+        $id = $this->sync();
+        $this->setFacilityEmail('manager@kch.example');
+
+        $sent = $this->dispatcher(new RecordingMailer())
+            ->send($id, 'en', ReportPdfService::FULL, false, 'someone@else.example', true);
+
+        self::assertSame('someone@else.example', $sent['to']);
+        self::assertFalse($sent['remembered']);
+        self::assertSame('manager@kch.example', $this->facilityEmail());
+    }
+
+    /** With nowhere to send it, this refuses rather than guessing. */
+    public function testSendingWithNoAddressAnywhereIsRefused(): void
+    {
+        $id = $this->sync();
+
+        self::assertSame(
+            422,
+            $this->post('/api/admin/reports/assessments/' . $id . '/send', [], $this->signIn('boss@example.org'))
+                ->getStatusCode(),
+        );
+    }
+
+    public function testSendingToSomethingThatIsNotAnAddressIsRefused(): void
+    {
+        $id = $this->sync();
+
+        self::assertSame(
+            422,
+            $this->post(
+                '/api/admin/reports/assessments/' . $id . '/send',
+                ['email' => 'not-an-address'],
+                $this->signIn('boss@example.org'),
+            )->getStatusCode(),
+        );
+    }
+
+    /** Which document went is part of what was sent. */
+    public function testTheShortDocumentCanBeTheOneSent(): void
+    {
+        $id = $this->sync();
+        $mailer = new RecordingMailer();
+
+        $this->dispatcher($mailer)
+            ->send($id, 'en', ReportPdfService::ACTIONS, false, 'lab@kch.example');
+
+        self::assertStringEndsWith('-actions.pdf', (string) $mailer->last()?->filename);
+    }
+
+    /**
+     * The send is written down, and so is the attempt that failed.
+     *
+     * An administrator asked why a laboratory never received their report needs
+     * to see that somebody tried and what the mail server said. A trail holding
+     * only the sends that worked cannot answer that.
+     */
+    public function testEverySendIsRecordedInTheAuditTrail(): void
+    {
+        $id = $this->sync();
+
+        $this->dispatcher(new RecordingMailer())
+            ->send($id, 'en', ReportPdfService::FULL, false, 'lab@kch.example');
+
+        try {
+            $this->dispatcher(new RecordingMailer('The mail server refused the message.'))
+                ->send($id, 'en', ReportPdfService::FULL, false, 'lab@kch.example');
+            self::fail('A refused message should not report success.');
+        } catch (MailFailed) {
+            // Expected. What matters is the row it wrote on the way out.
+        }
+
+        $history = $this->dispatcher(new RecordingMailer())->history($id);
+
+        self::assertCount(2, $history);
+        self::assertFalse($history[0]['sent']);
+        self::assertSame('The mail server refused the message.', $history[0]['reason']);
+        self::assertTrue($history[1]['sent']);
+        self::assertSame('lab@kch.example', $history[1]['to']);
+        self::assertSame('Boss', $history[1]['by']);
+    }
+
+    /** A failed send does not leave an unconfirmed address on the registry. */
+    public function testARefusedMessageDoesNotRememberTheAddress(): void
+    {
+        $id = $this->sync();
+
+        try {
+            $this->dispatcher(new RecordingMailer('No.'))
+                ->send($id, 'en', ReportPdfService::FULL, false, 'lab@kch.example', true);
+        } catch (MailFailed) {
+            // Expected.
+        }
+
+        self::assertNull($this->facilityEmail());
+    }
+
+    /**
+     * Reading a report is not sending one.
+     *
+     * A viewer whose whole job is these screens can be trusted with what is in
+     * them without being able to post a laboratory's score to any address they
+     * can type.
+     */
+    public function testAViewerMayNotSendTheReport(): void
+    {
+        $id = $this->sync();
+
+        self::assertSame(
+            403,
+            $this->post(
+                '/api/admin/reports/assessments/' . $id . '/send',
+                ['email' => 'lab@kch.example'],
+                $this->signIn('reader@example.org'),
+            )->getStatusCode(),
+        );
+    }
+
+    /**
+     * An address is not kept by somebody who may not correct the registry.
+     *
+     * `facilities` is shared across the programme, so a contact written here
+     * is the contact every organisation sharing that facility would send to.
+     * Correcting a shared record is `registry.write`, and sending a report is
+     * not.
+     */
+    public function testSendingDoesNotWriteTheRegistryWithoutThePermissionToDoSo(): void
+    {
+        $id = $this->sync();
+
+        $sent = $this->dispatcher(new RecordingMailer())
+            ->send($id, 'en', ReportPdfService::FULL, false, 'lab@kch.example', false);
+
+        self::assertSame('lab@kch.example', $sent['to']);
+        self::assertFalse($sent['remembered']);
+        self::assertNull($this->facilityEmail());
+    }
+
+    /**
+     * The trail says which document went, not merely which variant.
+     *
+     * A full report with the photographs in it and one without are the same
+     * variant and the same filename, and only one of them carries the evidence
+     * a laboratory is being asked to act on.
+     */
+    public function testTheTrailRecordsWhetherThePhotographsWentWithIt(): void
+    {
+        $id = $this->sync();
+
+        $this->dispatcher(new RecordingMailer())
+            ->send($id, 'en', ReportPdfService::FULL, true, 'lab@kch.example');
+
+        $history = $this->dispatcher(new RecordingMailer())->history($id);
+
+        self::assertTrue($history[0]['photographs']);
+    }
+
+    /**
+     * The trail of who mailed a score where is not part of reading a report.
+     *
+     * A contact address, the people who sent it, and whatever a mail server
+     * said belong to whoever may send it again. Hiding the dialog from a
+     * viewer is not the same as not answering with the data behind it.
+     */
+    public function testAViewerIsNotToldWhereTheReportHasBeenSent(): void
+    {
+        $id = $this->sync();
+        $this->setFacilityEmail('manager@kch.example');
+        $this->dispatcher(new RecordingMailer())->send($id);
+
+        $report = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('reader@example.org')),
+        );
+
+        self::assertSame([], $report['sent']);
+        self::assertSame('', $report['recipient']);
+
+        // And an administrator, who may send it again, is told both.
+        $forSender = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('boss@example.org')),
+        );
+
+        self::assertCount(1, $forSender['sent']);
+        self::assertSame('manager@kch.example', $forSender['recipient']);
+    }
+
+    /**
+     * A message the MIME layer refuses is still an attempt.
+     *
+     * A sender's display name and a subject carrying a site's name are both
+     * text somebody typed, and a stray newline in either is refused before the
+     * network is touched. That is the same failure to the person at the screen
+     * and has to reach the trail the same way.
+     */
+    public function testAMessageRefusedBeforeTheNetworkIsStillRecorded(): void
+    {
+        $id = $this->sync();
+
+        TenantContext::withoutScope(function (): void {
+            Capsule::table('system_config')->insertOrIgnore([
+                ['key' => 'smtp.host', 'value' => 'localhost'],
+                ['key' => 'smtp.from_address', 'value' => "reports@example.org\r\nBcc: x@y.z"],
+            ]);
+        });
+
+        $response = $this->post(
+            '/api/admin/reports/assessments/' . $id . '/send',
+            ['email' => 'lab@kch.example'],
+            $this->signIn('boss@example.org'),
+        );
+
+        self::assertSame(502, $response->getStatusCode());
+
+        $history = $this->dispatcher(new RecordingMailer())->history($id);
+
+        self::assertCount(1, $history);
+        self::assertFalse($history[0]['sent']);
+    }
+
+    /**
+     * The trail names the document that went, not the one that was asked for.
+     *
+     * The renderer treats a variant it does not recognise as the full report.
+     * A row recording the unrecognised word beside a full report actually sent
+     * is a row that answers the wrong question a year later.
+     */
+    public function testAnUnknownVariantIsRecordedAsWhatWasActuallySent(): void
+    {
+        $id = $this->sync();
+
+        $sent = $this->dispatcher(new RecordingMailer())
+            ->send($id, 'en', 'action', false, 'lab@kch.example');
+
+        self::assertSame(ReportPdfService::FULL, $sent['variant']);
+        self::assertSame(
+            ReportPdfService::FULL,
+            $this->dispatcher(new RecordingMailer())->history($id)[0]['variant'],
+        );
+    }
+
+    /**
+     * Sending is more than reading, not instead of it.
+     *
+     * A role can be edited to hold one permission and not the other, and a
+     * role holding only the send would be a way to read any report by mailing
+     * it to your own address — which is a read, performed by somebody who has
+     * had the read taken away.
+     */
+    public function testASendOnlyRoleCannotSendEither(): void
+    {
+        $id = $this->sync();
+
+        $this->makeRole('dispatcher', [\App\Auth\Permission::REPORTS_SEND]);
+        $this->makeUser($this->orgId, 'dispatcher@example.org', 'dispatcher');
+
+        self::assertSame(
+            403,
+            $this->post(
+                '/api/admin/reports/assessments/' . $id . '/send',
+                ['email' => 'lab@kch.example'],
+                $this->signIn('dispatcher@example.org'),
+            )->getStatusCode(),
+        );
+    }
+
+    /** The same answer every other route gives another organisation's id. */
+    public function testAPartnerCannotSendTheVisit(): void
+    {
+        $id = $this->sync();
+
+        self::assertSame(
+            404,
+            $this->post(
+                '/api/admin/reports/assessments/' . $id . '/send',
+                ['email' => 'lab@kch.example'],
+                $this->signIn('partner@example.org'),
+            )->getStatusCode(),
+        );
+    }
+
+    /**
+     * An installation with no mail server says so, and records the attempt.
+     *
+     * 502 rather than 500: the request was fine and something it depends on was
+     * not, which is an administrator's problem rather than the problem of
+     * whoever is looking at the dialog.
+     */
+    public function testAnInstallationWithNoMailServerAnswers502AndRecordsIt(): void
+    {
+        $id = $this->sync();
+
+        $response = $this->post(
+            '/api/admin/reports/assessments/' . $id . '/send',
+            ['email' => 'lab@kch.example'],
+            $this->signIn('boss@example.org'),
+        );
+
+        self::assertSame(502, $response->getStatusCode());
+
+        $history = $this->dispatcher(new RecordingMailer())->history($id);
+
+        self::assertCount(1, $history);
+        self::assertFalse($history[0]['sent']);
+        self::assertNull($this->facilityEmail());
+    }
+
+    /** The report carries where it has been, so the screen can say. */
+    public function testTheReportCarriesItsSendHistoryAndTheRecordedAddress(): void
+    {
+        $id = $this->sync();
+        $this->setFacilityEmail('manager@kch.example');
+
+        $this->dispatcher(new RecordingMailer())->send($id);
+
+        $report = $this->body(
+            $this->get('/api/admin/reports/assessments/' . $id, $this->signIn('boss@example.org')),
+        );
+
+        self::assertSame('manager@kch.example', $report['recipient']);
+        self::assertCount(1, $report['sent']);
+        self::assertTrue($report['sent'][0]['sent']);
+    }
+
     public function testAnIdThatIsNotAUuidIsNotAServerError(): void
     {
         self::assertSame(
@@ -1078,6 +1466,35 @@ final class ReportsTest extends TestCase
         ]);
     }
 
+    /**
+     * A role holding exactly what it is given.
+     *
+     * The system roles are seeded from Roles::GRANTS, which is the shape an
+     * organisation starts with rather than the shape it keeps — the roles
+     * screen can add and remove any permission afterwards, and the
+     * combinations it allows are what the route gates have to survive.
+     *
+     * @param list<string> $permissions
+     */
+    private function makeRole(string $key, array $permissions): void
+    {
+        TenantContext::withoutScope(function () use ($key, $permissions): void {
+            $roleId = (int) Capsule::table('roles')->insertGetId([
+                'organization_id' => $this->orgId,
+                'key'             => $key,
+                'name'            => ucfirst($key),
+            ]);
+
+            Capsule::table('role_permissions')->insertOrIgnore(array_map(
+                static fn (string $permission): array => [
+                    'role_id'        => $roleId,
+                    'permission_key' => $permission,
+                ],
+                $permissions,
+            ));
+        });
+    }
+
     private function signIn(string $email): string
     {
         return $this->body(
@@ -1088,6 +1505,58 @@ final class ReportsTest extends TestCase
     private function get(string $path, string $token): ResponseInterface
     {
         return $this->request('GET', $path, [], $token);
+    }
+
+    /** @param array<string,mixed> $payload */
+    private function post(string $path, array $payload, string $token): ResponseInterface
+    {
+        // An empty body still has to be a body: the endpoint reads the parsed
+        // body, and a request carrying none is the "no address given" case.
+        return $this->request('POST', $path, $payload === [] ? ['locale' => 'en'] : $payload, $token);
+    }
+
+    /**
+     * The dispatcher, wired to a mailer that keeps what it is given.
+     *
+     * The tenant context is set here rather than left to whatever the last
+     * request established — the fixture syncs a visit as the assessor, and an
+     * audit row is only worth asserting on if the test decided who the actor
+     * was.
+     */
+    private function dispatcher(RecordingMailer $mailer, string $as = 'boss@example.org'): ReportDispatchService
+    {
+        $userId = TenantContext::withoutScope(fn (): ?int => Capsule::table('users')
+            ->where('email', $as)
+            ->value('id'));
+
+        TenantContext::set(
+            $this->orgId,
+            $userId === null ? null : (int) $userId,
+            true,
+            $this->programmeFor($this->orgId),
+        );
+
+        return new ReportDispatchService(
+            new ReportPdfService(),
+            new ReportService(),
+            $mailer,
+        );
+    }
+
+    private function facilityEmail(): ?string
+    {
+        return TenantContext::withoutScope(fn (): ?string => Capsule::table('facilities')
+            ->where('id', BinaryUuid::toBytes($this->facilityId))
+            ->value('contact_email'));
+    }
+
+    private function setFacilityEmail(string $email): void
+    {
+        TenantContext::withoutScope(function () use ($email): void {
+            Capsule::table('facilities')
+                ->where('id', BinaryUuid::toBytes($this->facilityId))
+                ->update(['contact_email' => $email]);
+        });
     }
 
     /** @param array<string,mixed> $payload */

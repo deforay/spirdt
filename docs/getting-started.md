@@ -6,7 +6,7 @@ Docker needs only Docker and Docker Compose. Everything else needs these install
 
 | | |
 |---|---|
-| PHP | 8.4, with `pdo_mysql`, `intl`, `zip`, `mbstring`, `bcmath` |
+| PHP | 8.4.1 or newer, with `pdo_mysql`, `intl`, `zip`, `mbstring`, `bcmath` |
 | MySQL | 8, reachable over TCP |
 | Composer | any current version |
 | Apache | Option C only, with `mod_php` or `php-fpm` |

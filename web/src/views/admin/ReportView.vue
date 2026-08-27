@@ -23,7 +23,9 @@ import {
 import ReportPhotographs from '@/components/ReportPhotographs.vue'
 import AdminShell from '@/components/admin/AdminShell.vue'
 import PdfDownload from '@/components/admin/PdfDownload.vue'
+import SendReport from '@/components/admin/SendReport.vue'
 import ScoreBadge from '@/components/admin/ScoreBadge.vue'
+import { can, PERMISSION } from '@/auth/permissions'
 import { formatDate, formatPercent, locale, t, type MessageKey } from '@/i18n'
 
 /**
@@ -125,6 +127,9 @@ function roleLabel(role: string | null): string {
 
     return key === undefined ? (role ?? '') : t(key)
 }
+
+/** Reading a report is not sending one, and the two are different grants. */
+const canSend = can(PERMISSION.reportsSend)
 
 const status = computed(() => report.value?.assessment.status ?? '')
 
@@ -393,6 +398,17 @@ onMounted(load)
                     <PhPrinter :size="16" aria-hidden="true" />
                     {{ t('report.print') }}
                 </button>
+
+                <!-- Sending is its own permission, so the control is its own
+                     thing rather than a fourth line in the download menu: a
+                     viewer sees the menu and must not see this. -->
+                <SendReport
+                    v-if="canSend"
+                    :assessment-id="route.params.id as string"
+                    :recipient="report.recipient"
+                    :history="report.sent"
+                    @sent="load"
+                />
 
                 <PdfDownload :assessment-id="route.params.id as string" />
             </div>

@@ -57,8 +57,9 @@ con_print('header', 'SPI-RDT setup');
 
 con_print('step', '[1/5] Prerequisites');
 
-if (PHP_VERSION_ID < 80400) {
-    con_fail('PHP 8.4 or newer is required. Found ' . PHP_VERSION . '.');
+// See bin/preflight: the locked dependencies refuse 8.4.0.
+if (PHP_VERSION_ID < 80401) {
+    con_fail('PHP 8.4.1 or newer is required. Found ' . PHP_VERSION . '.');
 }
 con_print('success', 'PHP ' . PHP_VERSION);
 

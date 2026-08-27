@@ -41,6 +41,16 @@ final class Permission
     /** Read collected assessments and their scores. */
     public const REPORTS_READ = 'reports.read';
 
+    /**
+     * Email a report out of the system, to an address outside it.
+     *
+     * Separate from reading one, because it is not reading. A viewer whose
+     * whole job is these screens can be trusted with what is in them without
+     * being able to send a laboratory's score to any address they can type —
+     * and once a message has left, no permission can call it back.
+     */
+    public const REPORTS_SEND = 'reports.send';
+
     /** Create accounts, change roles, reset passwords, deactivate. */
     public const USERS_MANAGE = 'users.manage';
 
@@ -93,6 +103,7 @@ final class Permission
             self::REGISTRY_WRITE,
             self::ASSIGNMENTS_WRITE,
             self::REPORTS_READ,
+            self::REPORTS_SEND,
             self::USERS_MANAGE,
             self::ROLES_MANAGE,
             self::AUDIT_READ,

@@ -27,6 +27,7 @@ export const PERMISSION = {
     registryWrite: 'registry.write',
     assignmentsWrite: 'assignments.write',
     reportsRead: 'reports.read',
+    reportsSend: 'reports.send',
     usersManage: 'users.manage',
     rolesManage: 'roles.manage',
     auditRead: 'audit.read',

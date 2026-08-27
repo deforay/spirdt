@@ -78,7 +78,8 @@ mounts. Nothing to do beyond building the app and restarting nginx.
 Runs with `mod_php` or with `php-fpm` behind `mod_proxy_fcgi`. Nothing in the
 code depends on the SAPI.
 
-**PHP 8.4 is a hard floor** — `composer.json` requires `^8.4`. On Debian and
+**PHP 8.4.1 is a hard floor** — `composer.json` requires `^8.4.1`, and the
+Symfony components in the lock refuse to install below it. On Debian and
 Ubuntu that means the ondrej PPA, and both now treat `mod_php` as the legacy
 path, so `php8.4-fpm` is the better-supported choice there.
 

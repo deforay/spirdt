@@ -49,11 +49,15 @@ function check(string $label, string $status, string $detail = ''): void
 
 // ─── 1. PHP ───
 
-$phpOk = PHP_VERSION_ID >= 80400;
+// 8.4.1 rather than 8.4.0, and the extra digit is not pedantry: the Symfony
+// components this application locks — the mailer, and the console and process
+// libraries the backup tool brings — refuse to install below it, so 8.4.0 is a
+// version where composer install fails rather than one where anything runs.
+$phpOk = PHP_VERSION_ID >= 80401;
 check(
-    'PHP >= 8.4',
+    'PHP >= 8.4.1',
     $phpOk ? PF_OK : PF_FAIL,
-    PHP_VERSION . ($phpOk ? '' : ' — composer.json requires ^8.4'),
+    PHP_VERSION . ($phpOk ? '' : ' — composer.json requires ^8.4.1'),
 );
 
 // opcache is deliberately NOT required: it is a performance extension, and

@@ -159,6 +159,25 @@ export interface ReportContextField {
     rows: { label: string; value: string }[][]
 }
 
+/**
+ * One attempt to email this report out.
+ *
+ * Read off the audit trail rather than a table of its own, so a failed attempt
+ * is here beside the successful ones — an administrator asked why a laboratory
+ * never got their report needs to see that somebody tried.
+ */
+export interface ReportSend {
+    sent: boolean
+    to: string
+    variant: PdfVariant
+    /** Whether the evidence went with it. Two documents share one variant. */
+    photographs: boolean
+    /** What the mail server said, on an attempt that did not go. */
+    reason: string | null
+    by: string | null
+    at: string
+}
+
 export interface Report {
     assessment: {
         id: string
@@ -206,6 +225,16 @@ export interface Report {
     signatures: ReportSignature[]
     /** Part A, read back through the instrument that asked it. */
     context_fields: ReportContextField[]
+    /**
+     * Every time this report was emailed out, and every time it was not.
+     *
+     * Empty for an account that may read the report without being able to send
+     * it: who mailed a laboratory's score where belongs to whoever may send it
+     * again.
+     */
+    sent: ReportSend[]
+    /** The facility's contact, where a send goes unless somebody says otherwise. */
+    recipient: string
 }
 
 export async function listAssessments(filters: ReportFilters = {}): Promise<Page<AssessmentRow>> {
@@ -303,4 +332,37 @@ export async function downloadAssessmentPdf(
     // Freed on the next tick rather than immediately: revoking while the click
     // is still being handled cancels the download in some browsers.
     setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/**
+ * Email this report to the site it is about.
+ *
+ * The address is optional: without one the facility's recorded contact is
+ * used, and an address given for a facility that has none is kept, so the next
+ * send does not ask again.
+ *
+ * Slower than an ordinary call — a document is rendered and a mail server is
+ * spoken to before anything comes back — so it is given the same room the
+ * download is.
+ */
+export async function sendAssessmentReport(
+    id: string,
+    options: { locale: string; variant: PdfVariant; photographs: boolean; email?: string },
+): Promise<{
+    to: string
+    variant: PdfVariant
+    photographs: boolean
+    filename: string
+    remembered: boolean
+}> {
+    return apiRequest(`/admin/reports/assessments/${encodeURIComponent(id)}/send`, {
+        method: 'POST',
+        body: {
+            locale: options.locale,
+            variant: options.variant,
+            photographs: options.photographs,
+            ...(options.email === undefined ? {} : { email: options.email }),
+        },
+        timeoutMs: 180_000,
+    })
 }

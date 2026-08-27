@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Action\Admin;
 
+use App\Auth\Permission;
+use App\Exception\NoRecipient;
+use App\Mail\MailFailed;
+use App\Service\ReportDispatchService;
 use App\Service\ReportPdfService;
 use App\Service\ReportService;
 use InvalidArgumentException;
@@ -24,6 +28,7 @@ final class ReportsAction
     public function __construct(
         private readonly ReportService $reports = new ReportService(),
         private readonly ReportPdfService $pdfs = new ReportPdfService(),
+        private readonly ReportDispatchService $dispatch = new ReportDispatchService(),
     ) {
     }
 
@@ -69,6 +74,27 @@ final class ReportsAction
             // be distinguishable from outside.
             return $this->json($response, 404, ['error' => ['message' => $e->getMessage()]]);
         }
+
+        // Where it has already been, and where it would go by default. Both
+        // belong with the report rather than behind a second request: the
+        // screen shows them together, and a send history fetched separately is
+        // a screen that renders once saying nothing was ever sent.
+        //
+        // Only for somebody who may send. This is a contact address, a list of
+        // who mailed a laboratory's score where, and whatever a mail server
+        // said about it — which belongs to the person deciding whether to send
+        // it again, not to everybody who may read the report. Hiding the
+        // dialog is not the same as not answering with the data behind it.
+        $facility = is_array($report['assessment']['facility'] ?? null)
+            ? $report['assessment']['facility']
+            : [];
+
+        $maySend = $this->holds($request, Permission::REPORTS_SEND);
+
+        $report['sent'] = $maySend ? $this->dispatch->history((string) ($args['id'] ?? '')) : [];
+        $report['recipient'] = $maySend
+            ? $this->dispatch->recordedEmail((string) ($facility['id'] ?? ''))
+            : '';
 
         return $this->json($response, 200, $report);
     }
@@ -126,6 +152,74 @@ final class ReportsAction
                 'attachment; filename="' . $file['filename'] . '"',
             )
             ->withHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    /**
+     * Email the report to the site it is about.
+     *
+     * The address is the facility's recorded contact unless one is given, and
+     * one given for a facility that has none is kept — the second send should
+     * not have to ask again.
+     *
+     * Three answers, and the difference matters to whoever is looking at the
+     * dialog. 404: no such assessment here. 422: nothing to send to, or what
+     * was typed is not an address — both fixable by the person in front of the
+     * screen. 502: the request was fine and the mail server was not, which is
+     * an administrator's problem rather than theirs.
+     *
+     * @param array<string,string> $args
+     */
+    public function send(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $body = $request->getParsedBody();
+
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        $email = $body['email'] ?? null;
+
+        try {
+            $sent = $this->dispatch->send(
+                (string) ($args['id'] ?? ''),
+                $this->optionalString($body, 'locale') ?? 'en',
+                $this->optionalString($body, 'variant') ?? ReportPdfService::FULL,
+                ($body['photographs'] ?? false) === true,
+                is_string($email) ? $email : null,
+                // Keeping the address is a registry edit, and `facilities` is
+                // shared across the programme: an address remembered by
+                // somebody who may not correct records would become the
+                // contact every organisation sharing that facility sends to.
+                $this->holds($request, Permission::REGISTRY_WRITE),
+            );
+        } catch (NoRecipient $e) {
+            return $this->json($response, 422, ['error' => ['message' => $e->getMessage()]]);
+        } catch (InvalidArgumentException $e) {
+            // The id names nothing this organisation may see. Same answer a
+            // request for another organisation's assessment gets, on purpose.
+            return $this->json($response, 404, ['error' => ['message' => $e->getMessage()]]);
+        } catch (MailFailed $e) {
+            return $this->json($response, 502, ['error' => ['message' => $e->getMessage()]]);
+        }
+
+        return $this->json($response, 200, $sent);
+    }
+
+    /**
+     * Whether this request's account holds a permission.
+     *
+     * Read off the request rather than the database: AuthMiddleware has
+     * already resolved what the token's role carries, and asking again would
+     * be a second answer that could differ from the one the route gates used.
+     */
+    private function holds(ServerRequestInterface $request, string $permission): bool
+    {
+        $held = $request->getAttribute('permissions');
+
+        return is_array($held) && in_array($permission, $held, true);
     }
 
     /** @param array<string,mixed> $query */

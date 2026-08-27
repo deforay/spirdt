@@ -12,6 +12,7 @@
 | Runtime | Apache with mod_php, nginx, Docker Compose, or PHP's own server |
 | Backups | `amitdugar/db-tools` |
 | Report PDFs | `dompdf/dompdf`, rendered from `resources/pdf/report.php` |
+| Mail | `symfony/mailer` over SMTP, configured in Settings |
 
 The API is the product; the UIs are clients. Every capability becomes an endpoint before it becomes a screen.
 
